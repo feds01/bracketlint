@@ -1,6 +1,9 @@
+cargo-features = ["edition2024"]
+
 [package]
 name = "bl_parse"
 version = "0.1.0"
 authors = ["Alexander Fedotov <alexander.fedotov.uk@gmail.com>"]
+edition = "2024"
 
 [dependencies]
