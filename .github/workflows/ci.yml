@@ -1,0 +1,40 @@
+name: Rust
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+
+    env:
+      CARGO_TERM_COLOR: always
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly
+          components: rustfmt
+
+
+      - name: Dependency caching
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates
+      
+      - name: Run tests
+        run: "cargo test --all --verbose"
+
+      - name: Run clippy
+        run: "cargo clippy --all -- -D warnings"
+
+      - name: Check formatting
+        run: "cargo fmt --all -- --check"

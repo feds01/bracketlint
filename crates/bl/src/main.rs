@@ -1,5 +1,3 @@
 //! Entry point of Bracketlint.
 
-fn main() {
-    
-}
+fn main() {}
