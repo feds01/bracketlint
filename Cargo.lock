@@ -3,5 +3,17 @@
 version = 3
 
 [[package]]
+name = "bl_ast"
+version = "0.1.0"
+
+[[package]]
+name = "bl_lints"
+version = "0.1.0"
+
+[[package]]
+name = "bl_parse"
+version = "0.1.0"
+
+[[package]]
 name = "bracketlint"
 version = "0.1.0"

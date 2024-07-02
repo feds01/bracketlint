@@ -1,0 +1,6 @@
+[package]
+name = "bracketlint"
+version = "0.1.0"
+authors = ["Alexander Fedotov <alexander.fedotov.uk@gmail.com>"]
+
+[dependencies]

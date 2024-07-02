@@ -1,6 +1,18 @@
-[package]
-name = "bracketlint"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+members = [
+  "crates/bl*",
+]
 
-[dependencies]
+resolver = "2"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+debug-assertions = false
+overflow-checks = false
+
+# strip any symbols from the executable, this makes backtraces un-readable
+strip = false
+
+# set debug to true when profiling
+debug = false
