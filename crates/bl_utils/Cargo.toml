@@ -5,3 +5,10 @@ name = "bl_utils"
 version = "0.1.0"
 authors = { workspace = true }
 edition = { workspace = true }
+
+[dependencies]
+codespan-reporting = "0.11.1"
+path-absolutize = { workspace = true}
+log = { workspace = true }
+once_cell = { workspace = true }
+clap = { workspace = true }
