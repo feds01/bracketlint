@@ -1,10 +1,23 @@
 //! Library definition of `bl` crate.
 
 #![feature(panic_payload_as_str)]
+
 pub mod cli;
+mod commands;
 mod crash;
+pub(crate) mod version;
+
+use std::{
+    panic,
+    path::{Path, PathBuf},
+    process::ExitCode,
+};
+
 use anyhow::{Ok, Result};
+use bl_lints::settings::FixMode;
 use bl_utils::{logging::ToolLogger, stream::CompilerOutputStream};
+use bl_workspace::settings::Settings;
+use cli::CheckCommand;
 use crash::crash_handler;
 
 #[derive(Copy, Clone)]
@@ -51,7 +64,41 @@ pub fn run(cli::Cli { command }: cli::Cli) -> Result<ExitStatus> {
         cli::Command::Version => version(),
     }
 }
+
+/// Returns the default set of files if none are provided, otherwise returns
+/// `None`.
+fn resolve_default_files(files: Vec<PathBuf>, is_stdin: bool) -> Vec<PathBuf> {
+    if files.is_empty() {
+        if is_stdin {
+            vec![Path::new("-").to_path_buf()]
+        } else {
+            vec![Path::new(".").to_path_buf()]
+        }
+    } else {
+        files
+    }
+}
+
 fn check(args: CheckCommand) -> Result<ExitStatus> {
+    let files = resolve_default_files(args.files, false); // @@Todo: add stdin support.
+
+    // Fix rules are as follows:
+    // - By default, generate all fixes, but don't apply them to the filesystem.
+    // - If `--fix` or `--fix-only` is set, apply applicable fixes to the filesystem
+    //   (or print them to stdout, if we're reading from stdin).
+    // - If `--diff` or `--fix-only` are set, don't print any violations (only
+    //   applicable fixes)
+
+    let fix_mode = if args.diff {
+        FixMode::Diff
+    } else if args.fix {
+        FixMode::Apply
+    } else {
+        FixMode::Generate
+    };
+
+    let settings = Settings::new(args.respect_gitignore, fix_mode);
+    let _messages = commands::check::check(&files, settings)?;
 
     // @@TODO: display the actual diagnostics that were collected.
     Ok(ExitStatus::Success)

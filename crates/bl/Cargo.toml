@@ -7,5 +7,15 @@ authors = { workspace = true }
 edition = { workspace = true }
 
 [dependencies]
+bl_diagnostics = { workspace = true }
+bl_utils = { workspace = true }
+bl_workspace = { workspace = true }
+bl_lints = { workspace = true }
+
 anyhow = { workspace = true }
+argfile = { workspace = true }
 clap = { workspace = true, features = ["derive", "env", "wrap_help"] }
+colored = { workspace = true }
+log = { workspace = true }
+wild = { workspace = true}
+once_cell = { workspace = true }
