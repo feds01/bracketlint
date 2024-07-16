@@ -1,6 +1,9 @@
 //! Defines all of the settings that a [super::Workspace] can hold.
 
 use std::{ops::Deref, path::PathBuf, str::FromStr};
+
+use anyhow::Result;
+use bl_lints::settings::FixMode;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
@@ -8,6 +11,7 @@ pub enum FilePattern {
     Builtin(&'static str),
     User(String, PathBuf),
 }
+
 impl FilePattern {
     pub fn add_to(self, builder: &mut GlobSetBuilder) -> Result<()> {
         match self {
@@ -95,11 +99,18 @@ impl FileResolverSettings {
         }
     }
 }
+
+pub struct LinterSettings {
+    pub fix_mode: FixMode,
+}
+
 pub struct Settings {
     pub respect_gitignore: bool,
 
     /// Settings to do with file exclusions/inclusions.
     pub file_resolver: FileResolverSettings,
+
+    pub linter_settings: LinterSettings,
 }
 
 impl Settings {
@@ -107,6 +118,7 @@ impl Settings {
         Settings {
             respect_gitignore,
             file_resolver: FileResolverSettings::new(),
+            linter_settings: LinterSettings { fix_mode },
         }
     }
 }
