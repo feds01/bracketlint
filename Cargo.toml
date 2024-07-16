@@ -5,6 +5,19 @@ members = [
 
 resolver = "2"
 
+[workspace.package]
+authors = ["Alexander Fedotov <alexander.fedotov.uk@gmail.com>"]
+edition = "2024"
+
+
+[workspace.dependencies]
+bl_ast  = {  path = "crates/bl_ast" }
+bl_diagnostics = { path = "crates/bl_diagnostics" }
+bl_lints = { path = "crates/bl_lints" }
+bl_utils = { path = "crates/bl_utils" }
+bl_workspace = { path = "crates/bl_workspace" }
+
+anyhow = { version = "1.0.80" }
 [profile.release]
 opt-level = 3
 lto = "fat"

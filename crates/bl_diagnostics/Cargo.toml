@@ -1,11 +1,9 @@
 cargo-features = ["edition2024"]
 
 [package]
-name = "bl_ast"
+name = "bl_diagnostics"
 version = "0.1.0"
 authors = { workspace = true }
 edition = { workspace = true }
 
 [dependencies]
-derive_more = { workspace = true }
-line-span = { workspace = true }
