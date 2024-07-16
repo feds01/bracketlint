@@ -42,6 +42,120 @@ impl<'a> Resolver<'a> {
     }
 }
 
+pub fn find_files_in_paths(paths: &[PathBuf], settings: &Settings) -> Result<ResolvedFiles> {
+    // Create a resolver, and then use it to aid in the search for files.
+    let resolver = Resolver::new(settings);
+
+    // Normalize every path (e.g., convert from relative to absolute).
+    let mut paths: Vec<PathBuf> = paths.iter().map(fs::normalize_path).unique().collect();
+
+    // Check if the paths themselves are excluded.
+    if resolver.force_exclude() {
+        paths.retain(|path| !is_file_excluded(path, &resolver));
+        if paths.is_empty() {
+            return Ok(vec![]);
+        }
+    }
+
+    let (first_path, rest_paths) = paths
+        .split_first()
+        .ok_or_else(|| anyhow!("Expected at least one path to search for Python files"))?;
+
+    // Create the `WalkBuilder`.
+    let mut builder = WalkBuilder::new(first_path);
+    for path in rest_paths {
+        builder.add(path);
+    }
+
+    builder.hidden(false);
+    builder.standard_filters(resolver.respect_gitignore());
+
+    builder.threads(
+        std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get).min(12),
+    );
+
+    let walker = builder.build_parallel();
+
+    let state = WalkFilesState::new(resolver);
+    let mut visitor = FilesVisitorBuilder::new(&state);
+    walker.visit(&mut visitor);
+
+    state.finish()
+}
+
+type ResolvedFiles = Vec<Result<ResolvedFile, ignore::Error>>;
+
+pub struct WalkFilesState<'a> {
+    resolver: RwLock<Resolver<'a>>,
+    merged: std::sync::Mutex<(ResolvedFiles, Result<()>)>,
+}
+
+impl<'a> WalkFilesState<'a> {
+    pub fn new(resolver: Resolver<'a>) -> Self {
+        WalkFilesState {
+            resolver: RwLock::new(resolver),
+            merged: std::sync::Mutex::new((Vec::new(), Ok(()))),
+        }
+    }
+
+    fn finish(self) -> Result<ResolvedFiles> {
+        let (files, error) = self.merged.into_inner().unwrap();
+        error?;
+
+        Ok(files)
+    }
+}
+
+struct FilesVisitorBuilder<'s, 'config> {
+    state: &'s WalkFilesState<'config>,
+}
+
+impl<'s, 'config> FilesVisitorBuilder<'s, 'config> {
+    fn new(state: &'s WalkFilesState<'config>) -> Self {
+        FilesVisitorBuilder { state }
+    }
+}
+
+impl<'config, 's> ignore::ParallelVisitorBuilder<'s> for FilesVisitorBuilder<'s, 'config>
+where
+    'config: 's,
+{
+    fn build(&mut self) -> Box<dyn ignore::ParallelVisitor + 's> {
+        Box::new(FilesVisitor { local_files: vec![], local_error: Ok(()), global: self.state })
+    }
+}
+
+pub struct FilesVisitor<'s, 'config> {
+    local_files: Vec<Result<ResolvedFile, ignore::Error>>,
+    local_error: Result<()>,
+    global: &'s WalkFilesState<'config>,
+}
+
+impl<'s, 'config> ignore::ParallelVisitor for FilesVisitor<'s, 'config> {
+    fn visit(&mut self, result: std::result::Result<DirEntry, Error>) -> WalkState {
+
+        WalkState::Continue
+    }
+}
+
+impl Drop for FilesVisitor<'_, '_> {
+    fn drop(&mut self) {
+        let mut merged = self.global.merged.lock().unwrap();
+        let (ref mut files, ref mut error) = &mut *merged;
+
+        if files.is_empty() {
+            *files = std::mem::take(&mut self.local_files);
+        } else {
+            files.append(&mut self.local_files);
+        }
+
+        let local_error = std::mem::replace(&mut self.local_error, Ok(()));
+        if error.is_ok() {
+            *error = local_error;
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ResolvedFile {
     /// File explicitly passed to the CLI
