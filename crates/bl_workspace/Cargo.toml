@@ -5,3 +5,15 @@ name = "bl_workspace"
 version = "0.1.0"
 authors = { workspace = true }
 edition = { workspace = true }
+
+[dependencies]
+bl_ast = { workspace = true }
+bl_utils = { workspace = true }
+bl_lints = { workspace = true }
+
+anyhow = { workspace = true }
+globset = { workspace = true }
+ignore = { workspace = true }
+index_vec = { workspace = true }
+itertools = { workspace = true }
+log = { workspace = true }
