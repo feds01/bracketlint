@@ -1,4 +1,6 @@
 //! Various `bracketlint` utilities.
+
+pub mod fs;
 pub mod highlight;
 pub mod logging;
 pub mod printing;
