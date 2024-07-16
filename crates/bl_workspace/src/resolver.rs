@@ -133,6 +133,58 @@ pub struct FilesVisitor<'s, 'config> {
 
 impl<'s, 'config> ignore::ParallelVisitor for FilesVisitor<'s, 'config> {
     fn visit(&mut self, result: std::result::Result<DirEntry, Error>) -> WalkState {
+        // Respect our own exclusion behaviour.
+        if let Ok(entry) = &result {
+            if entry.depth() > 0 {
+                let path = entry.path();
+                let resolver = self.global.resolver.read().unwrap();
+                let settings = resolver.resolve(path);
+
+                if let Some(file_name) = path.file_name() {
+                    let file_path = Candidate::new(path);
+                    let file_basename = Candidate::new(file_name);
+                    if match_candidate_exclusion(
+                        &file_path,
+                        &file_basename,
+                        &settings.file_resolver.exclude,
+                    ) {
+                        return WalkState::Skip;
+                    }
+                } else {
+                    return WalkState::Skip;
+                }
+            }
+        }
+
+        match result {
+            Ok(entry) => {
+                // Ignore directories
+                let resolved = if entry.file_type().map_or(true, |ft| ft.is_dir()) {
+                    None
+                } else if entry.depth() == 0 {
+                    // Accept all files that are passed-in directly.
+                    Some(ResolvedFile::Root(entry.into_path()))
+                } else {
+                    // Otherwise, check if the file is included.
+                    let path = entry.path();
+                    let resolver = self.global.resolver.read().unwrap();
+                    let settings = resolver.resolve(path);
+
+                    if settings.file_resolver.include.is_match(path) {
+                        Some(ResolvedFile::Nested(entry.into_path()))
+                    } else {
+                        None
+                    }
+                };
+
+                if let Some(resolved) = resolved {
+                    self.local_files.push(Ok(resolved));
+                }
+            }
+            Err(err) => {
+                self.local_files.push(Err(err));
+            }
+        }
 
         WalkState::Continue
     }
@@ -154,6 +206,44 @@ impl Drop for FilesVisitor<'_, '_> {
             *error = local_error;
         }
     }
+}
+
+pub fn match_candidate_exclusion(
+    file_path: &Candidate,
+    file_basename: &Candidate,
+    exclusion: &GlobSet,
+) -> bool {
+    if exclusion.is_empty() {
+        return false;
+    }
+    exclusion.is_match_candidate(file_path) || exclusion.is_match_candidate(file_basename)
+}
+
+pub fn is_file_excluded(path: &Path, resolver: &Resolver) -> bool {
+    for path in path.ancestors() {
+        let settings = resolver.resolve(path);
+        if let Some(file_name) = path.file_name() {
+            let file_path = Candidate::new(path);
+            let file_basename = Candidate::new(file_name);
+            if match_candidate_exclusion(
+                &file_path,
+                &file_basename,
+                &settings.file_resolver.exclude,
+            ) {
+                debug!("Ignored path via `exclude`: {:?}", path);
+                return true;
+            } else if match_candidate_exclusion(
+                &file_path,
+                &file_basename,
+                &settings.file_resolver.user_exclude,
+            ) {
+                return true;
+            }
+        } else {
+            break;
+        }
+    }
+    false
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
