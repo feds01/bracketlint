@@ -7,3 +7,5 @@ authors = { workspace = true }
 edition = { workspace = true }
 
 [dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true, features = ["derive", "env", "wrap_help"] }

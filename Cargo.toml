@@ -18,6 +18,7 @@ bl_utils = { path = "crates/bl_utils" }
 bl_workspace = { path = "crates/bl_workspace" }
 
 anyhow = { version = "1.0.80" }
+clap = { version = "4.5.3", features = ["derive"] }
 [profile.release]
 opt-level = 3
 lto = "fat"
