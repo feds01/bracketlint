@@ -6,6 +6,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
+use bl_macros::define_tree;
 use bl_utils::counter;
 use once_cell::sync::Lazy;
 use parking_lot::{RwLock, RwLockWriteGuard};
@@ -411,5 +412,363 @@ impl<T> Deref for AstNodes<T> {
 impl<T> DerefMut for AstNodes<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.nodes
+    }
+}
+
+define_tree! {
+    opts! {{
+        node_type_name: AstNode,
+        nodes_type_name: AstNodes,
+        visitor_trait_base_name: AstVisitor,
+        visitor_node_ref_base_type_name: AstNodeRef,
+        get_ref_from_node_function_base_name: ast_ref,
+        ref_change_body_function_base_name: with_body,
+        root_module: bl_ast::ast,
+    }}
+
+    #[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
+    #[node]
+    pub enum Op {
+        /// +
+        Add,
+        /// -
+        Sub,
+        /// *
+        Mul,
+        /// /
+        Div,
+        /// %
+        Modulo,
+    }
+
+    /// All logic operators
+    #[derive(Copy, Clone, Debug, PartialEq)]
+    #[node]
+    pub enum BinOp {
+        /// >
+        Gt,
+        /// >=
+        Gte,
+        /// <
+        Lt,
+        /// <=
+        Lte,
+        /// ==
+        Eq,
+        /// !=
+        NotEq,
+        /// `and``
+        And,
+        /// `or`
+        Or,
+        /// `in`
+        In
+    }
+
+    /// Unary operators
+    #[derive(Copy, Clone, Debug, PartialEq)]
+    #[node]
+    pub enum UnaryOp {
+        /// `not`
+        Not,
+        /// -
+        Neg,
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub enum Lit {
+        Bool(bool),
+        Float(f64),
+        Int(i64)
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct LitExpr {
+        lit: Lit
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct ArrayExpr {
+        children: Children!(Expr),
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct BinExpr {
+        lhs: Child!(Expr),
+        rhs: Child!(Expr),
+        op: Child!(BinOp),
+    }
+
+    pub type Identifier = u32;
+
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct Name {
+        data: Identifier
+    }
+
+    /// A path reference, possibly to another file, or a module, i.e. in an `include`
+    /// tag:
+    ///
+    /// ```html
+    /// {% include "file" %}
+    ///            ^^^^^^
+    /// ```
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct Path {
+        data: String
+    }
+
+
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct VarExpr {
+        var: Name,
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct UnaryExpr {
+        op: Child!(UnaryOp),
+        expr: Child!(Expr),
+    }
+
+    /// An argument to a function, filter or a custom taf call.
+    ///
+    /// ##Note: It is an invariant for both `name` and `value` to
+    /// be [`None`] at the same time.
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct Arg {
+        name: OptionalChild!(Name),
+        value: OptionalChild!(Expr),
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct CallExpr {
+        subject: Child!(Expr),
+        args: Children!(Arg),
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct MacroCallExpr {
+        name: Child!(Name),
+        namespace: Child!(Name),
+        args: Children!(Arg),
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct FilteredExpr {
+        subject: Child!(Expr),
+        filters: Children!(CallExpr),
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub enum Expr {
+        Unary(UnaryExpr),
+        Lit(LitExpr),
+        Array(ArrayExpr),
+        Bin(BinExpr),
+        Var(VarExpr),
+        Call(CallExpr),
+        MacroCall(MacroCallExpr),
+        FilteredExpr(FilteredExpr)
+    }
+
+    /// A `block` tag, which can be used to define a block of code that can be
+    /// overridden by a child template.
+    ///
+    /// ```html
+    /// {% block name %}
+    /// {% endblock %}
+    /// ```
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct Block {
+        label: OptionalChild!(Name),
+        children: Children!(Statement),
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct MacroDef {
+        name: Child!(Name),
+        args: Children!(Name),
+        inner: Children!(Statement),
+    }
+
+    /// Directly insert the contents of another file into the current template.
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct Include {
+        path: Child!(Path),
+    }
+
+    /// Extend the current template with the contents of another file.
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct Extends {
+        path: Child!(Path),
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct Import {
+        path: Child!(Path),
+        name: OptionalChild!(Name),
+    }
+
+    /// A tag to set a value in place, i.e.
+    ///
+    /// ```html
+    /// {% set x = 10 %}
+    /// ```
+    ///
+    /// or
+    ///
+    /// ```html
+    /// {% with x = 10 %}
+    /// {% endwith %}
+    /// ```
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct Set {
+        name: Child!(Name),
+        value: Child!(Expr),
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct Super {
+    }
+
+    /// A generic tag, which can be used to represent user specific tags, and built-in tags, like
+    /// `block` or `extends`.
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct Tag {
+        name: Child!(Name),
+        args: Children!(Arg),
+    }
+
+    /// A hunk of text, the [Span] of this node exactly represents the range
+    /// of text that this node represents.
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct Text {
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct Var {
+        identifier: Child!(Name),
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct Body {
+        contents: Children!(Statement),
+    }
+
+    #[derive(Debug, PartialEq, Clone)]
+    #[node]
+    pub struct IfClause {
+        /// The condition of the `if` block.
+        pub condition: Child!(Expr),
+        /// The body of the `if-statement`
+        pub if_body: Child!(Body),
+    }
+
+    /// An `if` block consisting of the condition, block and an optional else clause
+    /// e.g. `{% if x %} ...  {% else %}  y {% endif %}`
+    #[derive(Debug, PartialEq, Clone)]
+    #[node]
+    pub struct If {
+        pub clauses: Children!(IfClause),
+        /// The else clause.
+        pub otherwise: OptionalChild!(Body),
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct For {
+        key: OptionalChild!(Name),
+        value: Child!(Name),
+        loop_body: Child!(Body),
+        loop_empty: OptionalChild!(Body),
+    }
+
+    /// Control flow statement to skip the current iteration of a [`For`] loop.
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct Continue {
+    }
+
+    /// Control flow statement to stop the iteration of a [`For`] loop.
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct Break {
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct Raw {
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct Comment {
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub enum Statement {
+        /// The `{{ super() }}` call in a block tag.
+        Super(Super),
+        /// A hunk of text.
+        Text(Text),
+        /// A interpolated variable `{{ var }}`
+        Var(Var),
+        /// A generic
+        Tag(Tag),
+        /// The `{% block name %}` tag, ending with `{% endblock %}`
+        Block(Block),
+        /// The `{% macro name() %}` tag, ending with `{% endmacro %}`
+        MacroDef(MacroDef),
+        /// The `{% set val = something %}` tag
+        Set(Set),
+        /// The `{% include "file" %}` tag
+        Include(Include),
+        /// The `{% extends "file" %}` tag
+        Extends(Extends),
+        /// The `{% import %}` tag
+        Import(Import),
+        /// The `{% if condition %}` tag
+        If(If),
+        /// The `{% for item in items %}` tag
+        For(For),
+        /// The `{% continue %}` tag
+        Continue(Continue),
+        /// The `{% break %}` tag
+        Break(Break),
+        /// The `{% raw %}` tag, ending with `{% endraw %}`
+        Raw(Raw),
+        /// Comment `{# comment #}` tag.
+        Comment(Comment),
+    }
+
+    #[derive(Debug, Clone, PartialEq)]
+    #[node]
+    pub struct Document {
+        pub children: Children!(Statement),
     }
 }
