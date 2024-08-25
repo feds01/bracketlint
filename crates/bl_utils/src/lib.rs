@@ -1,5 +1,6 @@
 //! Various `bracketlint` utilities.
 
+pub mod counter;
 pub mod fs;
 pub mod highlight;
 pub mod logging;
