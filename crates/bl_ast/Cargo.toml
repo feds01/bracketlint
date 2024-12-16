@@ -13,6 +13,10 @@ bl_macros = { workspace = true }
 derive_more = { workspace = true }
 line-span = { workspace = true }
 thin-vec = { workspace = true }
+index_vec = { workspace = true }
 parking_lot = { workspace = true }
 once_cell = { workspace = true }
 replace_with = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

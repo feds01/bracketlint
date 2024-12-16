@@ -3,10 +3,12 @@ use std::{cmp, fmt};
 
 use derive_more::Constructor;
 use index_vec::Idx;
+use schemars::{self, JsonSchema};
+use serde::{self, Serialize};
 
 pub static SOURCE_COUNT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
 
-#[derive(Debug, Clone, Copy, Constructor, PartialEq, Eq, Hash)]
+#[derive(
     Debug, Clone, Copy, Constructor, PartialEq, Eq, Hash, JsonSchema, Serialize, Ord, PartialOrd,
 )]
 pub struct SourceId(u32);
@@ -31,7 +33,7 @@ impl Idx for SourceId {
 /// The range itself is considered to be inclusive, so ranges such as `0:0`
 /// would include the first byte of the source, and ranges like `0:1` would
 /// include the first two bytes of the source.
-#[derive(Debug, Eq, Hash, Clone, Copy, PartialEq)]
+#[derive(Debug, Eq, Hash, Clone, Copy, PartialEq, JsonSchema, Serialize)]
 pub struct ByteRange(u32, u32);
 
 impl ByteRange {
@@ -118,7 +120,7 @@ impl fmt::Display for ByteRange {
 /// `hash_reporting` crate. Ideally, data structures that need to store
 /// locations of various items should use [ByteRange] and then convert into
 /// [Span]s.
-#[derive(Debug, Clone, Copy, Constructor, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, Constructor, PartialEq, Eq, Hash, JsonSchema, Serialize)]
 pub struct Span {
     /// The associated [ByteRange] with the [Span].
     pub range: ByteRange,

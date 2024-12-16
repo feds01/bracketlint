@@ -1,0 +1,16 @@
+cargo-features = ["edition2024"]
+
+[package]
+name = "bl_reporting"
+version = "0.1.0"
+authors = { workspace = true }
+edition = { workspace = true }
+
+[dependencies]
+bl_ast = { workspace = true }
+
+annotate-snippets = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thin-vec = { workspace = true }
