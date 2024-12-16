@@ -9,18 +9,19 @@ pub mod settings;
 
 use std::{collections::HashMap, path::PathBuf};
 
+use bl_ast::SourceId;
 use bl_lints::settings::FixMode;
 use bl_utils::stream::CompilerOutputStream;
 use index_vec::IndexVec;
-pub use member::{Member, MemberId};
+pub use member::Member;
 use settings::Settings;
 
 #[derive(Default)]
 pub struct WorkspaceMembers {
-    member_map: HashMap<PathBuf, MemberId>,
+    member_map: HashMap<PathBuf, SourceId>,
 
     /// All of the members in the [Workspace].
-    members: IndexVec<MemberId, Member>,
+    members: IndexVec<SourceId, Member>,
 }
 
 impl WorkspaceMembers {
@@ -28,13 +29,16 @@ impl WorkspaceMembers {
         WorkspaceMembers { member_map: HashMap::new(), members: IndexVec::new() }
     }
 
-    pub fn add_member(&mut self, path: PathBuf, member: Member) -> MemberId {
-        let id = self.members.push(member);
+    /// Reserve a member ready for setting its contents after it has completed
+    /// the first stage, i.e. the parsing.
+    pub fn reserve_member(&mut self, path: PathBuf, contents: String) -> SourceId {
+        let id = self.members.push(Member { path: path.clone(), contents, document: None });
         self.member_map.insert(path, id);
+
         id
     }
 
-    fn path_to_id(&self, path: &PathBuf) -> Option<MemberId> {
+    fn path_to_id(&self, path: &PathBuf) -> Option<SourceId> {
         self.member_map.get(path).copied()
     }
 
@@ -44,9 +48,14 @@ impl WorkspaceMembers {
         self.members.get(id)
     }
 
-    /// Get a reference to a member by its [MemberId].
-    pub fn get_member_by_id(&self, id: MemberId) -> Option<&Member> {
+    /// Get a reference to a member by its [SourceId].
+    pub fn get_member_by_id(&self, id: SourceId) -> Option<&Member> {
         self.members.get(id)
+    }
+
+    /// Get a mutable reference to a member by its [SourceId].
+    pub fn get_member_by_id_mut(&mut self, id: SourceId) -> Option<&mut Member> {
+        self.members.get_mut(id)
     }
 }
 

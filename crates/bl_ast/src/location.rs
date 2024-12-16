@@ -2,15 +2,28 @@
 use std::{cmp, fmt};
 
 use derive_more::Constructor;
+use index_vec::Idx;
 
 pub static SOURCE_COUNT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
 
 #[derive(Debug, Clone, Copy, Constructor, PartialEq, Eq, Hash)]
+    Debug, Clone, Copy, Constructor, PartialEq, Eq, Hash, JsonSchema, Serialize, Ord, PartialOrd,
+)]
 pub struct SourceId(u32);
 
-impl SourceId {
-    pub fn default() -> Self {
+impl Default for SourceId {
+    fn default() -> Self {
         SourceId(SOURCE_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst))
+    }
+}
+
+impl Idx for SourceId {
+    fn from_usize(idx: usize) -> Self {
+        SourceId(idx as u32)
+    }
+
+    fn index(self) -> usize {
+        self.0 as usize
     }
 }
 
