@@ -38,6 +38,14 @@ impl WorkspaceMembers {
         id
     }
 
+    pub fn member_mut(&mut self, id: SourceId) -> &mut Member {
+        &mut self.members[id]
+    }
+
+    pub fn member(&self, id: SourceId) -> &Member {
+        &self.members[id]
+    }
+
     fn path_to_id(&self, path: &PathBuf) -> Option<SourceId> {
         self.member_map.get(path).copied()
     }
