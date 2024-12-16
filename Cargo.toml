@@ -16,8 +16,10 @@ bl_diagnostics = { path = "crates/bl_diagnostics" }
 bl_lints = { path = "crates/bl_lints" }
 bl_utils = { path = "crates/bl_utils" }
 bl_macros = { path = "crates/bl_macros" }
+bl_reporting = { path = "crates/bl_reporting" }
 bl_workspace = { path = "crates/bl_workspace" }
 
+annotate-snippets = { version = "0.11.4" }
 anyhow = { version = "1.0.80" }
 argfile = { version = "0.2.0" }
 bitflags = { version = "2.5.0" }
@@ -37,6 +39,9 @@ path-absolutize = "3.1.1"
 proc-macro2 = "1.0.63"
 quote = "1.0"
 replace_with = "0.1.7"
+schemars = { version = "0.8.16", features = ["indexmap1"] }
+serde = { version = "1.0.202", features = ["derive"] }
+serde_json = "1.0.117"
 syn = { version = "1.0", features = ["extra-traits", "full"] }
 thin-vec = "0.2.13"
 wild = { version = "2" }
