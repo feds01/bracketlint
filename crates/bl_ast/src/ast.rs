@@ -665,7 +665,7 @@ define_tree! {
     /// `block` or `extends`.
     #[derive(Clone, Debug, PartialEq)]
     #[node]
-    pub struct Tag {
+    pub struct GenericTag {
         name: Child!(Name),
         args: Children!(Arg),
     }
@@ -741,37 +741,59 @@ define_tree! {
 
     #[derive(Clone, Debug, PartialEq)]
     #[node]
-    pub enum Statement {
-        /// The `{{ super() }}` call in a block tag.
-        Super(Super),
-        /// A hunk of text.
-        Text(Text),
-        /// A interpolated variable `{{ var }}`
-        Var(Var),
+    pub enum Tag {
         /// A generic
-        Tag(Tag),
+        Generic(GenericTag),
+
         /// The `{% block name %}` tag, ending with `{% endblock %}`
         Block(Block),
+
         /// The `{% macro name() %}` tag, ending with `{% endmacro %}`
         MacroDef(MacroDef),
+
         /// The `{% set val = something %}` tag
         Set(Set),
+
         /// The `{% include "file" %}` tag
         Include(Include),
+
         /// The `{% extends "file" %}` tag
         Extends(Extends),
+
         /// The `{% import %}` tag
         Import(Import),
+
         /// The `{% if condition %}` tag
         If(If),
+
         /// The `{% for item in items %}` tag
         For(For),
+
         /// The `{% continue %}` tag
         Continue(Continue),
+
         /// The `{% break %}` tag
         Break(Break),
+
         /// The `{% raw %}` tag, ending with `{% endraw %}`
         Raw(Raw),
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub enum Statement {
+        /// A hunk of text.
+        Text(Text),
+
+        /// A tag `{%  ... <tag> ... %}` which is eventually terminated by a `{% end<tag> %}` tag.
+        Tag(Tag),
+
+        /// The `{{ super() }}` call in a block tag.
+        Super(Super),
+
+        /// A interpolated variable `{{ var }}`
+        Var(Var),
+
         /// Comment `{# comment #}` tag.
         Comment(Comment),
     }
