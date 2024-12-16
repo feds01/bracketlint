@@ -51,9 +51,9 @@ pub fn crash_handler(info: &PanicInfo) {
 
         // Print backtrace and thread name if available
         if let Some(name) = thread::current().name() {
-            let _ = writeln!(&mut stdout, "Backtrace for thread \"{name}\":\n{backtrace:?}");
+            let _ = writeln!(&mut stdout, "Backtrace for thread \"{name}\":\n{backtrace}");
         } else {
-            let _ = writeln!(&mut stdout, "Backtrace:\n{backtrace:?}");
+            let _ = writeln!(&mut stdout, "Backtrace:\n{backtrace}");
         }
 
         let _ = writeln!(
