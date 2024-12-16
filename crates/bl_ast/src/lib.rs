@@ -4,7 +4,7 @@ mod ast;
 mod location;
 
 pub use ast::*;
-pub use location::{ByteRange, Span};
+pub use location::{ByteRange, SourceId, Span, SpannedSource};
 
 pub mod visitor {
     pub use super::ast::{

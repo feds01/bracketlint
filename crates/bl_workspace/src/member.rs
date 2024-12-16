@@ -20,13 +20,11 @@ pub struct Member {
 
 impl Member {
     /// Create a new [Member] with the given contents.
-    pub fn new(path: PathBuf, contents: String) -> Self {
-        Member { path, contents, document: None }
+    pub fn new(
+        path: PathBuf,
+        contents: String,
+        document: Option<ast::AstNode<ast::Document>>,
+    ) -> Self {
+        Member { path, contents, document }
     }
-}
-
-index_vec::define_index_type! {
-    // Define StrIdx to use only 32 bits internally (you can use usize, u16,
-    // and even u8).
-    pub struct MemberId = u32;
 }
