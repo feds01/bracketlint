@@ -1,0 +1,16 @@
+cargo-features = ["edition2024"]
+
+[package]
+name = "bl_lexer"
+version = "0.1.0"
+authors = { workspace = true }
+edition = { workspace = true }
+
+[dependencies]
+logos = "0.14.2"
+derive_more = { workspace = true }
+
+bl_ast = { workspace = true }
+bl_workspace = { workspace = true }
+bl_reporting = { workspace = true }
+thin-vec = { workspace = true }
