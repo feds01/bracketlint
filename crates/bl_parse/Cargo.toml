@@ -7,3 +7,12 @@ authors = { workspace = true }
 edition = { workspace = true }
 
 [dependencies]
+bitflags = { workspace = true}
+crossbeam-channel = { workspace = true }
+derive_more = { workspace = true }
+log = { workspace = true }
+thin-vec = { workspace = true }
+
+bl_ast = { workspace = true }
+bl_lexer = { workspace = true }
+bl_reporting = { workspace = true }
