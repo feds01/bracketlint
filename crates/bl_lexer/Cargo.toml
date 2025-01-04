@@ -7,10 +7,14 @@ authors = { workspace = true }
 edition = { workspace = true }
 
 [dependencies]
-logos = "0.14.2"
 derive_more = { workspace = true }
 
 bl_ast = { workspace = true }
 bl_workspace = { workspace = true }
 bl_reporting = { workspace = true }
+
+num-derive = { workspace = true }
+num-traits = { workspace = true }
+phf = { workspace = true }
+strum_macros = { workspace = true }
 thin-vec = { workspace = true }
