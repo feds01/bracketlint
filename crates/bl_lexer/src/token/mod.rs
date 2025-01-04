@@ -35,7 +35,7 @@ pub enum TokenKind {
     Plus,
     Exclamation,
     Pound,
-    Ident(Identifier),
+    Ident,
     Number,
     Str,
 
