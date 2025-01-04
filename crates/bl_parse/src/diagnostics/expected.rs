@@ -191,7 +191,7 @@ impl From<TokenKind> for ExpectedItem {
             TokenKind::Pound => ExpectedItem::Pound,
             TokenKind::Colon => ExpectedItem::Colon,
             TokenKind::Comma => ExpectedItem::Comma,
-            TokenKind::Ident(_) => ExpectedItem::Ident,
+            TokenKind::Ident => ExpectedItem::Ident,
             _ => unreachable!("unexpected token kind when deriving expected item: {:?}", value),
         }
     }
