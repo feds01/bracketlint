@@ -2,20 +2,11 @@
 //! tokens, including the definitions of the tokens themselves.
 
 pub mod cursor;
+pub mod keywords;
 
 use bl_ast::{ByteRange, Identifier};
 
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
-pub enum Keyword {
-    For,
-    In,
-    If,
-    Elif,
-    Else,
-    Block,
-    Endblock,
-    As,
-}
+pub use keywords::Keyword;
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub enum Delimiter {
