@@ -1,5 +1,5 @@
 //! Hash Compiler source locations utilities and definitions.
-use std::{cmp, fmt};
+use std::{cmp, fmt, ops::Range};
 
 use derive_more::Constructor;
 use index_vec::Idx;
@@ -97,6 +97,12 @@ impl ByteRange {
     /// Convert the [ByteRange] into a [Span].
     pub fn into_span(self, source_id: SourceId) -> Span {
         Span::new(self, source_id)
+    }
+}
+
+impl From<ByteRange> for Range<usize> {
+    fn from(value: ByteRange) -> Self {
+        value.start()..value.end() + 1
     }
 }
 
