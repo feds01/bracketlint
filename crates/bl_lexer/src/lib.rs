@@ -235,7 +235,6 @@ impl<'lex> Lexer<'lex> {
                 c @ (')' | ']') => {
                     info.delimiter = Some(Delimiter::try_from(c).unwrap());
                     self.tree.set(Some(info));
-                    self.skip_ascii();
                     return None;
                 }
                 ch @ ('(' | '[') => {
