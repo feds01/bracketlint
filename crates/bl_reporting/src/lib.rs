@@ -3,6 +3,7 @@
 //! emit arbitrary diagnostics to the user.
 #![feature(decl_macro)]
 
+mod builder;
 pub mod inline;
 mod reporter;
 mod store;
@@ -10,7 +11,8 @@ mod utils;
 
 use annotate_snippets::Level;
 use bl_ast::Span;
-pub use reporter::{ReportBuilder, Reporter};
+pub use builder::ReportBuilder;
+pub use reporter::Reporter;
 use schemars::{self, JsonSchema};
 use serde::{self, Serialize};
 pub use store::*;
