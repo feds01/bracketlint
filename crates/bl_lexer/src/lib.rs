@@ -241,6 +241,37 @@ impl<'lex> Lexer<'lex> {
                 ch @ ('(' | '[') => {
                     return on_tree(self, Delimiter::try_from(ch).unwrap());
                 }
+                c if is_ident_start(c) => self.ident(c),
+                '0'..='9' => self.number(ShouldSkip::No),
+                ':' => TokenKind::Colon,
+                ',' => TokenKind::Comma,
+                '.' => TokenKind::Dot,
+                '=' => match self.peek() {
+                    '=' => {
+                        self.skip_ascii();
+                        TokenKind::EqEq
+                    }
+                    _ => TokenKind::Eq,
+                },
+                '>' => match self.peek() {
+                    '=' => {
+                        self.skip_ascii();
+                        TokenKind::GtEq
+                    }
+                    _ => TokenKind::Gt,
+                },
+                '<' => match self.peek() {
+                    '=' => {
+                        self.skip_ascii();
+                        TokenKind::LtEq
+                    }
+                    _ => TokenKind::Lt,
+                },
+                '-' => match self.peek() {
+                    c if c.is_ascii_digit() => self.number(ShouldSkip::Yes),
+                    _ => TokenKind::Minus,
+                },
+                c @ ('\'' | '"') => self.string(c),
                 c => TokenKind::Unexpected(c),
             }
         } else {
