@@ -321,6 +321,16 @@ impl<'lex> Lexer<'lex> {
         }
     }
 
+    fn comment(&mut self) -> TokenKind {
+        while let Some(c) = self.next() {
+            if c == '#' && self.peek() == '}' {
+                self.skip_ascii();
+                break;
+            }
+        }
+
+        TokenKind::Comment
+    }
 }
 
 fn is_ident_start(c: char) -> bool {
