@@ -1,6 +1,8 @@
 use bl_ast::Span;
 use bl_reporting::{DiagnosticStore, ReportBuilder, Reports};
 
+use crate::token::Delimiter;
+
 #[derive(Debug, Clone, Copy)]
 pub enum LexerErrorKind {
     /// When a string literal is considered to be unclosed.
@@ -17,6 +19,9 @@ pub enum LexerErrorKind {
     /// 1.0e-1.0
     /// ```
     InvalidFloatExponent,
+
+    /// When a token tree is left un-closed without a matching delimiter.
+    Unclosed(Delimiter),
 }
 
 /// The error type for the lexer.
@@ -40,6 +45,11 @@ impl From<LexerError> for Reports {
                 "float exponent to have at least one digit".to_string()
             }
             LexerErrorKind::UnclosedStringLit => "unclosed string literal".to_string(),
+            LexerErrorKind::Unclosed(delim) => format!(
+                "encountered unclosed delimiter `{}`, add a `{}` after the inner expression",
+                delim.left(),
+                delim.right()
+            ),
             LexerErrorKind::InvalidFloatExponent => {
                 "float literal has an invalid exponent".to_string()
             }
