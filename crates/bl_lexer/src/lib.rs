@@ -192,9 +192,13 @@ impl<'lex> Lexer<'lex> {
     }
 
     pub fn advance_token(&mut self) -> Option<Token> {
-        let offset = self.offset.get();
-
+        // First, discard all of the white-space characters that we encounter
+        // before we start lexing the next token.
         self.eat_while_and_discard(char::is_whitespace);
+
+        // Record where the token starts, and then we can start lexing the
+        // token.
+        let offset = self.offset.get();
 
         let on_tree = |this: &mut Self, delimiter: Delimiter| {
             this.tokens.push(Token::new(
