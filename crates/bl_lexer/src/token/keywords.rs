@@ -1,4 +1,4 @@
-//! Hash Compiler token keyword definitions.
+//! Language token keyword definitions.
 use std::fmt;
 
 use num_derive::FromPrimitive;

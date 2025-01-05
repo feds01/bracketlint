@@ -1,4 +1,22 @@
-//! Hash Compiler error and warning reporting module.
+//! Error and warning reporting module. This module provides a way to report
+//! various messages using the colour, and text "modifiers" provided by the
+//! [highlight] module.
+//!
+//! For the most part, this provides a way to `highlight` a message with a
+//! specific colour and text effect, and then report it using the [Reporter]
+//! struct, e.g.:
+//!
+//! ```rust
+//! use bl_reporting::{ReportBuilder, Reports};
+//! use bl_utils::highlight::{highlight, Colour, Modifier};
+//!
+//! let mut reporter = ReportBuilder::default();
+//!
+//! let message = highlight(Colour::Red | Modifier::Bold, "This is a message");
+//!
+//! reporter.error().title(message);
+//! ```
+
 use std::ops::BitOr;
 
 /// Variants of highlighter colour that can be used.

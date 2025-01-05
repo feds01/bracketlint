@@ -8,8 +8,8 @@ pub enum LexerErrorKind {
     /// When a string literal is considered to be unclosed.
     UnclosedStringLit,
 
-    /// When a float literal specifies an exponent, but no digits are provided. i.e.
-    /// ```
+    /// When a float literal specifies an exponent, but no digits are provided.
+    /// i.e. ```
     /// 1.0e
     /// ```
     MissingExponentDigits,
@@ -68,8 +68,7 @@ impl From<LexerError> for Reports {
 
 /// Warning types that can occur from the lexer.
 #[derive(Debug, Clone, Copy)]
-pub enum LexerWarningKind {
-}
+pub enum LexerWarningKind {}
 
 /// The warning type for the lexer.
 #[derive(Debug, Clone, Copy)]
