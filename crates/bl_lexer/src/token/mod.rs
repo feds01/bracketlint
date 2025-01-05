@@ -26,7 +26,8 @@ pub enum Delimiter {
 }
 
 impl Delimiter {
-    pub fn left(&self) -> &'static str {
+    /// Get the left hand side of the delimiter.
+    pub const fn left(&self) -> &'static str {
         match self {
             Delimiter::Paren => "(",
             Delimiter::Percent => "{%",
@@ -35,12 +36,23 @@ impl Delimiter {
         }
     }
 
-    pub fn right(&self) -> &'static str {
+    /// Get the right hand side of the delimiter.
+    pub const fn right(&self) -> &'static str {
         match self {
             Delimiter::Paren => ")",
             Delimiter::Percent => "%}",
             Delimiter::Brace => "}}",
             Delimiter::Bracket => "]",
+        }
+    }
+
+    /// Get the width of the delimiter.
+    pub const fn width(&self) -> usize {
+        match self {
+            // `(`, `)`, `{`, `}`, `[`, `]`
+            Delimiter::Paren | Delimiter::Bracket => 1,
+            // `{%`, `%}`, `{{`, `}}`
+            Delimiter::Percent | Delimiter::Brace => 2,
         }
     }
 }
