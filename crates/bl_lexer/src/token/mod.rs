@@ -29,15 +29,22 @@ pub enum TokenKind {
     Comma,
     Dot,
     Eq,
+    EqEq,
     Gt,
+    GtEq,
     Lt,
+    LtEq,
     Minus,
-    Plus,
     Exclamation,
     Pound,
+    Percent,
     Ident,
     Number,
     Str,
+
+    /// Effectively a hunk of text within the source that isn't tokenised from
+    /// the context of the template.
+    Text,
 
     /// A comment token, a hunk of text that should be structurally
     /// ignored, but preserved when rendering the template.

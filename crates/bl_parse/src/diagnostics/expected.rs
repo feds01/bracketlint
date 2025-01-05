@@ -7,7 +7,7 @@ use std::fmt;
 
 use bitflags::bitflags;
 use bl_lexer::token::{Delimiter, TokenKind};
-use bl_reporting::utils::SequenceDisplay;
+use bl_reporting::SequenceDisplay;
 
 bitflags! {
     /// Defines what expected items could be encountered in a given context.
@@ -185,7 +185,6 @@ impl From<TokenKind> for ExpectedItem {
             TokenKind::Lt => ExpectedItem::Lt,
             TokenKind::Gt => ExpectedItem::Gt,
             TokenKind::Minus => ExpectedItem::Minus,
-            TokenKind::Plus => ExpectedItem::Plus,
             TokenKind::Dot => ExpectedItem::Dot,
             TokenKind::Exclamation => ExpectedItem::Exclamation,
             TokenKind::Pound => ExpectedItem::Pound,
