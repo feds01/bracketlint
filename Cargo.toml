@@ -29,6 +29,7 @@ clap = { version = "4.5.3", features = ["derive"] }
 colored = { version = "2.1.0" }
 convert_case ="0.4"
 crossbeam-channel = "0.5.1"
+dashmap = "5.1"
 derive_more = "0.99.18"
 globset = "0.4.14"
 ignore = "0.4.22"

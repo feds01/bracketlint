@@ -12,11 +12,13 @@ bl_utils = { workspace = true }
 bl_lints = { workspace = true }
 
 anyhow = { workspace = true }
+dashmap = { workspace = true }
 globset = { workspace = true }
 ignore = { workspace = true }
 index_vec = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
+parking_lot = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

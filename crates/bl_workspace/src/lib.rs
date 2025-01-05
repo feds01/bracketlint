@@ -9,7 +9,7 @@ pub mod settings;
 
 use std::{collections::HashMap, path::PathBuf};
 
-use bl_ast::SourceId;
+use bl_ast::{HasSource, SourceId};
 use bl_lints::settings::FixMode;
 use bl_utils::stream::CompilerOutputStream;
 use index_vec::IndexVec;
@@ -67,6 +67,16 @@ impl WorkspaceMembers {
     }
 }
 
+impl HasSource for WorkspaceMembers {
+    fn contents(&self, source: SourceId) -> &str {
+        self.members[source].contents()
+    }
+
+    fn path(&self, source: SourceId) -> &str {
+        self.members[source].path.to_str().unwrap()
+    }
+}
+
 pub struct Workspace {
     /// The [CompilerOutputStream] for `standard output`.
     pub stdout: CompilerOutputStream,
@@ -82,6 +92,16 @@ pub struct Workspace {
 }
 
 impl Workspace {}
+
+impl HasSource for Workspace {
+    fn contents(&self, source: SourceId) -> &str {
+        self.members.contents(source)
+    }
+
+    fn path(&self, source: SourceId) -> &str {
+        self.members.path(source)
+    }
+}
 
 #[derive(Default)]
 pub struct WorkspaceBuilder {
