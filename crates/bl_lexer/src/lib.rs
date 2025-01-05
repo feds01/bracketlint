@@ -46,6 +46,8 @@ pub struct Lexer<'lex> {
     /// Diagnostics that the lexer has produced.
     pub diagnostics: LexerDiagnostics,
 
+    pub has_fatal_error: bool,
+
     /// The tokens that the lexer has produced.
     pub tokens: Vec<Token>,
 }
@@ -57,8 +59,27 @@ impl<'lex> Lexer<'lex> {
             id,
             diagnostics: LexerDiagnostics::default(),
             tokens: Vec::new(),
+            has_fatal_error: false,
             offset: Cell::new(0),
         }
+    }
+
+    /// Emit an error into [LexerDiagnostics] and also
+    /// set `has_fatal_error` flag to true so that the
+    /// lexer terminates on the next advancement.
+    #[inline]
+    fn emit_fatal_error(&mut self, kind: LexerErrorKind, span: ByteRange) -> TokenKind {
+        self.has_fatal_error = true;
+        self.emit_error(kind, span)
+    }
+
+    /// Put an error into the [LexerDiagnostics], whilst returning a
+    /// [TokenKind::Err] in place of a lexed token.
+    #[inline]
+    fn emit_error(&mut self, kind: LexerErrorKind, span: ByteRange) -> TokenKind {
+        self.diagnostics.add_error(LexerError { kind, span: Span { range: span, id: self.id } });
+
+        TokenKind::Err
     }
 
 
