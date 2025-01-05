@@ -15,6 +15,18 @@ use token::{Delimiter, Keyword, Token, TokenKind};
 /// 'prev' in a [Lexer] since there is no character before the start.
 const EOF_CHAR: char = '\0';
 
+/// Information about a tree that is being lexed by the [Lexer]. Includes
+/// information about the start of the lexer (in the token buffer), and if the
+/// lexer consumed a delimiter token.
+#[derive(Clone, Copy, Debug)]
+struct TreeInfo {
+    /// An index into the stream of tokens, pointing to where the tree begins.
+    start: usize,
+
+    /// The kind of [Delimiter] that the tree is.
+    delimiter: Option<Delimiter>,
+}
+
 enum ShouldSkip {
     Yes,
     No,
@@ -54,6 +66,8 @@ pub struct Lexer<'lex> {
 
     pub has_fatal_error: bool,
 
+    tree: Cell<Option<TreeInfo>>,
+
     /// The tokens that the lexer has produced.
     pub tokens: Vec<Token>,
 }
@@ -66,6 +80,7 @@ impl<'lex> Lexer<'lex> {
             diagnostics: LexerDiagnostics::default(),
             tokens: Vec::new(),
             has_fatal_error: false,
+            tree: Cell::new(None),
             offset: Cell::new(0),
         }
     }
@@ -180,9 +195,145 @@ impl<'lex> Lexer<'lex> {
         let offset = self.offset.get();
 
         self.eat_while_and_discard(char::is_whitespace);
+
+        let on_tree = |this: &mut Self, delimiter: Delimiter| {
+            this.tokens.push(Token::new(
+                TokenKind::Tree(delimiter, 0),
+                ByteRange::new(offset, this.len_consumed()),
+            ));
+            this.eat_token_tree(delimiter);
+
+            if this.has_fatal_error {
+                return None;
+            }
+
+            // Immediately try to index the next token...
+            this.advance_token()
+        };
+
+        let kind = if let Some(mut info) = self.tree.get() {
+            match self.next()? {
+                '%' => match self.peek() {
+                    '}' => {
+                        info.delimiter = Some(Delimiter::Percent);
+                        self.tree.set(Some(info));
+
+                        self.skip_ascii();
+                        return None;
+                    }
+                    _ => TokenKind::Percent,
+                },
+                '}' => match self.peek() {
+                    '}' => {
+                        info.delimiter = Some(Delimiter::Brace);
+                        self.tree.set(Some(info));
+                        self.skip_ascii();
+                        return None;
+                    }
+                    _ => TokenKind::RightDelim(Delimiter::Brace),
+                },
+                c @ (')' | ']') => {
+                    info.delimiter = Some(Delimiter::try_from(c).unwrap());
+                    self.tree.set(Some(info));
+                    self.skip_ascii();
+                    return None;
+                }
+                ch @ ('(' | '[') => {
+                    return on_tree(self, Delimiter::try_from(ch).unwrap());
+                }
+                c => TokenKind::Unexpected(c),
+            }
+        } else {
+            match self.next()? {
+                '{' => {
+                    // we need to handle whether this a variable block, we have a few options:
+                    //
+                    // 1. We have a variable block, which is `{{ ... }}`
+                    // 2. We have a function block, which is `{% ... %}`
+                    // 3. We have a comment block, which is `{# ... #}`
+                    match self.peek() {
+                        c @ ('%' | '{') => {
+                            self.skip_ascii();
+
+                            let delimiter =
+                                if c == '%' { Delimiter::Percent } else { Delimiter::Brace };
+                            return on_tree(self, delimiter);
+                        }
+                        '#' => {
+                            self.skip_ascii();
+                            self.comment()
+                        }
+                        _ => self.text(),
+                    }
+                }
+                // We assume that this is just "text"
+                _ => self.text(),
+            }
+        };
+
         // If we reach here, that means we can return a token.
         let location = ByteRange::new(offset, self.len_consumed());
         Some(Token::new(kind, location))
+    }
+
+    /// This will essentially recursively consume tokens until it reaches the
+    /// right hand-side variant of the provided delimiter. If no delimiter
+    /// is reached, but the stream has reached EOF, this is reported
+    /// as an error because it is essentially an un-closed block. This kind of
+    /// behaviour is desired and avoids performing complex delimiter depth
+    /// analysis later on.
+    fn eat_token_tree(&mut self, delimiter: Delimiter) -> TokenKind {
+        let delim_offset = self.offset.get() - 2; // we need to ge the previous location to accurately denote the error...
+
+        // we need to reset self.prev here as it might be polluted with previous token
+        // trees
+        let tree = Cell::new(Some(TreeInfo { start: self.tokens.len(), delimiter: None }));
+        self.tree.swap(&tree);
+
+        // `None` here doesn't just mean EOF, it could also be that
+        // the next token failed to be parsed.
+        while !self.is_eof() {
+            match self.advance_token() {
+                Some(token) => self.tokens.push(token),
+                None => break,
+            }
+        }
+
+        // ##Note: Now that we have done parsing the inner tree (with or without error),
+        // we want to put the `old` tree value back into `self.tree`, and
+        // retrieve the one that we were working with. Beyond this point,
+        // everyone should refer to `tree`, not `self.tree` since this is now
+        // the old one.
+        self.tree.swap(&tree);
+
+        // If there is a fatal error, then we need to abort
+        if self.has_fatal_error {
+            return TokenKind::Err;
+        }
+
+        match tree.get() {
+            Some(TreeInfo { delimiter: Some(d), start, .. }) if d == delimiter => {
+                // Update the tree token with the length of the tree.
+                self.tokens[start - 1] = Token::new(
+                    TokenKind::Tree(delimiter, (self.tokens.len() - start) as u32),
+                    ByteRange::new(delim_offset, self.len_consumed()),
+                );
+
+                // ##Hack: This token won't be put into the token stream, it's just
+                // a dummy token to denote the end of the tree.
+                TokenKind::RightDelim(delimiter)
+            }
+            _ => {
+                // backtrack a single token, so that if other trees exist, they can
+                // still be properly handled.
+                self.offset.set(self.offset.get() - 1);
+
+                self.emit_error(
+                    LexerErrorKind::Unclosed(delimiter),
+                    ByteRange::singleton(delim_offset),
+                )
+            }
+        }
     }
 
     /// Consume the lexer and produce a stream of tokens.
