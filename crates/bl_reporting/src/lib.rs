@@ -3,6 +3,7 @@
 //! emit arbitrary diagnostics to the user.
 #![feature(decl_macro)]
 
+pub mod inline;
 mod reporter;
 mod store;
 mod utils;
