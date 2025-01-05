@@ -5,7 +5,7 @@ pub(crate) mod error;
 pub(crate) mod expected;
 pub(crate) mod warning;
 
-use bl_reporting::store::{DiagnosticStore, DiagnosticsMut, HasDiagnosticsMut};
+use bl_reporting::{DiagnosticStore, DiagnosticsMut, HasDiagnosticsMut};
 
 use self::{error::ParseError, warning::ParseWarning};
 use crate::parser::Parser;

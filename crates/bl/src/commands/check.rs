@@ -5,7 +5,7 @@ use std::{fs, path::PathBuf};
 use anyhow::Result;
 use bl_diagnostics::Diagnostics;
 use bl_parse::{parse_source, ParseQuery, ParseResult};
-use bl_reporting::{default_renderer, ReportWriter};
+use bl_reporting::Reporter;
 use bl_utils::{stream::CompilerOutputStream, timed};
 use bl_workspace::{resolver::find_files_in_paths, settings::Settings, WorkspaceBuilder};
 use log::info;

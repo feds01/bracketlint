@@ -3,14 +3,14 @@
 //! emit arbitrary diagnostics to the user.
 #![feature(decl_macro)]
 
-pub mod store;
-pub mod utils;
-
-use std::fmt;
+mod store;
+mod utils;
 
 use bl_ast::Span;
 use schemars::{self, JsonSchema};
 use serde::{self, Serialize};
+pub use store::*;
+pub use utils::*;
 
 /// An alias for a collection of [Report]s.
 pub type Reports = Vec<Report>;

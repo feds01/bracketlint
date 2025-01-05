@@ -2,7 +2,7 @@
 
 use bl_ast::{AstNode, Document, LocalSpanMap, SourceId, SpanMap, SpannedSource};
 use bl_lexer::{Lexer, LexerMetadata};
-use bl_reporting::{store::DiagnosticsMut, Report, Reports};
+use bl_reporting::{DiagnosticsMut, Report, Reports};
 use diagnostics::ParserDiagnostics;
 use parser::Parser;
 

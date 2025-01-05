@@ -1,4 +1,4 @@
-use bl_reporting::{store::DiagnosticStore, Reports};
+use bl_reporting::{DiagnosticStore, ReportBuilder, Reports};
 
 /// The error type for the lexer.
 #[derive(Debug, Clone, Copy)]
