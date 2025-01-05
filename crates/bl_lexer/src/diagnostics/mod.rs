@@ -6,15 +6,26 @@ pub enum LexerErrorKind {
     /// When a string literal is considered to be unclosed.
     UnclosedStringLit,
 
+    /// When a float literal specifies an exponent, but no digits are provided. i.e.
+    /// ```
+    /// 1.0e
+    /// ```
     MissingExponentDigits,
 
+    /// When a float literal specifies an invalid exponent. i.e.
+    /// ```
+    /// 1.0e-1.0
+    /// ```
     InvalidFloatExponent,
 }
 
 /// The error type for the lexer.
 #[derive(Debug, Clone, Copy)]
 pub struct LexerError {
+    /// The kind of the error.
     pub kind: LexerErrorKind,
+
+    /// The span of the error.
     pub span: Span,
 }
 
@@ -45,8 +56,20 @@ impl From<LexerError> for Reports {
     }
 }
 
+/// Warning types that can occur from the lexer.
 #[derive(Debug, Clone, Copy)]
-pub struct LexerWarning {}
+pub enum LexerWarningKind {
+}
+
+/// The warning type for the lexer.
+#[derive(Debug, Clone, Copy)]
+pub struct LexerWarning {
+    /// The kind of the warning.
+    pub kind: LexerWarningKind,
+
+    /// The span of the warning.
+    pub span: Span,
+}
 
 impl From<LexerWarning> for Reports {
     fn from(_: LexerWarning) -> Self {
@@ -54,6 +77,8 @@ impl From<LexerWarning> for Reports {
     }
 }
 
+/// The diagnostics store for the lexer.
 pub type LexerDiagnostics = DiagnosticStore<LexerError, LexerWarning>;
 
+/// The result type for the lexer.
 pub type LexerResult<T> = Result<T, LexerError>;
