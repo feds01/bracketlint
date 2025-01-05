@@ -8,7 +8,6 @@ pub mod utils;
 
 use std::fmt;
 
-use annotate_snippets::{Level, Renderer};
 use bl_ast::Span;
 use schemars::{self, JsonSchema};
 use serde::{self, Serialize};
@@ -235,38 +234,4 @@ impl Default for Report {
             contents: vec![],
         }
     }
-}
-
-pub struct ReportWriter<'a> {
-    renderer: &'a Renderer,
-    report: &'a Report,
-}
-
-impl<'a> ReportWriter<'a> {
-    pub fn new(renderer: &'a Renderer, report: &'a Report) -> Self {
-        Self { renderer, report }
-    }
-}
-
-impl fmt::Display for ReportWriter<'_> {
-    /// Essentially, this function will take a given `Report` and convert
-    /// into the `annotate_snippets::Message` type. This is useful for
-    /// rendering the report in a human-readable format.
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let ReportWriter { renderer, report } = self;
-
-        let mut message = match report.kind {
-            ReportKind::Internal | ReportKind::Error => Level::Error.title(&report.title),
-            ReportKind::Info => Level::Info.title(&report.title),
-            ReportKind::Warning => Level::Warning.title(&report.title),
-        };
-
-        message = message.id(report.error_code.as_deref().unwrap_or(""));
-        writeln!(f, "{}", renderer.render(message))
-    }
-}
-
-/// Return the default renderer for the reports.
-pub fn default_renderer() -> Renderer {
-    Renderer::styled()
 }
