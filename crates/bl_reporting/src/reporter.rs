@@ -1,59 +1,25 @@
-//! A diagnostic reporter for the Hash compiler.
-//!
-//! Has a fluent API for creating reports in a declarative way.
+//! Definitions for a diagnostic [Reporter] for the Bracketlint. [Reporter]
+//! provides the necessary context for a [Report] to be rendered in a
+//! human-readable format. This is done via the [annotate_snippets] crate and
+//! its API.
+
 use std::fmt;
 
 use annotate_snippets::{Level, Renderer, Snippet};
 use bl_ast::HasSource;
-use derive_more::Constructor;
 
-use crate::{Report, ReportCodeBlock, ReportElement, ReportKind, Reports};
-
-#[derive(Debug, Constructor, Default)]
-pub struct ReportBuilder {
-    reports: Reports,
-}
-
-impl ReportBuilder {
-    /// Add a report to the builder.
-    pub fn report(&mut self, kind: ReportKind) -> &mut Report {
-        let mut report = Report::new();
-        report.kind(kind);
-        self.reports.push(report);
-        self.reports.last_mut().unwrap()
-    }
-
-    /// Add an error report to the builder.
-    pub fn error(&mut self) -> &mut Report {
-        self.report(ReportKind::Error)
-    }
-
-    /// Add an info report to the builder.
-    pub fn info(&mut self) -> &mut Report {
-        self.report(ReportKind::Info)
-    }
-
-    /// Add a warning report to the builder.
-    pub fn warning(&mut self) -> &mut Report {
-        self.report(ReportKind::Warning)
-    }
-
-    /// Add an internal report to the builder.
-    pub fn internal(&mut self) -> &mut Report {
-        self.report(ReportKind::Internal)
-    }
-
-    /// Consume the [`Reporter`], producing a [`Vec<Report>`].
-    pub fn into_reports(self) -> Reports {
-        self.reports
-    }
-}
+use crate::{Report, ReportCodeBlock, ReportElement, Reports};
 
 /// Facilitates the creation of lists of [Report]s in a declarative way.
 #[derive(Debug)]
 pub struct Reporter<'a, S: HasSource> {
+    /// The renderer that the reporter will use to render the reports.
     renderer: Option<&'a Renderer>,
+
+    /// The list of reports that the reporter will render.
     reports: Reports,
+
+    /// The source map that the reporter will use to access source information.
     sources: &'a S,
 }
 
