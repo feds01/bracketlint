@@ -1,8 +1,16 @@
+use bl_ast::Span;
 use bl_reporting::{DiagnosticStore, ReportBuilder, Reports};
+
+#[derive(Debug, Clone, Copy)]
+pub enum LexerErrorKind {
+}
 
 /// The error type for the lexer.
 #[derive(Debug, Clone, Copy)]
-pub enum LexerError {}
+pub struct LexerError {
+    pub kind: LexerErrorKind,
+    pub span: Span,
+}
 
 impl From<LexerError> for Reports {
     fn from(_: LexerError) -> Self {
@@ -11,7 +19,7 @@ impl From<LexerError> for Reports {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum LexerWarning {}
+pub struct LexerWarning {}
 
 impl From<LexerWarning> for Reports {
     fn from(_: LexerWarning) -> Self {
@@ -20,3 +28,5 @@ impl From<LexerWarning> for Reports {
 }
 
 pub type LexerDiagnostics = DiagnosticStore<LexerError, LexerWarning>;
+
+pub type LexerResult<T> = Result<T, LexerError>;
