@@ -4,8 +4,10 @@
 pub mod cursor;
 pub mod keywords;
 
-use bl_ast::{ByteRange, Identifier};
+use core::fmt;
 
+use bl_ast::ByteRange;
+use derive_more::Constructor;
 pub use keywords::Keyword;
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
@@ -21,6 +23,39 @@ pub enum Delimiter {
 
     /// Bracket, `[` or `]`
     Bracket,
+}
+
+impl Delimiter {
+    pub fn left(&self) -> &'static str {
+        match self {
+            Delimiter::Paren => "(",
+            Delimiter::Percent => "{%",
+            Delimiter::Brace => "{{",
+            Delimiter::Bracket => "[",
+        }
+    }
+
+    pub fn right(&self) -> &'static str {
+        match self {
+            Delimiter::Paren => ")",
+            Delimiter::Percent => "%}",
+            Delimiter::Brace => "}}",
+            Delimiter::Bracket => "]",
+        }
+    }
+}
+
+impl TryFrom<char> for Delimiter {
+    type Error = ();
+
+    fn try_from(c: char) -> Result<Delimiter, Self::Error> {
+        match c {
+            '(' | ')' => Ok(Delimiter::Paren),
+            '{' | '}' => Ok(Delimiter::Brace),
+            '[' | ']' => Ok(Delimiter::Bracket),
+            _ => Err(()),
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -73,7 +108,39 @@ pub enum TokenKind {
     Err,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+impl fmt::Display for TokenKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TokenKind::Eq => write!(f, "="),
+            TokenKind::EqEq => write!(f, "=="),
+            TokenKind::Lt => write!(f, "<"),
+            TokenKind::LtEq => write!(f, "<="),
+            TokenKind::Gt => write!(f, ">"),
+            TokenKind::GtEq => write!(f, ">="),
+            TokenKind::Minus => write!(f, "-"),
+            TokenKind::Percent => write!(f, "%"),
+            TokenKind::Exclamation => write!(f, "!"),
+            TokenKind::Dot => write!(f, "."),
+            TokenKind::Colon => write!(f, ":"),
+            TokenKind::Pound => write!(f, "#"),
+            TokenKind::Comma => write!(f, ","),
+            TokenKind::LeftDelim(delim) => write!(f, "{}", delim.left()),
+            TokenKind::RightDelim(delim) => write!(f, "{}", delim.right()),
+            TokenKind::Tree(delim, _) => write!(f, "{}...{}", delim.left(), delim.right()),
+            TokenKind::Str => write!(f, "<string>"),
+            TokenKind::Keyword(kwd) => kwd.fmt(f),
+            TokenKind::Ident => write!(f, "<identifier>"),
+            TokenKind::Number => write!(f, "<number>"),
+            TokenKind::Text => write!(f, "<text>"),
+            TokenKind::Comment => write!(f, "<comment>"),
+
+            TokenKind::Unexpected(atom) => write!(f, "{atom}"),
+            TokenKind::Err => write!(f, "<error>"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Constructor)]
 pub struct Token {
     /// The kind of token.
     pub kind: TokenKind,
