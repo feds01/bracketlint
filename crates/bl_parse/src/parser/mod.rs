@@ -173,9 +173,9 @@ impl<'s> Parser<'s> {
     }
 
     pub fn parse_document(&mut self) -> AstNode<Document> {
-        if self.options.recovery {
-            log::info!("recovery mode enabled");
-        }
+        // if self.options.recovery {
+        //     log::info!("recovery mode enabled");
+        // }
 
         let start = self.current_pos();
         let children = thin_vec![];
