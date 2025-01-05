@@ -3,10 +3,13 @@
 //! emit arbitrary diagnostics to the user.
 #![feature(decl_macro)]
 
+mod reporter;
 mod store;
 mod utils;
 
+use annotate_snippets::Level;
 use bl_ast::Span;
+pub use reporter::{ReportBuilder, Reporter};
 use schemars::{self, JsonSchema};
 use serde::{self, Serialize};
 pub use store::*;
@@ -29,6 +32,16 @@ pub enum ReportKind {
     Warning,
     // This is an internal compiler error.
     Internal,
+}
+
+impl From<ReportKind> for Level {
+    fn from(kind: ReportKind) -> Self {
+        match kind {
+            ReportKind::Info => Level::Info,
+            ReportKind::Warning => Level::Warning,
+            ReportKind::Error | ReportKind::Internal => Level::Error,
+        }
+    }
 }
 
 /// The kind of [ReportNote], this is primarily used for rendering the label of
