@@ -248,6 +248,25 @@ impl<'lex> Lexer<'lex> {
     fn eat_decimal_digits(&self, radix: u32) -> &str {
         self.eat_while_and_slice(move |c| c.is_digit(radix))
     }
+
+    fn text(&mut self) -> TokenKind {
+        // keep eating until we find a delimiter
+        while let Some(c) = self.next() {
+            match c {
+                '{' => match self.peek() {
+                    '%' | '{' => {
+                        self.offset.update(|x| x - 1);
+                        break;
+                    }
+                    _ => continue,
+                },
+                _ => continue,
+            }
+        }
+
+        TokenKind::Text
+    }
+
     fn string(&mut self, start: char) -> TokenKind {
         let is_double = start == '"';
         let mut closed = false;
