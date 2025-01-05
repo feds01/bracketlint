@@ -4,7 +4,7 @@
 
 use std::path::PathBuf;
 
-use bl_ast as ast;
+use bl_ast::{self as ast, SourceId, TempSourceMap};
 
 #[derive(Clone)]
 pub struct Member {
@@ -26,5 +26,24 @@ impl Member {
         document: Option<ast::AstNode<ast::Document>>,
     ) -> Self {
         Member { path, contents, document }
+    }
+
+    pub fn contents(&self) -> &str {
+        &self.contents
+    }
+
+    pub fn with_id(&self, id: SourceId) -> MemberWithId<'_> {
+        MemberWithId(id, self)
+    }
+}
+
+pub struct MemberWithId<'a>(SourceId, &'a Member);
+
+impl From<MemberWithId<'_>> for TempSourceMap {
+    fn from(entry: MemberWithId) -> Self {
+        let MemberWithId(id, member) = entry;
+        let mut map = TempSourceMap::new();
+        map.add(id, member.path.clone(), member.contents.clone());
+        map
     }
 }
