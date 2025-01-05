@@ -14,6 +14,12 @@ use token::{Delimiter, Keyword, Token, TokenKind};
 /// Representing the end of stream, or the initial character that is set as
 /// 'prev' in a [Lexer] since there is no character before the start.
 const EOF_CHAR: char = '\0';
+
+enum ShouldSkip {
+    Yes,
+    No,
+}
+
 /// Metadata that the lexer produces once it finished processing the given
 /// input.
 pub struct LexerMetadata {
@@ -153,6 +159,23 @@ impl<'lex> Lexer<'lex> {
         self.offset.update(|x| x + index);
     }
 
+    /// Eat while the condition holds, and produces a slice from where it began
+    /// to eat the input and where it finished, this is sometimes beneficial
+    /// as the slice doesn't have to be re-allocated as a string.
+    fn eat_while_and_slice(&self, condition: impl FnMut(char) -> bool) -> &str {
+        if self.is_eof() {
+            return "";
+        }
+
+        // Capture the range of the slice, and then finally update the offset
+        let start = self.offset.get();
+        self.eat_while_and_discard(condition);
+        let consumed = self.offset.get();
+        let end = if consumed == start { start } else { consumed - 1 };
+
+        self.source.hunk(ByteRange::new(start, end))
+    }
+
     pub fn advance_token(&mut self) -> Option<Token> {
         let offset = self.offset.get();
 
@@ -171,6 +194,60 @@ impl<'lex> Lexer<'lex> {
         LexerMetadata { tokens: self.tokens, diagnostics: self.diagnostics }
     }
 
+    fn number(&mut self, skip: ShouldSkip) -> TokenKind {
+        // record the start location of the literal
+        let start = self.offset.get() - (skip as usize);
+
+        // If we didn't get a radix, then we eat all the digits that we can, and then
+        // check if it is a float literal.
+        self.eat_while_and_slice(move |c| c.is_ascii_digit());
+
+        match self.peek() {
+            '.' if !is_ident_start(self.peek_second()) => {
+                self.skip_ascii();
+                self.eat_while_and_slice(move |c| c.is_ascii_digit());
+                self.eat_float_lit(start)
+            }
+            // Immediate exponent
+            'e' | 'E' => self.eat_float_lit(start),
+            _ => TokenKind::Number,
+        }
+    }
+
+    fn eat_float_lit(&mut self, start: usize) -> TokenKind {
+        if !matches!(self.peek(), 'e' | 'E') {
+            return TokenKind::Number;
+        }
+
+        self.skip_ascii(); // consume the exponent
+
+        // Check if there is a sign before the digits start in the exponent...
+        if self.peek() == '-' {
+            self.skip_ascii();
+        };
+
+        // Check that there is at least on digit in the exponent
+        if self.peek() == EOF_CHAR {
+            return self.emit_error(
+                LexerErrorKind::MissingExponentDigits,
+                ByteRange::new(start, self.len_consumed()),
+            );
+        }
+
+        if self.eat_decimal_digits(10).parse::<i32>().is_err() {
+            self.emit_error(
+                LexerErrorKind::InvalidFloatExponent,
+                ByteRange::new(start, self.len_consumed()),
+            )
+        } else {
+            TokenKind::Number
+        }
+    }
+
+    /// Consume only decimal digits up to encountering a non-decimal digit.
+    fn eat_decimal_digits(&self, radix: u32) -> &str {
+        self.eat_while_and_slice(move |c| c.is_digit(radix))
+    }
     fn string(&mut self, start: char) -> TokenKind {
         let is_double = start == '"';
         let mut closed = false;
