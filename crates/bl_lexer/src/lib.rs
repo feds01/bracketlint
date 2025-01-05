@@ -287,4 +287,28 @@ impl<'lex> Lexer<'lex> {
         // seen the string, and then push it into our literal map if we haven't...
         TokenKind::Str
     }
+
+    fn ident(&mut self, first: char) -> TokenKind {
+        debug_assert!(is_ident_start(first));
+
+        let start = self.offset.get() - first.len_utf8();
+        self.eat_while_and_discard(is_id_continue);
+        let name = &self.source.0[start..self.offset.get()];
+
+        if let Ok(keyword) = Keyword::try_from(name) {
+            TokenKind::Keyword(keyword)
+        } else {
+            TokenKind::Ident
+        }
+    }
+
+}
+
+fn is_ident_start(c: char) -> bool {
+    c.is_ascii_alphabetic() || c == '_'
+}
+
+/// True if `c` is valid as a non-first character of an identifier.
+pub(crate) fn is_id_continue(c: char) -> bool {
+    c.is_ascii_alphanumeric() || c == '_'
 }
