@@ -1,8 +1,10 @@
 //! Contains all of the parsing logic for the `bl` project.
+#![allow(dead_code)]
 
 use bl_ast::{AstNode, Document, LocalSpanMap, SourceId, SpanMap, SpannedSource};
 use bl_lexer::{Lexer, LexerMetadata};
 use bl_reporting::{DiagnosticsMut, Report, Reports};
+use bl_workspace::Member;
 use diagnostics::ParserDiagnostics;
 use parser::Parser;
 
@@ -36,7 +38,7 @@ pub struct ParseQuery<'a> {
     id: SourceId,
 
     /// The contents of the module to parse.
-    source: &'a str,
+    member: &'a Member,
 
     /// The options for the parsing operation.
     options: ParseOptions,
@@ -44,15 +46,15 @@ pub struct ParseQuery<'a> {
 
 impl<'a> ParseQuery<'a> {
     /// Create a new parse query with the given source ID and source.
-    pub fn new(id: SourceId, source: &'a str) -> Self {
-        Self { id, source, options: ParseOptions::default() }
+    pub fn new(id: SourceId, member: &'a Member) -> Self {
+        Self { id, member, options: ParseOptions::default() }
     }
 
     /// Create a new parse query with the given source ID, source, and options.
     /// This is useful for when you want to customise the parsing operation.
     /// For example, you may want to disable error recovery.
-    pub fn with_options(id: SourceId, source: &'a str, options: ParseOptions) -> Self {
-        Self { id, source, options }
+    pub fn with_options(id: SourceId, member: &'a Member, options: ParseOptions) -> Self {
+        Self { id, member, options }
     }
 }
 
@@ -72,13 +74,20 @@ pub struct ParseResult {
 /// An entry point for the general framework to parse a module.
 pub fn parse_source(query: ParseQuery) -> ParseResult {
     // let mut timings = StageMetrics::default();
-    let ParseQuery { id, source, options } = query;
+    let ParseQuery { id, member, options } = query;
 
-    let spanned = SpannedSource::from_string(source);
+    let spanned = SpannedSource::from_string(&member.contents);
 
     // Lex the contents of the module or interactive block
     let LexerMetadata { tokens, mut diagnostics } = Lexer::new(spanned, id).tokenise();
     let mut spans = LocalSpanMap::with_capacity(tokens.len() * 2);
+
+    // Print the tokens that we produce.
+    // let temp_map = TempSourceMap::from((&member).with_id(id));
+    // for token in &tokens {
+    //     let snippet = InlineSnippet::new(&temp_map, Span::new(token.span, id));
+    //     note_on_span(snippet, format!("token: {}", token.kind));
+    // }
 
     // Check if the lexer has errors...
     if diagnostics.has_errors() {
