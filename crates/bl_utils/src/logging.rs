@@ -1,5 +1,5 @@
-//! Hash compiler logging utilities. This defines a simple logger with a
-//! style which should be used across the compiler to log and print messages.
+//! This defines a simple logger with a style which should be used across the
+//! compiler to log and print messages.
 
 use std::{fmt, io::Write};
 

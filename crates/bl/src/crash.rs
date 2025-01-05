@@ -1,12 +1,12 @@
-//! Hash Compiler crash handler
+//! Bracketlint Compiler crash handler
 use std::{io::Write, panic::PanicInfo, process::exit, sync::atomic, thread};
 
-const BUG_REPORT_MSG: &str = "This is an compiler bug, please file a bug report at";
+const BUG_REPORT_MSG: &str = "This is an bracketlint bug, please file a bug report at";
 const BUG_REPORT_URI: &str =
     "https://github.com/feds01/bracketlint/issues?labels=bug&template=bug_report";
 
-/// The Hash compiler crash handler. This function should be used to register a
-/// `panic` handle for the compiler. It will ensure that only one thread can
+/// The Bracketlint crash handler. This function should be used to register a
+/// `panic` handle for Bracketlint. It will ensure that only one thread can
 /// panic at a time, it will print the panic message, a backtrace, and a link to
 /// the bug report page.
 ///

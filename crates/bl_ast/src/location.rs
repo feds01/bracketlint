@@ -1,4 +1,10 @@
-//! Hash Compiler source locations utilities and definitions.
+//! Definitions for data structures that are used to represent locations within
+//! a given source file. Namely, we define [ByteRange], [Span], the bread and
+//! butter of the location system. We also define a notion of a source, via a
+//! [SourceId], which is unique to each source file that is processed by the
+//! linting tool. We also define various other useful tools and useful data
+//! structures that are used to represent locations within a source file.
+
 use std::{cmp, fmt, ops::Range};
 
 use derive_more::Constructor;
