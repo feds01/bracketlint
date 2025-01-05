@@ -82,6 +82,41 @@ impl<'lex> Lexer<'lex> {
         TokenKind::Err
     }
 
+    /// Moves to the next character.
+    #[inline]
+    fn next(&mut self) -> Option<char> {
+        let slice = unsafe { self.as_slice() };
+        let ch = slice.chars().next()?;
+        self.offset.update(|x| x + ch.len_utf8());
+        Some(ch)
+    }
+
+    /// Returns nth character relative to the current position.
+    /// If requested position doesn't exist, `EOF_CHAR` is returned.
+    /// However, getting `EOF_CHAR` doesn't always mean actual end of file,
+    /// it should be checked with `is_eof` method.
+    fn nth_char(&self, n: usize) -> char {
+        let slice = unsafe { self.as_slice() };
+
+        slice.chars().nth(n).unwrap_or(EOF_CHAR)
+    }
+
+    /// Peeks the next symbol from the input stream without consuming it.
+    #[inline]
+    fn peek(&self) -> char {
+        self.nth_char(0)
+    }
+
+    /// Peeks the second symbol from the input stream.
+    #[inline]
+    fn peek_second(&self) -> char {
+        self.nth_char(1)
+    }
+
+    #[inline]
+    fn skip_ascii(&self) {
+        self.offset.update(|x| x + 1);
+    }
 
     /// Get the remaining un-lexed contents as a raw string.
     #[inline]
@@ -134,5 +169,45 @@ impl<'lex> Lexer<'lex> {
         }
 
         LexerMetadata { tokens: self.tokens, diagnostics: self.diagnostics }
+    }
+
+    fn string(&mut self, start: char) -> TokenKind {
+        let is_double = start == '"';
+        let mut closed = false;
+
+        let start = self.offset.get();
+
+        while let Some(c) = self.next() {
+            match c {
+                '"' if is_double => {
+                    closed = true;
+                    break;
+                }
+                '\'' if !is_double => {
+                    closed = true;
+                    break;
+                }
+                // '\\' => match self.escaped_char(false) {
+                //     Ok(ch) => continue,
+                //     Err(err) => {
+                //         self.add_error(err);
+                //         return TokenKind::Err;
+                //     }
+                // },
+                _c => continue,
+            }
+        }
+
+        // Report that the literal is unclosed and set the error as being fatal
+        if !closed {
+            return self.emit_fatal_error(
+                LexerErrorKind::UnclosedStringLit,
+                ByteRange::new(start, self.len_consumed()),
+            );
+        }
+
+        // Avoid interning on a global level until later, we check locally if we've
+        // seen the string, and then push it into our literal map if we haven't...
+        TokenKind::Str
     }
 }

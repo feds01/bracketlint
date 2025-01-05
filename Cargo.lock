@@ -157,7 +157,6 @@ dependencies = [
  "bl_ast",
  "bl_lexer",
  "bl_reporting",
- "bl_workspace",
  "crossbeam-channel",
  "derive_more",
  "log",
