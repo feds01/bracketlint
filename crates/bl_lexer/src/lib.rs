@@ -313,7 +313,7 @@ impl<'lex> Lexer<'lex> {
     /// behaviour is desired and avoids performing complex delimiter depth
     /// analysis later on.
     fn eat_token_tree(&mut self, delimiter: Delimiter) -> TokenKind {
-        let delim_offset = self.offset.get() - 2; // we need to ge the previous location to accurately denote the error...
+        let delim_offset = self.offset.get() - delimiter.width(); // we need to ge the previous location to accurately denote the error...
 
         // we need to reset self.prev here as it might be polluted with previous token
         // trees
