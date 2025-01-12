@@ -3,35 +3,28 @@
 use std::{fs, path::PathBuf};
 
 use anyhow::Result;
-use bl_diagnostics::Diagnostics;
 use bl_parse::{parse_source, ParseQuery, ParseResult};
-use bl_reporting::Reporter;
-use bl_utils::{stream::CompilerOutputStream, timed};
-use bl_workspace::{resolver::find_files_in_paths, settings::Settings, WorkspaceBuilder};
-use log::{info, Level};
+use bl_reporting::Reports;
+use bl_utils::timed;
+use bl_workspace::{Workspace, resolver::find_files_in_paths};
+use log::{Level, info};
 
-pub fn check(files: &[PathBuf], settings: Settings) -> Result<Diagnostics> {
+pub fn check(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
     // Firstly, we need to discover all of the files in the provided paths.
     let files = timed(
-        || find_files_in_paths(files, &settings),
+        || find_files_in_paths(files, &workspace.settings),
         log::Level::Info,
         |duration| info!("resolved files in {duration:?}"),
     )?;
 
     if files.is_empty() {
         // @@Todo: warn the user that there were no files to check.
-        return Ok(Diagnostics::default());
+        return Ok(Reports::default());
     }
 
     info!("found {} files", files.len());
 
-    // @@Todo: move this out to above as this isn't the right place to
-    // build the workspace.
-    let builder = WorkspaceBuilder::new()
-        .with_settings(settings)
-        .with_stdout(CompilerOutputStream::stdout())
-        .with_stderr(CompilerOutputStream::stderr());
-    let mut workspace = builder.build();
+    let mut pipeline_diagnostics = Reports::default();
 
     // @@Todo: integrate a cache system here, we should be able to avoid re-linting
     // already existent files and just skip them.
@@ -57,10 +50,7 @@ pub fn check(files: &[PathBuf], settings: Settings) -> Result<Diagnostics> {
                         let ParseResult { node, diagnostics } =
                             parse_source(ParseQuery::new(id, member));
 
-                        // Print any shown diagnostics
-                        if !diagnostics.is_empty() {
-                            println!("{}", Reporter::new(&workspace, diagnostics));
-                        }
+                        pipeline_diagnostics.extend(diagnostics);
 
                         let member = workspace.members.member_mut(id);
                         member.document = node;
@@ -78,5 +68,5 @@ pub fn check(files: &[PathBuf], settings: Settings) -> Result<Diagnostics> {
         },
     );
 
-    Ok(Diagnostics::default())
+    Ok(pipeline_diagnostics)
 }

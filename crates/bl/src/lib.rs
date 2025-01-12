@@ -8,6 +8,7 @@ mod crash;
 pub(crate) mod version;
 
 use std::{
+    io::Write,
     panic,
     path::{Path, PathBuf},
     process::ExitCode,
@@ -15,8 +16,9 @@ use std::{
 
 use anyhow::{Ok, Result};
 use bl_lints::settings::FixMode;
-use bl_utils::{logging::ToolLogger, stream::CompilerOutputStream};
-use bl_workspace::settings::Settings;
+use bl_reporting::{Reporter, Reports, pluralise};
+use bl_utils::{logging::ToolLogger, stream::CompilerOutputStream, stream_writeln};
+use bl_workspace::{Workspace, WorkspaceBuilder, settings::Settings};
 use cli::CheckCommand;
 use crash::crash_handler;
 
@@ -97,14 +99,54 @@ fn check(args: CheckCommand) -> Result<ExitStatus> {
         FixMode::Generate
     };
 
-    let settings = Settings::new(args.respect_gitignore, fix_mode);
-    let _messages = commands::check::check(&files, settings)?;
+    let settings = Settings::new(args.respect_gitignore, fix_mode, args.dump_ast);
+    let builder = WorkspaceBuilder::new()
+        .with_settings(settings)
+        .with_stdout(CompilerOutputStream::stdout())
+        .with_stderr(CompilerOutputStream::stderr());
+    let mut workspace = builder.build();
 
-    // @@TODO: display the actual diagnostics that were collected.
-    Ok(ExitStatus::Success)
+    let messages = commands::check::check(&files, &mut workspace)?;
+    consume_diagnostics(&workspace, messages)
 }
 
 fn version() -> Result<ExitStatus> {
     commands::version::version()?;
+    Ok(ExitStatus::Success)
+}
+
+/// Emit diagnostics to the error stream with the applied settings.
+fn consume_diagnostics(workspace: &Workspace, diagnostics: Reports) -> Result<ExitStatus> {
+    let mut err_count = 0;
+    let mut warn_count = 0;
+    let mut stderr = workspace.error_stream();
+
+    for diagnostic in diagnostics.iter() {
+        if diagnostic.is_error() {
+            err_count += 1;
+        }
+
+        if diagnostic.is_warning() {
+            warn_count += 1;
+        }
+    }
+
+    if !diagnostics.is_empty() {
+        stream_writeln!(stderr, "{}", Reporter::new(workspace, diagnostics));
+    }
+
+    // ##Hack: to prevent the compiler from printing this message when the pipeline
+    // when it was instructed to terminate before all of the stages. For example, if
+    // the compiler is just checking the source, then it will terminate early.
+    if err_count != 0 || warn_count != 0 {
+        log::info!(
+            "bracketlint terminated with {err_count} error{}, and {warn_count} warning{}",
+            pluralise!(err_count),
+            pluralise!(warn_count)
+        );
+
+        return Ok(ExitStatus::Failure);
+    }
+
     Ok(ExitStatus::Success)
 }

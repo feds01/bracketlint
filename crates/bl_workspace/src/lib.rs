@@ -91,7 +91,11 @@ pub struct Workspace {
     pub settings: Settings,
 }
 
-impl Workspace {}
+impl Workspace {
+    pub fn error_stream(&self) -> CompilerOutputStream {
+        self.stderr.clone()
+    }
+}
 
 impl HasSource for Workspace {
     fn contents(&self, source: SourceId) -> &str {
