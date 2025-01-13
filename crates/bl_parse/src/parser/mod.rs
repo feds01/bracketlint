@@ -358,6 +358,11 @@ impl<'s> Parser<'s> {
     fn parse_statement(&mut self) -> ParseResult<Option<AstNode<ast::Statement>>> {
         let token = self.peek().ok_or_else(|| self.make_unexpected_eof())?;
         let statement = match token.kind {
+            // For parsing text nodes.
+            TokenKind::Text => {
+                self.skip_fast(TokenKind::Text); // `<text>` Skip the text token.
+                Ok(self.node_with_span(ast::Statement::text(), token.span))
+            }
             _ => self.err_with_location(
                 ParseErrorKind::Statement,
                 ExpectedItem::empty(),
