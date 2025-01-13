@@ -564,31 +564,23 @@ define_tree! {
         data: Identifier
     }
 
-    /// A path reference, possibly to another file, or a module, i.e. in an `include`
-    /// tag:
-    ///
-    /// ```html
-    /// {% include "file" %}
-    ///            ^^^^^^
-    /// ```
-    #[derive(Clone, Debug, PartialEq)]
-    #[node]
-    pub struct Path {
-        data: String
+    impl Name {
+        pub fn new(data: Identifier) -> Self {
+            Self { data }
+        }
     }
-
 
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct VarExpr {
-        var: Name,
+        pub name: Name,
     }
 
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct UnaryExpr {
-        op: Child!(UnaryOp),
-        expr: Child!(Expr),
+        pub op: Child!(UnaryOp),
+        pub expr: Child!(Expr),
     }
 
     /// An argument to a function, filter or a custom taf call.
@@ -598,15 +590,15 @@ define_tree! {
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct Arg {
-        name: OptionalChild!(Name),
-        value: OptionalChild!(Expr),
+        pub name: OptionalChild!(Name),
+        pub value: OptionalChild!(Expr),
     }
 
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct CallExpr {
-        subject: Child!(Expr),
-        args: Children!(Arg),
+        pub subject: Child!(Expr),
+        pub args: Children!(Arg),
     }
 
     #[derive(Clone, Debug, PartialEq)]
@@ -620,8 +612,40 @@ define_tree! {
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct FilteredExpr {
-        subject: Child!(Expr),
-        filters: Children!(CallExpr),
+        pub subject: Child!(Expr),
+        pub filter: Child!(Filter),
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct Filter {
+        pub name: Child!(Name),
+        pub args: Children!(Arg),
+    }
+
+    /// An "access" expression, when a field is being accessed
+    /// from a subject, i.e.
+    ///
+    /// ```html
+    /// {{ x.y }}
+    /// ```
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct AccessExpr {
+        pub subject: Child!(Expr),
+        pub field: Child!(Name),
+    }
+
+    /// An "index" expression, when an index is being accessed
+    /// from a subject, i.e.
+    /// ```html
+    /// {{ x[0] }}
+    /// ```
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct IndexExpr {
+        pub subject: Child!(Expr),
+        pub index: Child!(Expr),
     }
 
     #[derive(Clone, Debug, PartialEq)]
@@ -634,6 +658,8 @@ define_tree! {
         Var(VarExpr),
         Call(CallExpr),
         MacroCall(MacroCallExpr),
+        Access(AccessExpr),
+        Index(IndexExpr),
         FilteredExpr(FilteredExpr)
     }
 

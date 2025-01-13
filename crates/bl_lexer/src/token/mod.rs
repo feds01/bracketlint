@@ -174,6 +174,57 @@ pub enum TokenKind {
     Err,
 }
 
+impl TokenKind {
+    /// Check if a token is a literal value.
+    pub fn is_lit(&self) -> bool {
+        matches!(
+            self,
+            TokenKind::Str
+                | TokenKind::Number(_)
+                | TokenKind::Keyword(Keyword::True | Keyword::False)
+        )
+    }
+
+    /// Check if a token is a tree token.
+    pub fn is_tree(&self) -> bool {
+        matches!(self, TokenKind::Tree(_, _))
+    }
+
+    /// Check if a token is a tree token.
+    pub fn is_percent_tree(&self) -> bool {
+        matches!(self, TokenKind::Tree(Delimiter::Percent, _))
+    }
+
+    pub fn is_soft_keyword(&self) -> bool {
+        matches!(self, TokenKind::Keyword(Keyword::True | Keyword::False | Keyword::Load))
+    }
+
+
+    pub fn is_unary_op(&self) -> bool {
+        matches!(self, TokenKind::Keyword(Keyword::Not) | TokenKind::Minus)
+    }
+
+
+    /// Check if a token starts an expression.
+    pub fn starts_expr(&self) -> bool {
+        match self {
+            kind if kind.is_lit() => true,
+            TokenKind::Ident => true,
+            TokenKind::Keyword(keyword) if keyword.identifier_like() => true,
+            TokenKind::LeftDelim(Delimiter::Paren | Delimiter::Bracket | Delimiter::Brace) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_ident_like(&self) -> bool {
+        match self {
+            TokenKind::Ident => true,
+            TokenKind::Keyword(kwd) => kwd.identifier_like(),
+            _ => false,
+        }
+    }
+}
+
 impl fmt::Display for TokenKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
