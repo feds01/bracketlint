@@ -11,11 +11,11 @@ use bl_utils::counter;
 use once_cell::sync::Lazy;
 use parking_lot::{RwLock, RwLockWriteGuard};
 use replace_with::replace_with_or_abort;
-use thin_vec::{thin_vec, ThinVec};
+use thin_vec::{ThinVec, thin_vec};
 
 use crate::{
-    location::{SourceId, Span},
     ByteRange,
+    location::{SourceId, Span},
 };
 
 counter! {

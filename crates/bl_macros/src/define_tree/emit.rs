@@ -6,8 +6,8 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
 use super::definitions::{
-    EnumNodeDef, EnumNodeVariant, NodeFieldData, StructNodeDef, StructNodeField, TreeDef,
-    TreeNodeDef, NODE_DEF_ATTR_NAME,
+    EnumNodeDef, EnumNodeVariant, NODE_DEF_ATTR_NAME, NodeFieldData, StructNodeDef,
+    StructNodeField, TreeDef, TreeNodeDef,
 };
 
 /// Suffix the given identifier with "Mut"/"_mut" etc as appropriate depending
@@ -622,19 +622,12 @@ fn emit_walker_enum_function(
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    emit_walker_function(
-        &enum_node.name,
-        tree_def,
-        visitor_name,
-        nodes_mut,
-        self_mut,
-        quote! {
-           let id = node.id();
-           Ok(match #ref_or_mut *node {
-               #(#cases),*
-           })
-        },
-    )
+    emit_walker_function(&enum_node.name, tree_def, visitor_name, nodes_mut, self_mut, quote! {
+       let id = node.id();
+       Ok(match #ref_or_mut *node {
+           #(#cases),*
+       })
+    })
 }
 
 /// Emit a `walk_*` function for the given struct.
@@ -669,19 +662,12 @@ fn emit_walker_struct_function(
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    emit_walker_function(
-        &struct_node.name,
-        tree_def,
-        visitor_name,
-        nodes_mut,
-        self_mut,
-        quote! {
-            let id = node.id();
-            Ok(#node_name {
-                #(#walk_fields),*
-            })
-        },
-    )
+    emit_walker_function(&struct_node.name, tree_def, visitor_name, nodes_mut, self_mut, quote! {
+        let id = node.id();
+        Ok(#node_name {
+            #(#walk_fields),*
+        })
+    })
 }
 
 /// Emit `walk_*` functions for all the nodes in the tree.

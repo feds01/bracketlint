@@ -10,6 +10,6 @@ pub use source::{HasSource, TempSourceMap};
 
 pub mod visitor {
     pub use super::ast::{
-        walk, walk_mut, walk_mut_self, AstVisitor, AstVisitorMut, AstVisitorMutSelf,
+        AstVisitor, AstVisitorMut, AstVisitorMutSelf, walk, walk_mut, walk_mut_self,
     };
 }

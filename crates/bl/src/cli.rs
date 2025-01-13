@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use clap::{command, Parser};
+use clap::{Parser, command};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -12,7 +12,6 @@ use clap::{command, Parser};
     after_help = "For help with a specific command, see: `bl help <command>`."
 )]
 #[command(version)]
-
 pub struct Cli {
     #[command(subcommand)]
     pub(crate) command: Command,

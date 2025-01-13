@@ -5,7 +5,7 @@ use define_tree::{
     definitions::TreeDef, difference::Difference, emit::emit_tree, validate::validate_tree_def,
 };
 use quote::quote;
-use syn::{parse_macro_input, Ident};
+use syn::{Ident, parse_macro_input};
 
 mod define_tree;
 
