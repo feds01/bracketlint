@@ -1,5 +1,5 @@
 //! Bracketlint Compiler crash handler
-use std::{io::Write, panic::PanicInfo, process::exit, sync::atomic, thread};
+use std::{io::Write, panic::PanicHookInfo, process::exit, sync::atomic, thread};
 
 const BUG_REPORT_MSG: &str = "This is an bracketlint bug, please file a bug report at";
 const BUG_REPORT_URI: &str =
@@ -17,7 +17,7 @@ const BUG_REPORT_URI: &str =
 ///
 /// panic::set_hook(Box::new(crash_handler));
 /// ```
-pub fn crash_handler(info: &PanicInfo) {
+pub fn crash_handler(info: &PanicHookInfo) {
     // keep track to ensure that we only panic once and multiple threads can exit
     // gracefully!
     static PANIC_ONCE: atomic::AtomicBool = atomic::AtomicBool::new(false);

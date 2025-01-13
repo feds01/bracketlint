@@ -5,16 +5,16 @@ use std::collections::HashMap;
 
 use proc_macro2::TokenStream;
 use syn::{
-    parse::Parse, spanned::Spanned, Attribute, Field, FieldsNamed, Ident, Item, ItemEnum,
-    ItemMacro, ItemStruct, Path, Type, Variant,
+    Attribute, Field, FieldsNamed, Ident, Item, ItemEnum, ItemMacro, ItemStruct, Path, Type,
+    Variant, parse::Parse, spanned::Spanned,
 };
 
 use super::definitions::{
-    EnumNodeDef, EnumNodeVariant, NodeFieldData, StructNodeDef, StructNodeField, TreeDef,
-    TreeDefOpts, TreeNodeDef, GET_REF_FROM_NODE_FUNCTION_BASE_NAME_OPTS_FIELD, NODES_TYPE_NAME,
-    NODES_TYPE_NAME_OPTS_FIELD, NODE_DEF_ATTR_NAME, NODE_TYPE_NAME, NODE_TYPE_NAME_OPTS_FIELD,
-    OPTIONAL_NODE_TYPE_NAME, OPTS_MACRO_NAME, REF_CHANGE_BODY_FUNCTION_BASE_NAME_OPTS_FIELD,
-    ROOT_MODULE_OPTS_FIELD, VISITOR_NODE_REF_BASE_TYPE_NAME_OPTS_FIELD,
+    EnumNodeDef, EnumNodeVariant, GET_REF_FROM_NODE_FUNCTION_BASE_NAME_OPTS_FIELD,
+    NODE_DEF_ATTR_NAME, NODE_TYPE_NAME, NODE_TYPE_NAME_OPTS_FIELD, NODES_TYPE_NAME,
+    NODES_TYPE_NAME_OPTS_FIELD, NodeFieldData, OPTIONAL_NODE_TYPE_NAME, OPTS_MACRO_NAME,
+    REF_CHANGE_BODY_FUNCTION_BASE_NAME_OPTS_FIELD, ROOT_MODULE_OPTS_FIELD, StructNodeDef,
+    StructNodeField, TreeDef, TreeDefOpts, TreeNodeDef, VISITOR_NODE_REF_BASE_TYPE_NAME_OPTS_FIELD,
     VISITOR_TRAIT_BASE_NAME_OPTS_FIELD,
 };
 
@@ -47,7 +47,7 @@ impl TryFrom<&Variant> for EnumNodeVariant {
                     return Err(syn::Error::new(
                         value.span(),
                         "Named fields are not supported in enum node definitions",
-                    ))
+                    ));
                 }
                 syn::Fields::Unnamed(fields) => Some(
                     fields

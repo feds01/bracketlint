@@ -8,7 +8,7 @@ use std::{
     sync::RwLock,
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use bl_utils::fs;
 use globset::{Candidate, GlobSet};
 use ignore::{DirEntry, Error, WalkBuilder, WalkState};
@@ -131,7 +131,7 @@ pub struct FilesVisitor<'s, 'config> {
     global: &'s WalkFilesState<'config>,
 }
 
-impl<'s, 'config> ignore::ParallelVisitor for FilesVisitor<'s, 'config> {
+impl ignore::ParallelVisitor for FilesVisitor<'_, '_> {
     fn visit(&mut self, result: std::result::Result<DirEntry, Error>) -> WalkState {
         // Respect our own exclusion behaviour.
         if let Ok(entry) = &result {
@@ -159,7 +159,7 @@ impl<'s, 'config> ignore::ParallelVisitor for FilesVisitor<'s, 'config> {
         match result {
             Ok(entry) => {
                 // Ignore directories
-                let resolved = if entry.file_type().map_or(true, |ft| ft.is_dir()) {
+                let resolved = if entry.file_type().is_none_or(|ft| ft.is_dir()) {
                     None
                 } else if entry.depth() == 0 {
                     // Accept all files that are passed-in directly.
@@ -193,7 +193,7 @@ impl<'s, 'config> ignore::ParallelVisitor for FilesVisitor<'s, 'config> {
 impl Drop for FilesVisitor<'_, '_> {
     fn drop(&mut self) {
         let mut merged = self.global.merged.lock().unwrap();
-        let (ref mut files, ref mut error) = &mut *merged;
+        let &mut (ref mut files, ref mut error) = &mut *merged;
 
         if files.is_empty() {
             *files = std::mem::take(&mut self.local_files);
