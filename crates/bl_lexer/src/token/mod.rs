@@ -70,6 +70,15 @@ impl TryFrom<char> for Delimiter {
     }
 }
 
+/// Flags for the number token.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum NumberFlags {
+    /// A floating point number.
+    Float,
+    /// An integer number.
+    Int,
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum TokenKind {
     /// Colon, `:`
@@ -122,7 +131,9 @@ pub enum TokenKind {
 
     /// An identifier.
     Ident,
-    Number,
+
+    /// A number literal.
+    Number(NumberFlags),
 
     /// A string literal.
     ///
@@ -188,7 +199,7 @@ impl fmt::Display for TokenKind {
             TokenKind::Str => write!(f, "<string>"),
             TokenKind::Keyword(kwd) => kwd.fmt(f),
             TokenKind::Ident => write!(f, "<identifier>"),
-            TokenKind::Number => write!(f, "<number>"),
+            TokenKind::Number(_) => write!(f, "<number>"),
             TokenKind::Text => write!(f, "<text>"),
             TokenKind::Comment => write!(f, "<comment>"),
 
