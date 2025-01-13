@@ -363,6 +363,7 @@ impl<'s> Parser<'s> {
                 self.skip_fast(TokenKind::Text); // `<text>` Skip the text token.
                 Ok(self.node_with_span(ast::Statement::text(), token.span))
             }
+            TokenKind::Comment => self.parse_comment(),
             _ => self.err_with_location(
                 ParseErrorKind::Statement,
                 ExpectedItem::empty(),
@@ -373,6 +374,14 @@ impl<'s> Parser<'s> {
 
         Ok(Some(statement))
     }
+
+    fn parse_comment(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+        let token = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
+        self.skip_fast(TokenKind::Comment); // `<comment>` Skip the comment token.
+
+        Ok(self.node_with_joined_span(ast::Statement::Comment(ast::Comment {}), token.span))
+    }
+
     fn parse_lit(&self) -> ParseResult<ast::Lit> {
         let token = self.current_token();
 
