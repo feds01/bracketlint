@@ -13,9 +13,11 @@ use bl_reporting::{
 };
 use bl_workspace::Member;
 use diagnostics::ParserDiagnostics;
+use dialect::Dialect;
 use parser::Parser;
 
 mod diagnostics;
+mod dialect;
 mod parser;
 
 /// The options for the parsing operation.
@@ -23,19 +25,22 @@ mod parser;
 pub struct ParseOptions {
     /// Whether to recover from a parsing error, or terminate immediately
     /// upon encountering an error.
-    recovery: bool,
+    pub recovery: bool,
+
+    /// The dialect to parse the module in.
+    pub dialect: Dialect,
 }
 
 impl ParseOptions {
     /// Create a new set of parse options with the given recovery setting.
-    pub fn new(recovery: bool) -> Self {
-        Self { recovery }
+    pub fn new(recovery: bool, dialect: Dialect) -> Self {
+        Self { recovery, dialect }
     }
 }
 
 impl Default for ParseOptions {
     fn default() -> Self {
-        Self { recovery: true }
+        Self { recovery: true, dialect: Dialect::default() }
     }
 }
 
