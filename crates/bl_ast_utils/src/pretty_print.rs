@@ -32,6 +32,24 @@ impl AstVisitor for AstTreePrinter<'_> {
         Ok(TreeNode::branch("document", children))
     }
 
+    type ArgRet = TreeNode;
+
+    fn visit_arg(&self, node: ast::AstNodeRef<ast::Arg>) -> Result<Self::ArgRet, Self::Error> {
+        let walk::Arg { name, value } = walk::walk_arg(self, node)?;
+
+        let mut nodes = vec![];
+
+        if let Some(name) = name {
+            nodes.push(name);
+        }
+
+        if let Some(value) = value {
+            nodes.push(value);
+        }
+
+        Ok(TreeNode::branch("arg", nodes))
+    }
+
     type CommentRet = TreeNode;
 
     fn visit_comment(

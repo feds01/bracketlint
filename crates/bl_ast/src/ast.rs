@@ -676,6 +676,12 @@ define_tree! {
         FilteredExpr(FilteredExpr)
     }
 
+    impl Expr {
+        pub fn is_var(&self) -> bool {
+            matches!(self, Expr::Var(_))
+        }
+    }
+
     /// A `block` tag, which can be used to define a block of code that can be
     /// overridden by a child template.
     ///
@@ -861,6 +867,15 @@ define_tree! {
         Raw(Raw),
     }
 
+
+
+    /// A statement level expression.
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct Inline {
+        pub expr: Child!(Expr),
+    }
+
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub enum Statement {
@@ -870,14 +885,26 @@ define_tree! {
         /// A tag `{%  ... <tag> ... %}` which is eventually terminated by a `{% end<tag> %}` tag.
         Tag(Tag),
 
-        /// The `{{ super() }}` call in a block tag.
-        Super(Super),
-
-        /// A interpolated variable `{{ var }}`
-        Var(Var),
+        /// A interpolated variable or function call `{{ var }}`
+        Inline(Inline),
 
         /// Comment `{# comment #}` tag.
         Comment(Comment),
+    }
+
+    impl Statement {
+        pub fn text() -> Self {
+            Statement::Text(Text {})
+        }
+
+        pub fn kind(&self) -> &'static str {
+            match self {
+                Statement::Text(_) => "text",
+                Statement::Tag(tag) => tag.kind(),
+                Statement::Inline(_) => "inline",
+                Statement::Comment(_) => "comment",
+            }
+        }
     }
 
     #[derive(Debug, Clone, PartialEq)]

@@ -311,6 +311,26 @@ impl<'s> Parser<'s> {
         result
     }
 
+    /// Function to peek ahead and match some parsing function that returns a
+    /// [Option<T>]. If The result is an error, the function wil reset the
+    /// current offset of the token stream to where it was the function was
+    /// peeked. This is essentially a convertor from a [ParseResult<T>]
+    /// into an [Option<T>] with the side effect of resetting the parser state
+    /// back to it's original settings.
+    pub(crate) fn peek_resultant_fn<T, E>(
+        &mut self,
+        mut parse_fn: impl FnMut(&mut Self) -> Result<T, E>,
+    ) -> Option<T> {
+        let start = self.position();
+
+        match parse_fn(self) {
+            Ok(result) => Some(result),
+            Err(_) => {
+                self.set_pos(start);
+                None
+            }
+        }
+    }
     /// Record the [ByteRange] that a parse function `f` traversed during
     /// its execution. This is useful for tracking the span of a node that
     /// is generated from a parse function.
@@ -445,6 +465,17 @@ impl<'s> Parser<'s> {
         let token = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
         let expr = self.in_tree(Delimiter::Brace, None, |g| {
             let subject = g.parse_expr()?;
+
+            // If the subject is an identifier, we ha
+            if !g.exhausted() && subject.body.is_var() {
+                // This might be a call expression, try and parse the arguments
+                let args = g.parse_args()?;
+
+                return Ok(g.node_with_joined_span(
+                    ast::Expr::Call(ast::CallExpr { subject, args }),
+                    token.span,
+                ));
+            }
 
             Ok(subject)
         })?;
@@ -724,6 +755,21 @@ impl<'s> Parser<'s> {
     }
 
 
+    fn parse_args(&mut self) -> ParseResult<AstNodes<ast::Arg>> {
+        let mut args = thin_vec![];
+        let start = self.current_pos();
+
+        while self.peek().is_some() {
+            match self.parse_arg() {
+                Ok(Some(arg)) => args.push(arg),
+                Ok(None) => break,
+                Err(err) => return Err(err),
+            }
+        }
+
+        Ok(self.nodes_with_joined_span(args, start))
+    }
+
     fn parse_string(&mut self) -> ParseResult<AstNode<ast::StrLit>> {
         match self.peek() {
             Some(Token { kind: TokenKind::Str, span }) => {
@@ -739,5 +785,44 @@ impl<'s> Parser<'s> {
             ),
         }
     }
+
+    fn parse_arg(&mut self) -> ParseResult<Option<AstNode<ast::Arg>>> {
+        match (self.peek().copied(), self.peek_second().copied()) {
+            (
+                Some(Token { kind: TokenKind::Ident, span }),
+                Some(Token { kind: TokenKind::Eq, .. }),
+            ) => {
+                let name = self.parse_name()?;
+                self.parse_token(TokenKind::Eq)?;
+
+                let value = self.parse_expr()?;
+
+                Ok(Some(self.node_with_joined_span(
+                    ast::Arg { name: Some(name), value: Some(value) },
+                    span,
+                )))
+            }
+            (Some(Token { kind, span }), _) if kind.starts_expr() => {
+                let value = self.parse_expr()?;
+                Ok(Some(
+                    self.node_with_joined_span(ast::Arg { name: None, value: Some(value) }, span),
+                ))
+            }
+            _ => Ok(None),
+        }
+    }
+    /// Exhaust the current [TokenCursor] until the end of the input.
+    ///
+    /// This is an auxiliary operation for the parser for wh
+    fn exhaust(&mut self) {
+        let end = self.cursor.len();
+
+        unsafe {
+            self.cursor.set_pos(end);
+        }
+    }
+
+    fn exhausted(&self) -> bool {
+        self.cursor.position() == self.cursor.len()
     }
 }
