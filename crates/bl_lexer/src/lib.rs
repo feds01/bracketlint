@@ -535,5 +535,5 @@ fn is_ident_start(c: char) -> bool {
 
 /// True if `c` is valid as a non-first character of an identifier.
 pub(crate) fn is_id_continue(c: char) -> bool {
-    c.is_ascii_alphanumeric() || c == '_'
+    c.is_ascii_alphanumeric() || c == '_' || c == '-'
 }
