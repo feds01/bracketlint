@@ -9,7 +9,7 @@ use std::cell::Cell;
 use bl_ast::{ByteRange, SourceId, Span, SpannedSource};
 use bl_reporting::DiagnosticsMut;
 use diagnostics::{LexerDiagnostics, LexerError, LexerErrorKind};
-use token::{Delimiter, Keyword, Token, TokenKind};
+use token::{Delimiter, Keyword, NumberFlags, Token, TokenKind};
 
 /// Representing the end of stream, or the initial character that is set as
 /// 'prev' in a [Lexer] since there is no character before the start.
@@ -406,13 +406,13 @@ impl<'lex> Lexer<'lex> {
             }
             // Immediate exponent
             'e' | 'E' => self.eat_float_lit(start),
-            _ => TokenKind::Number,
+            _ => TokenKind::Number(NumberFlags::Int),
         }
     }
 
     fn eat_float_lit(&mut self, start: usize) -> TokenKind {
         if !matches!(self.peek(), 'e' | 'E') {
-            return TokenKind::Number;
+            return TokenKind::Number(NumberFlags::Int);
         }
 
         self.skip_ascii(); // consume the exponent
@@ -436,7 +436,7 @@ impl<'lex> Lexer<'lex> {
                 ByteRange::new(start, self.len_consumed()),
             )
         } else {
-            TokenKind::Number
+            TokenKind::Number(NumberFlags::Float)
         }
     }
 
