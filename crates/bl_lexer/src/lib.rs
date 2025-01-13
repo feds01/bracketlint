@@ -52,7 +52,7 @@ pub struct LexerMetadata {
 /// stream of tokens that it was able to produce before the error occurred.
 pub struct Lexer<'lex> {
     /// The source that the lexer is processing.
-    pub source: SpannedSource<'lex>,
+    pub spanned: SpannedSource<'lex>,
 
     /// Location of the lexer in the current stream.
     offset: Cell<usize>,
@@ -73,10 +73,10 @@ pub struct Lexer<'lex> {
 }
 
 impl<'lex> Lexer<'lex> {
-    pub fn new(source: SpannedSource<'lex>, id: SourceId) -> Self {
+    pub fn new(spanned: SpannedSource<'lex>, id: SourceId) -> Self {
         Self {
-            source,
             id,
+            spanned,
             diagnostics: LexerDiagnostics::default(),
             tokens: Vec::new(),
             has_fatal_error: false,
@@ -146,12 +146,14 @@ impl<'lex> Lexer<'lex> {
 
         // ##Safety: We rely that the byte offset is correctly computed when stepping
         // over the characters in the iterator.
-        unsafe { std::str::from_utf8_unchecked(self.source.0.as_bytes().get_unchecked(offset..)) }
+        unsafe {
+            std::str::from_utf8_unchecked(self.spanned.source.as_bytes().get_unchecked(offset..))
+        }
     }
 
     /// Checks if there is nothing more to consume.
     fn is_eof(&self) -> bool {
-        self.source.0.len() == self.offset.get()
+        self.spanned.source.len() == self.offset.get()
     }
 
     /// Returns amount of already consumed symbols.
@@ -188,7 +190,7 @@ impl<'lex> Lexer<'lex> {
         let consumed = self.offset.get();
         let end = if consumed == start { start } else { consumed - 1 };
 
-        self.source.hunk(ByteRange::new(start, end))
+        self.spanned.hunk(ByteRange::new(start, end))
     }
 
     pub fn advance_token(&mut self) -> Option<Token> {
@@ -497,7 +499,7 @@ impl<'lex> Lexer<'lex> {
 
         let start = self.offset.get() - first.len_utf8();
         self.eat_while_and_discard(is_id_continue);
-        let name = &self.source.0[start..self.offset.get()];
+        let name = &self.spanned.source[start..self.offset.get()];
 
         if let Ok(keyword) = Keyword::try_from(name) {
             TokenKind::Keyword(keyword)
