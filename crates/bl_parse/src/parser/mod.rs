@@ -547,6 +547,7 @@ impl<'s> Parser<'s> {
                 // Effectively, special functions that we keep track of.
                 token::Keyword::Extends => self.parse_extends_statement(),
                 token::Keyword::Include => self.parse_include_statement(),
+                token::Keyword::Load => self.parse_load_statement(),
                 token::Keyword::Import => self.parse_import_statement(),
                 _ => self.err_with_location(
                     ParseErrorKind::Tag,
@@ -1160,6 +1161,22 @@ impl<'s> Parser<'s> {
 
             Ok(g.node_with_span(
                 ast::Statement::Tag(ast::Tag::Include(ast::Include { template, context })),
+                g.range(),
+            ))
+        })
+    }
+
+    fn parse_load_statement(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+        self.in_tree(Delimiter::Percent, None, |g| {
+            let name = g.parse_name()?;
+            // g.parse_token(TokenKind::Keyword(token::Keyword::Load))?;
+
+            // @@Cleanup: technically not fully correct since we should only support
+            // identifiers, but we can validate this on `ast_expand`.
+            let args = g.parse_args()?;
+
+            Ok(g.node_with_span(
+                ast::Statement::Tag(ast::Tag::Generic(ast::GenericTag { name, args })),
                 g.range(),
             ))
         })
