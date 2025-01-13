@@ -168,6 +168,11 @@ impl AstVisitor for AstTreePrinter<'_> {
         Ok(TreeNode::branch("lit_expr", vec![lit]))
     }
 
+    type BreakRet = TreeNode;
+
+    fn visit_break(&self, _: ast::AstNodeRef<ast::Break>) -> Result<Self::BreakRet, Self::Error> {
+        Ok(TreeNode::leaf("break"))
+    }
     type IntLitRet = TreeNode;
 
     fn visit_int_lit(
@@ -269,6 +274,15 @@ impl AstVisitor for AstTreePrinter<'_> {
         }
 
         Ok(TreeNode::branch("for", children))
+    }
+
+    type ContinueRet = TreeNode;
+
+    fn visit_continue(
+        &self,
+        _: ast::AstNodeRef<ast::Continue>,
+    ) -> Result<Self::ContinueRet, Self::Error> {
+        Ok(TreeNode::leaf("continue"))
     }
     type AccessExprRet = TreeNode;
 

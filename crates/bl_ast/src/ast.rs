@@ -892,6 +892,16 @@ define_tree! {
         Raw(Raw),
     }
 
+    impl Tag {
+        pub fn _continue() -> Self {
+            Tag::Continue(Continue {})
+        }
+
+        pub fn _break() -> Self {
+            Tag::Break(Break {})
+        }
+
+    }
 
 
     /// A statement level expression.
