@@ -5,12 +5,14 @@
 //! linting tool. We also define various other useful tools and useful data
 //! structures that are used to represent locations within a source file.
 
-use std::{cmp, fmt, ops::Range};
+use std::{cmp, fmt, ops::Range, path::PathBuf};
 
 use derive_more::Constructor;
 use index_vec::Idx;
 use schemars::{self, JsonSchema};
 use serde::{self, Serialize};
+
+use crate::HasSource;
 
 pub static SOURCE_COUNT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
 
@@ -172,18 +174,36 @@ impl Span {
 /// is stored in [SourceMap]. It features useful methods for extracting
 /// and reading sections of the source by using [Span] or [ByteRange]s.
 #[derive(Clone, Copy)]
-pub struct SpannedSource<'s>(pub &'s str);
+pub struct SpannedSource<'s> {
+    pub source: &'s str,
+    pub path: &'s PathBuf,
+}
 
 impl<'s> SpannedSource<'s> {
     /// Create a [SpannedSource] from a [String].
-    pub fn from_string(s: &'s str) -> Self {
-        Self(s)
+    pub fn new(s: &'s str, path: &'s PathBuf) -> Self {
+        Self { source: s, path }
     }
 
     /// Get a hunk of the source by the specified [ByteRange].
     pub fn hunk(&self, range: ByteRange) -> &'s str {
         // clamp the end to the `length` of the contents
-        let end = cmp::min(self.0.len(), range.end() + 1);
-        &self.0[range.start()..end]
+        let end = cmp::min(self.source.len(), range.end() + 1);
+        &self.source[range.start()..end]
+    }
+}
+
+/// This implementation is intended for debugging purposes within the
+/// `bl_parser` crate.
+///
+/// It conveniently allows for the `SpannedSource` to act as the machinery
+/// needed to render reports that are always local to a source file.
+impl HasSource for SpannedSource<'_> {
+    fn contents(&self, _: SourceId) -> &str {
+        self.source
+    }
+
+    fn path(&self, _: SourceId) -> &str {
+        self.path.to_str().unwrap()
     }
 }

@@ -76,7 +76,7 @@ pub fn parse_source(query: ParseQuery) -> ParseResult {
     // let mut timings = StageMetrics::default();
     let ParseQuery { id, member, options } = query;
 
-    let spanned = SpannedSource::from_string(&member.contents);
+    let spanned = SpannedSource::new(&member.contents, &member.path);
 
     // Lex the contents of the module or interactive block
     let LexerMetadata { tokens, mut diagnostics } = Lexer::new(spanned, id).tokenise();

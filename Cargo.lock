@@ -197,6 +197,9 @@ dependencies = [
  "log",
  "once_cell",
  "path-absolutize",
+ "schemars",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
