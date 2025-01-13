@@ -22,4 +22,61 @@ fn labelled(label: impl ToString, contents: impl ToString, quote_str: &str) -> S
 }
 
 impl AstVisitor for AstTreePrinter<'_> {
+
+    type BoolLitRet = TreeNode;
+
+    fn visit_bool_lit(
+        &self,
+        node: ast::AstNodeRef<ast::BoolLit>,
+    ) -> Result<Self::BoolLitRet, Self::Error> {
+        Ok(TreeNode::leaf(labelled("bool_lit", self.source.hunk(node.span().range), "")))
+    }
+
+
+    type LitRet = TreeNode;
+
+    fn visit_lit(&self, node: ast::AstNodeRef<ast::Lit>) -> Result<Self::LitRet, Self::Error> {
+        walk::walk_lit_same_children(self, node)
+    }
+
+
+    type FloatLitRet = TreeNode;
+
+    fn visit_float_lit(
+        &self,
+        node: ast::AstNodeRef<ast::FloatLit>,
+    ) -> Result<Self::FloatLitRet, Self::Error> {
+        Ok(TreeNode::leaf(labelled("float_lit", self.source.hunk(node.span().range), "")))
+    }
+
+
+    type LitExprRet = TreeNode;
+
+    fn visit_lit_expr(
+        &self,
+        node: ast::AstNodeRef<ast::LitExpr>,
+    ) -> Result<Self::LitExprRet, Self::Error> {
+        let walk::LitExpr { lit } = walk::walk_lit_expr(self, node)?;
+
+        Ok(TreeNode::branch("lit_expr", vec![lit]))
+    }
+
+    type IntLitRet = TreeNode;
+
+    fn visit_int_lit(
+        &self,
+        node: ast::AstNodeRef<ast::IntLit>,
+    ) -> Result<Self::IntLitRet, Self::Error> {
+        Ok(TreeNode::leaf(labelled("int_lit", self.source.hunk(node.span().range), "")))
+    }
+
+
+    type StrLitRet = TreeNode;
+
+    fn visit_str_lit(
+        &self,
+        node: ast::AstNodeRef<ast::StrLit>,
+    ) -> Result<Self::StrLitRet, Self::Error> {
+        Ok(TreeNode::leaf(labelled("str_lit", self.source.hunk(node.span().range), "")))
+    }
 }

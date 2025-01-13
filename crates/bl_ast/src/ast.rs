@@ -503,18 +503,43 @@ define_tree! {
             }
         }
     }
+
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct BoolLit {
+        pub value: bool,
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct FloatLit {
+        pub value: f64,
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct IntLit {
+        pub value: i64,
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct StrLit {
+    }
+
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub enum Lit {
-        Bool(bool),
-        Float(f64),
-        Int(i64)
+        Bool(BoolLit),
+        Float(FloatLit),
+        Int(IntLit),
+        Str(StrLit),
     }
 
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct LitExpr {
-        lit: Lit
+        pub lit: Lit
     }
 
     #[derive(Clone, Debug, PartialEq)]
