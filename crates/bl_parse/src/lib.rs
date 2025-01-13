@@ -4,6 +4,11 @@
 use bl_ast::{AstNode, Document, LocalSpanMap, SourceId, SpanMap, SpannedSource};
 use bl_lexer::{Lexer, LexerMetadata};
 use bl_reporting::{DiagnosticsMut, Report, Reports};
+use bl_ast_utils::{AstTreePrinter, TreeWriter, TreeWriterConfig};
+use bl_reporting::{
+    DiagnosticsMut, Report, Reports,
+    inline::{InlineSnippet, note_on_span},
+};
 use bl_workspace::Member;
 use diagnostics::ParserDiagnostics;
 use parser::Parser;
@@ -112,4 +117,18 @@ pub fn parse_source(query: ParseQuery) -> ParseResult {
         node: Some(node),
         diagnostics: diagnostics.into_reports(Reports::from, Reports::from),
     }
+}
+
+pub fn emit_source_tree(member: &Member) {
+    let Member { path, document, .. } = member;
+
+    let spanned = SpannedSource::new(&member.contents, &member.path);
+    let tree =
+        AstTreePrinter::new(spanned).visit_document(document.as_ref().unwrap().ast_ref()).unwrap();
+    let config = TreeWriterConfig::unicode();
+    log::info!(
+        "parsed module '{}':\n{}",
+        path.display(),
+        TreeWriter::new_with_config(&tree, config)
+    );
 }

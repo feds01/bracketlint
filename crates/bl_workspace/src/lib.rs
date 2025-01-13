@@ -10,7 +10,6 @@ pub mod settings;
 use std::{collections::HashMap, path::PathBuf};
 
 use bl_ast::{HasSource, SourceId};
-use bl_lints::settings::FixMode;
 use bl_utils::stream::CompilerOutputStream;
 use index_vec::IndexVec;
 pub use member::Member;
@@ -64,6 +63,10 @@ impl WorkspaceMembers {
     /// Get a mutable reference to a member by its [SourceId].
     pub fn get_member_by_id_mut(&mut self, id: SourceId) -> Option<&mut Member> {
         self.members.get_mut(id)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (SourceId, &Member)> + '_ {
+        self.members.iter_enumerated()
     }
 }
 
@@ -143,10 +146,7 @@ impl WorkspaceBuilder {
         Workspace {
             stdout: self.stdout.unwrap_or_else(CompilerOutputStream::stdout),
             stderr: self.stderr.unwrap_or_else(CompilerOutputStream::stderr),
-            settings: self.settings.unwrap_or_else(|| Settings::new(true, FixMode::default())), /* @@Todo: actually
-                                                                                                 * create a default
-                                                                                                 * for this or
-                                                                                                 * something? */
+            settings: self.settings.unwrap_or_default(),
             members: WorkspaceMembers::new(),
         }
     }

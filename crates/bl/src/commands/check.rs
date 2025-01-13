@@ -68,5 +68,13 @@ pub fn check(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
         },
     );
 
+    if workspace.settings.should_dump_ast() {
+        for (_, member) in workspace.members.iter() {
+            if member.document.is_some() {
+                emit_source_tree(member);
+            }
+        }
+    }
+
     Ok(pipeline_diagnostics)
 }

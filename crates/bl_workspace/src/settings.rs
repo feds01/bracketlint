@@ -133,21 +133,40 @@ pub struct LinterSettings {
     pub fix_mode: FixMode,
 }
 
+pub struct ParserSettings {
+    pub dump_ast: bool,
+}
+
 pub struct Settings {
     pub respect_gitignore: bool,
 
     /// Settings to do with file exclusions/inclusions.
     pub file_resolver: FileResolverSettings,
 
+    /// Settings to do with the parser.
+    pub parser_settings: ParserSettings,
+
+    /// Settings to do with the linter.
     pub linter_settings: LinterSettings,
 }
 
 impl Settings {
-    pub fn new(respect_gitignore: bool, fix_mode: FixMode) -> Self {
+    pub fn new(respect_gitignore: bool, fix_mode: FixMode, dump_ast: bool) -> Self {
         Settings {
             respect_gitignore,
+            parser_settings: ParserSettings { dump_ast },
             file_resolver: FileResolverSettings::new(),
             linter_settings: LinterSettings { fix_mode },
         }
+    }
+
+    pub fn should_dump_ast(&self) -> bool {
+        self.parser_settings.dump_ast
+    }
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Settings::new(true, FixMode::default(), false)
     }
 }
