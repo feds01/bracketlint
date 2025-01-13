@@ -770,6 +770,29 @@ impl<'s> Parser<'s> {
         Ok(self.nodes_with_joined_span(args, start))
     }
 
+
+    fn parse_name(&mut self) -> ParseResult<AstNode<ast::Name>> {
+        match self.peek() {
+            Some(Token { kind: TokenKind::Ident, span }) => {
+                self.skip_fast(TokenKind::Ident); // `<ident>` Skip the identifier token.
+
+                // @@Todo: actually interpolate the identifiers.
+                Ok(self.node_with_span(ast::Name::new(ast::Identifier::from(0u32)), *span))
+            }
+            Some(Token { kind: kind @ TokenKind::Keyword(kw), span }) if kw.identifier_like() => {
+                self.skip_fast(*kind); // `<kw>` Skip the keyword token.
+
+                Ok(self.node_with_span(ast::Name::new(ast::Identifier::from(0u32)), *span))
+            }
+            token => self.err_with_location(
+                ParseErrorKind::UnExpected,
+                ExpectedItem::Ident,
+                token.map(|tok| tok.kind),
+                self.expected_pos(),
+            ),
+        }
+    }
+
     fn parse_string(&mut self) -> ParseResult<AstNode<ast::StrLit>> {
         match self.peek() {
             Some(Token { kind: TokenKind::Str, span }) => {
