@@ -199,6 +199,20 @@ impl TokenKind {
         matches!(self, TokenKind::Keyword(Keyword::True | Keyword::False | Keyword::Load))
     }
 
+    /// This function is used to create an error message representing when a
+    /// token was unexpectedly encountered or was expected in a particular
+    /// context.
+    pub fn as_error_string(&self) -> String {
+        match self {
+            TokenKind::Unexpected(atom) => format!("an unknown character `{atom}`"),
+            TokenKind::Str => "a string literal".to_string(),
+            TokenKind::Number(_) => "a number".to_string(),
+            TokenKind::Text => "text".to_string(),
+            TokenKind::Keyword(kwd) => format!("the keyword `{kwd}`"),
+            TokenKind::Ident => "an identifier".to_string(),
+            kind => format!("a `{kind}`"),
+        }
+    }
 
     pub fn is_unary_op(&self) -> bool {
         matches!(self, TokenKind::Keyword(Keyword::Not) | TokenKind::Minus)

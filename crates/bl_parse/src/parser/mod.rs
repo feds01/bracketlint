@@ -538,6 +538,10 @@ impl<'s> Parser<'s> {
                 // Control flow tags, that are effectively standalone.
                 token::Keyword::Break => self.parse_break_statement(),
                 token::Keyword::Continue => self.parse_continue_statement(),
+                token::Keyword::Comment => {
+                    self.with_tag_context(TagContext::Comment, |g| g.parse_comment_block())
+                }
+
                 kwd if let Some(ctx) = self.tag_context()
                     && ctx.applies_to(kwd) =>
                 {
@@ -1059,6 +1063,29 @@ impl<'s> Parser<'s> {
                 g.range(),
             ))
         })
+    }
+
+    fn parse_comment_block(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+        let start = self.current_pos();
+
+        while let Some(token) = self.peek() {
+            // If it's a percent tree (and of length 1), then we can check if it's the end
+            // of the block.
+            if let TokenKind::Tree(Delimiter::Percent, _) = token.kind {
+                let maybe_token = self.peek_raw(1).map(|tok| tok.kind);
+                if let Some(TokenKind::Keyword(Keyword::EndComment)) = maybe_token {
+                    self.in_tree(Delimiter::Percent, None, |g| {
+                        g.parse_token(TokenKind::Keyword(token::Keyword::EndComment))?;
+                        Ok(())
+                    })?;
+                    break;
+                }
+            }
+
+            self.skip_token();
+        }
+
+        Ok(self.node_with_joined_span(ast::Statement::Comment(ast::Comment {}), start))
     }
 
     fn parse_body_until_block_footer<U>(
