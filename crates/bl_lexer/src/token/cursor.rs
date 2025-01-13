@@ -194,6 +194,37 @@ impl<'t> TokenCursor<'t> {
         }
     }
 
+    /// Lookup a token within the flat token stream instead of adhering
+    /// to the tree structure. This is useful for when we need to disambiguate
+    /// on how to parse a particular token tree. @@Future: Perhaps later we can
+    /// instead use `peek_tree()`, and then perform some kind of peek within
+    /// the tree itself to determine on how to parse the tree.
+    ///
+    /// ## Safety
+    ///
+    /// > Use this function with caution as it doesn't perform any checks
+    /// > on the tree ranges.
+    ///
+    /// ```
+    /// # use bl_lexer::token::{Token, TokenKind};
+    ///
+    /// let token = self.peek(1).unwrap_or_else(SomeErr(..))?;
+    /// assert!(token.kind.is_percent_tree());
+    ///
+    /// // Suppose that we wanna check the next token within the tree:
+    ///
+    /// let next = self.peek_second().unwrap_or_else(SomeErr(..))?; // 💣
+    /// assert!(next.kind.is_keyword(Keyword::If)); // 💣
+    ///
+    /// // Would not work since this would skip over the tree.
+    ///
+    /// let next = self.peek_raw(1).unwrap_or_else(SomeErr(..))?;
+    /// assert!(next.kind.is_keyword(Keyword::If));
+    /// ```
+    pub fn peek_raw(&self, offset: usize) -> Option<&Token> {
+        self.stream.get(self.pos.get() + offset)
+    }
+
     /// Function to check if the token stream has been exhausted based on the
     /// current offset in the generator.
     #[inline]
