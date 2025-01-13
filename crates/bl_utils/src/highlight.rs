@@ -8,7 +8,7 @@
 //!
 //! ```rust
 //! use bl_reporting::{ReportBuilder, Reports};
-//! use bl_utils::highlight::{highlight, Colour, Modifier};
+//! use bl_utils::highlight::{Colour, Modifier, highlight};
 //!
 //! let mut reporter = ReportBuilder::default();
 //!

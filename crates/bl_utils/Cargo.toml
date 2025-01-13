@@ -5,8 +5,11 @@ authors = { workspace = true }
 edition = { workspace = true }
 
 [dependencies]
+clap = { workspace = true }
 codespan-reporting = "0.11.1"
-path-absolutize = { workspace = true}
 log = { workspace = true }
 once_cell = { workspace = true }
-clap = { workspace = true }
+path-absolutize = { workspace = true}
+schemars = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

@@ -1,0 +1,13 @@
+[package]
+name = "bl_ast_utils"
+version = "0.1.0"
+authors = { workspace = true }
+edition = { workspace = true }
+
+[dependencies]
+bl_utils = { workspace = true }
+bl_ast = { workspace = true }
+
+derive_more = { workspace = true }
+itertools = { workspace = true }
+replace_with = { workspace = true }
