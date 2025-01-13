@@ -715,7 +715,7 @@ define_tree! {
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct Extends {
-        path: Child!(Path),
+        pub template: Child!(Expr),
     }
 
     #[derive(Clone, Debug, PartialEq)]
