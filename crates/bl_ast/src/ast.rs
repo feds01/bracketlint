@@ -701,7 +701,7 @@ define_tree! {
     pub struct MacroDef {
         name: Child!(Name),
         args: Children!(Name),
-        inner: Children!(Statement),
+        block_body: Child!(Body),
     }
 
     /// Directly insert the contents of another file into the current template.

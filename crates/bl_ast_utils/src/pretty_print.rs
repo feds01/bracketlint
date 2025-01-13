@@ -126,6 +126,37 @@ impl AstVisitor for AstTreePrinter<'_> {
         Ok(TreeNode::leaf(labelled("bool_lit", self.source.hunk(node.span().range), "")))
     }
 
+    type MacroDefRet = TreeNode;
+
+    fn visit_macro_def(
+        &self,
+        node: ast::AstNodeRef<ast::MacroDef>,
+    ) -> Result<Self::MacroDefRet, Self::Error> {
+        let walk::MacroDef { name, args, block_body } = walk::walk_macro_def(self, node)?;
+
+        Ok(TreeNode::branch("macro_def", vec![name, TreeNode::branch("args", args), block_body]))
+    }
+
+    type TagRet = TreeNode;
+
+    fn visit_tag(&self, node: ast::AstNodeRef<ast::Tag>) -> Result<Self::TagRet, Self::Error> {
+        walk::walk_tag_same_children(self, node)
+    }
+
+    type MacroCallExprRet = TreeNode;
+
+    fn visit_macro_call_expr(
+        &self,
+        node: ast::AstNodeRef<ast::MacroCallExpr>,
+    ) -> Result<Self::MacroCallExprRet, Self::Error> {
+        let walk::MacroCallExpr { name, namespace, args } = walk::walk_macro_call_expr(self, node)?;
+
+        Ok(TreeNode::branch("macro_call_expr", vec![
+            name,
+            TreeNode::branch("namespace", vec![namespace]),
+            TreeNode::branch("args", args),
+        ]))
+    }
 
     type LitRet = TreeNode;
 
