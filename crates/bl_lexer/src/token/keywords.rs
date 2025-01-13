@@ -101,6 +101,8 @@ pub enum Keyword {
     /// {% endif %}
     /// ```
     In,
+    /// `is` equality operator
+    Is,
     /// `as` - Variable assignment operator
     /// ```django
     /// {% with total=business.employees.count %}
@@ -159,24 +161,6 @@ pub enum Keyword {
     Raw,
     /// `endraw` - Ends a raw block
     EndRaw,
-    /// `csrf_token` - Generates a CSRF token for forms
-    /// ```django
-    /// <form method="post">
-    ///     {% csrf_token %}
-    ///     {{ form }}
-    /// </form>
-    /// ```
-    CsrfToken,
-    /// `url` - Generates a URL for a given view
-    /// ```django
-    /// <a href="{% url 'view-name' arg1 arg2 %}">Link</a>
-    /// ```
-    Url,
-    /// `static` - Generates URL for static files
-    /// ```django
-    /// <img src="{% static 'images/logo.png' %}">
-    /// ```
-    Static,
     /// `True` - Boolean true constant
     /// ```django
     /// {% if user.is_active == True %}
@@ -198,6 +182,22 @@ pub enum Keyword {
     /// {% import 'forms.html' as forms %}
     /// ```
     Import,
+
+    /// Reversed keyword for the `for` keyword.
+    /// ```django
+    /// {% for user in users reversed %}
+    ///    {{ user.name }}
+    /// {% endfor %}
+    /// ```
+    Reversed,
+}
+impl Keyword {
+    pub fn identifier_like(&self) -> bool {
+        matches!(
+            self,
+            Keyword::Block | Keyword::Empty | Keyword::Load | Keyword::Import | Keyword::Comment
+        )
+    }
 }
 
 impl fmt::Display for Keyword {
@@ -226,6 +226,7 @@ static KEYWORDS: phf::Map<&'static str, Keyword> = phf_map! {
     "not" => Keyword::Not,
     "in" => Keyword::In,
     "as" => Keyword::As,
+    "is" => Keyword::Is,
 
     // Context management
     "with" => Keyword::With,
@@ -244,17 +245,15 @@ static KEYWORDS: phf::Map<&'static str, Keyword> = phf_map! {
     "raw" => Keyword::Raw,
     "endraw" => Keyword::EndRaw,
 
-    // Special tags
-    "csrf_token" => Keyword::CsrfToken,
-    "url" => Keyword::Url,
-    "static" => Keyword::Static,
-
     // Constants
     "True" => Keyword::True,
     "False" => Keyword::False,
 
     // Template importing
     "import" => Keyword::Import,
+
+    // Modifiers
+    "reversed" => Keyword::Reversed,
 };
 
 impl TryFrom<&str> for Keyword {
