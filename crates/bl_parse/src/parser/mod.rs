@@ -242,7 +242,58 @@ impl<'s> Parser<'s> {
         AstNodes::with_id(nodes, id)
     }
 
-    pub fn parse_document(&mut self) -> AstNode<Document> {
+    /// Create an error without wrapping it in an [Err] variant
+    #[inline(always)]
+    fn make_err(
+        &self,
+        kind: ParseErrorKind,
+        expected: ExpectedItem,
+        received: Option<TokenKind>,
+        span: Option<ByteRange>,
+    ) -> ParseError {
+        self.frame.error.set(true);
+
+        ParseError::new(
+            kind,
+            self.make_span(span.unwrap_or_else(|| self.eof_pos())),
+            expected,
+            received,
+        )
+    }
+
+    /// Create an error at the current location.
+    pub(crate) fn err_with_location<T>(
+        &self,
+        kind: ParseErrorKind,
+        expected: ExpectedItem,
+        received: Option<TokenKind>,
+        span: ByteRange,
+    ) -> ParseResult<T> {
+        Err(self.make_err(kind, expected, received, Some(span)))
+    }
+
+    /// Generate an error that represents that within the current [AstGen] the
+    /// `end of file` state should be reached. This means that either in the
+    /// root generator there are no more tokens or within a nested generator
+    /// (such as if the generator is within a brackets) that it should now
+    /// read no more tokens.
+    pub(crate) fn expected_eof<T>(&self) -> ParseResult<T> {
+        let tok = self.peek().unwrap_or_else(|| self.previous_token());
+
+        self.err_with_location(
+            ParseErrorKind::UnExpected,
+            ExpectedItem::empty(),
+            Some(tok.kind),
+            tok.span,
+        )
+    }
+
+    #[inline]
+    pub(crate) fn make_unexpected_eof(&self) -> ParseError {
+        self.make_err(ParseErrorKind::UnExpected, ExpectedItem::empty(), None, None)
+    }
+
+    pub fn parse_document(&mut self) -> AstNode<ast::Document> {
         // if self.options.recovery {
         //     log::info!("recovery mode enabled");
         // }
