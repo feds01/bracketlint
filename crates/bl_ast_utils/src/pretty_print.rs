@@ -1,5 +1,4 @@
 //! AST visualisation utilities.
-#![allow(dead_code, unused_variables)]
 use std::convert::Infallible;
 
 use bl_ast::{self as ast, AstVisitor, SpannedSource, walk};
@@ -73,6 +72,16 @@ impl AstVisitor for AstTreePrinter<'_> {
         Ok(TreeNode::leaf("comment"))
     }
 
+    type GenericTagRet = TreeNode;
+
+    fn visit_generic_tag(
+        &self,
+        node: ast::AstNodeRef<ast::GenericTag>,
+    ) -> Result<Self::GenericTagRet, Self::Error> {
+        let walk::GenericTag { name, args } = walk::walk_generic_tag(self, node)?;
+
+        Ok(TreeNode::branch("generic_tag", vec![name, TreeNode::branch("args", args)]))
+    }
 
     type WithRet = TreeNode;
 
@@ -470,4 +479,12 @@ impl AstVisitor for AstTreePrinter<'_> {
         })
     }
 
+    type UnprocessableTagRet = TreeNode;
+
+    fn visit_unprocessable_tag(
+        &self,
+        _: ast::AstNodeRef<ast::UnprocessableTag>,
+    ) -> Result<Self::UnprocessableTagRet, Self::Error> {
+        Ok(TreeNode::leaf("unprocessable_tag"))
+    }
 }
