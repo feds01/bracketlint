@@ -248,6 +248,14 @@ impl<'lex> Lexer<'lex> {
                 }
                 c if is_ident_start(c) => self.ident(c),
                 '0'..='9' => self.number(ShouldSkip::No),
+                '|' => TokenKind::Pipe,
+                '!' => match self.peek() {
+                    '=' => {
+                        self.skip_ascii();
+                        TokenKind::NotEq
+                    }
+                    _ => TokenKind::Exclamation,
+                },
                 ':' => TokenKind::Colon,
                 ',' => TokenKind::Comma,
                 '.' => TokenKind::Dot,
@@ -276,6 +284,7 @@ impl<'lex> Lexer<'lex> {
                     c if c.is_ascii_digit() => self.number(ShouldSkip::Yes),
                     _ => TokenKind::Minus,
                 },
+                '+' => TokenKind::Plus,
                 c @ ('\'' | '"') => self.string(c),
                 c => TokenKind::Unexpected(c),
             }
