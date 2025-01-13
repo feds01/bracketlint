@@ -538,6 +538,12 @@ impl<'s> Parser<'s> {
                 // Control flow tags, that are effectively standalone.
                 token::Keyword::Break => self.parse_break_statement(),
                 token::Keyword::Continue => self.parse_continue_statement(),
+
+                // Block tags, which have a structure that they must be terminated with an
+                // end tag, e.self. `{% block %} ... {% endblock %}`.
+                token::Keyword::With => {
+                    self.with_tag_context(TagContext::With, |g| g.parse_with_block())
+                }
                 token::Keyword::Block => {
                     self.with_tag_context(TagContext::Block, |g| g.parse_block_statement())
                 }
@@ -1071,6 +1077,36 @@ impl<'s> Parser<'s> {
         })
     }
 
+    fn parse_with_block(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+        let token = *self.current_token();
+
+        // Parse the header first, we should get `block <name>`.
+        let assignments = self.in_tree(Delimiter::Percent, None, |g| {
+            g.parse_token(TokenKind::Keyword(token::Keyword::With))?;
+            g.parse_assignments()
+        })?;
+
+        // Now parse a bunch of general statements until we reach the end of the block.
+        let (block_body, _) = self.parse_body_until_block_footer(
+            ExpectedItem::empty(),
+            |kind| matches!(kind, TokenKind::Keyword(token::Keyword::EndWith)),
+            |g| {
+                g.skip_fast(TokenKind::Keyword(token::Keyword::EndWith)); // `<endwith>` Skip the end token.
+                let _ = g.parse_token_fast(TokenKind::Ident);
+
+                Ok(())
+            },
+        )?;
+
+        Ok(self.node_with_joined_span(
+            ast::Statement::Tag(ast::Tag::With(ast::With {
+                assignments,
+                block_body,
+                kind: ast::AssignmentKind::With,
+            })),
+            token.span,
+        ))
+    }
 
     fn parse_block_statement(&mut self) -> ParseResult<AstNode<ast::Statement>> {
         let token = *self.current_token();
@@ -1389,6 +1425,63 @@ impl<'s> Parser<'s> {
             _ => Ok(None),
         }
     }
+
+    fn parse_assignments(&mut self) -> ParseResult<AstNodes<ast::Assignment>> {
+        let mut assignments = thin_vec![];
+        let start = self.current_pos();
+
+        while self.peek().is_some() {
+            match self.parse_assignment() {
+                Ok(Some(assignment)) => assignments.push(assignment),
+                Ok(None) => break,
+                Err(err) => {
+                    self.add_error(err);
+                    break;
+                }
+            }
+        }
+
+        Ok(self.nodes_with_joined_span(assignments, start))
+    }
+
+    fn parse_assignment(&mut self) -> ParseResult<Option<AstNode<ast::Assignment>>> {
+        let position = self.cursor.position();
+        let start = self.current_pos();
+
+        match (self.peek(), self.peek_second()) {
+            (
+                Some(Token { kind: TokenKind::Ident, .. }),
+                Some(Token { kind: TokenKind::Eq, .. }),
+            ) => {
+                let name = self.parse_name()?;
+                self.skip_fast(TokenKind::Eq); // `<eq>` Skip the assignment operator token.
+                let value = self.parse_expr()?;
+                Ok(Some(self.node_with_joined_span(ast::Assignment { name, value }, start)))
+            }
+            _ if self.options.dialect.is_django() => {
+                let Some(value) = self.peek_resultant_fn(|g| g.parse_expr()) else {
+                    return Ok(None);
+                };
+
+                let maybe_token = self.peek_kind();
+
+                if let Some(TokenKind::Keyword(Keyword::As)) = maybe_token {
+                    self.skip_fast(TokenKind::Keyword(Keyword::As)); // `as` Skip the operator token.
+                    let name = self.parse_name()?;
+
+                    Ok(Some(self.node_with_joined_span(ast::Assignment { name, value }, start)))
+                } else {
+                    // Reset the cursor to the start position.
+                    unsafe {
+                        self.cursor.set_pos(position);
+                    }
+                    Ok(None)
+                }
+            }
+            _ => Ok(None),
+        }
+    }
+
     /// Exhaust the current [TokenCursor] until the end of the input.
     ///
     /// This is an auxiliary operation for the parser for wh
