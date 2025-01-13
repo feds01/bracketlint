@@ -243,6 +243,33 @@ impl AstVisitor for AstTreePrinter<'_> {
         Ok(TreeNode::leaf(format!("operator `{}`", node.body())))
     }
 
+
+    type ForRet = TreeNode;
+
+    fn visit_for(&self, node: ast::AstNodeRef<ast::For>) -> Result<Self::ForRet, Self::Error> {
+        let walk::For { target, iterator, guard, loop_body, loop_empty, reverse_modifier } =
+            walk::walk_for(self, node)?;
+
+        let mut children = vec![
+            TreeNode::branch("target", vec![target]),
+            TreeNode::branch("iterator", vec![iterator]),
+            TreeNode::branch("loop_body", vec![loop_body]),
+        ];
+
+        if let Some(loop_empty) = loop_empty {
+            children.push(TreeNode::branch("loop_empty", vec![loop_empty]));
+        }
+
+        if reverse_modifier.is_some() {
+            children.push(TreeNode::leaf("reversed"));
+        }
+
+        if let Some(guard) = guard {
+            children.push(TreeNode::branch("guard", vec![guard]));
+        }
+
+        Ok(TreeNode::branch("for", children))
+    }
     type AccessExprRet = TreeNode;
 
     fn visit_access_expr(
@@ -277,6 +304,23 @@ impl AstVisitor for AstTreePrinter<'_> {
     ) -> Result<Self::FilterRet, Self::Error> {
         let walk::Filter { name, args } = walk::walk_filter(self, node)?;
         Ok(TreeNode::branch("filter", vec![name, TreeNode::branch("args", args)]))
+    }
+
+    type ForTargetRet = TreeNode;
+
+    fn visit_for_target(
+        &self,
+        node: ast::AstNodeRef<ast::ForTarget>,
+    ) -> Result<Self::ForTargetRet, Self::Error> {
+        let walk::ForTarget { items } = walk::walk_for_target(self, node)?;
+        let length = items.len();
+
+        // For 1, just get the item, otherwise create a branch.
+        Ok(if length == 1 {
+            items.into_iter().next().unwrap()
+        } else {
+            TreeNode::branch("for_target", items)
+        })
     }
 
 }

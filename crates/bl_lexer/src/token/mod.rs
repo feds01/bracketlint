@@ -205,6 +205,26 @@ impl TokenKind {
     }
 
 
+    #[allow(clippy::match_like_matches_macro)]
+    pub fn is_control_flow_for(&self, preceding_token: TokenKind) -> bool {
+        match (preceding_token, self) {
+            (
+                TokenKind::Keyword(Keyword::For),
+                TokenKind::Keyword(Keyword::Empty | Keyword::EndFor),
+            ) => true,
+            (
+                TokenKind::Keyword(Keyword::If),
+                TokenKind::Keyword(Keyword::Elif | Keyword::Else | Keyword::EndIf),
+            ) => true,
+            (
+                TokenKind::Keyword(Keyword::Elif),
+                TokenKind::Keyword(Keyword::Elif | Keyword::Else | Keyword::EndIf),
+            ) => true,
+            (TokenKind::Keyword(Keyword::Else), TokenKind::Keyword(Keyword::EndIf)) => true,
+            _ => false,
+        }
+    }
+
     /// Check if a token starts an expression.
     pub fn starts_expr(&self) -> bool {
         match self {

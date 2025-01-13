@@ -799,10 +799,35 @@ define_tree! {
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct For {
-        key: OptionalChild!(Name),
-        value: Child!(Name),
-        loop_body: Child!(Body),
-        loop_empty: OptionalChild!(Body),
+        pub target: Child!(ForTarget),
+        pub iterator: Child!(Expr),
+        pub guard: OptionalChild!(Expr),
+        pub reverse_modifier: OptionalChild!(Name),
+        pub loop_body: Child!(Body),
+        pub loop_empty: OptionalChild!(Body),
+    }
+
+    /// The target of a [`For`] loop, which can be a simple variable or a variable
+    /// with an optional value.
+    ///
+    /// For example:
+    ///
+    /// ```html
+    ///
+    /// {% for item in items %}
+    ///    {{ item }}
+    /// {% endfor %}
+    ///
+    /// {% for key, value in items %}
+    ///   {{ key }}: {{ value }}
+    /// {% endfor %}
+    /// ```
+    ///
+    /// Reference: https://jinja.palletsprojects.com/en/3.0.x/templates/#for
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct ForTarget {
+        pub items : Children!(Name),
     }
 
     /// Control flow statement to skip the current iteration of a [`For`] loop.
