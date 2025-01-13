@@ -68,4 +68,8 @@ pub struct CheckCommand {
     show_fixes: bool,
     #[clap(long, overrides_with("show_fixes"), hide = true)]
     no_show_fixes: bool,
+
+    /// Dump the generated AST for the given files.
+    #[arg(long)]
+    pub dump_ast: bool,
 }

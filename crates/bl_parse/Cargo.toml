@@ -12,6 +12,7 @@ log = { workspace = true }
 thin-vec = { workspace = true }
 
 bl_ast = { workspace = true }
+bl_ast_utils = { workspace = true }
 bl_lexer = { workspace = true }
 bl_reporting = { workspace = true }
 bl_workspace = { workspace = true }
