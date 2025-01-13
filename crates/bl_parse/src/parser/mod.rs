@@ -61,7 +61,7 @@ impl<'s> ParseFrame<'s> {
 
     /// Get the current location from the current token, if there is no token at
     /// the current offset, then the location of the last token is used.
-    pub(crate) fn current_pos(&self) -> ByteRange {
+    pub(crate) fn _current_pos(&self) -> ByteRange {
         // If there are no tokens in the cursor, or if current position
         // is beyond the length of the stream, then we use the last token's
         // location.
@@ -107,12 +107,6 @@ impl<'s> ParseFrame<'s> {
     fn expected_pos(&self) -> ByteRange {
         let pos = self.previous_pos().end() + 1;
         ByteRange::new(pos, pos)
-    }
-
-    /// Check whether the frame has encountered an error.
-    #[inline(always)]
-    pub(crate) fn has_error(&self) -> bool {
-        self.error.get()
     }
 }
 
@@ -293,6 +287,29 @@ impl<'s> Parser<'s> {
         self.make_err(ParseErrorKind::UnExpected, ExpectedItem::empty(), None, None)
     }
 
+    /// Create new AST generator from a provided token stream with inherited
+    /// module resolver and a provided parent span.
+    fn new_frame<T>(
+        &mut self,
+        start: usize,
+        len: usize,
+        parent_span: ByteRange,
+        mut g: impl FnMut(&mut Self) -> T,
+    ) -> T {
+        let new_frame =
+            ParseFrame::from_stream(&self.frame.stream()[start..(start + len)], parent_span);
+        let old_frame = std::mem::replace(&mut self.frame, new_frame);
+        let result = g(self);
+
+        // Ensure that the generator token stream has been exhausted
+        if !self.error.get() && self.has_token() {
+            self.maybe_add_error::<()>(self.expected_eof());
+        }
+
+        // Now finally swap back the old frame
+        let _ = std::mem::replace(&mut self.frame, old_frame);
+        result
+    }
 
     /// Function to parse the next [Token] with the specified [TokenKind].
     ///
@@ -314,6 +331,31 @@ impl<'s> Parser<'s> {
         }
     }
 
+    /// Utility function to parse a brace tree as the next token, if a brace
+    /// tree isn't present, then an error is generated.
+    pub(crate) fn in_tree<T>(
+        &mut self,
+        delimiter: Delimiter,
+        error: Option<ParseErrorKind>,
+        g: impl FnMut(&mut Self) -> ParseResult<T>,
+    ) -> ParseResult<T> {
+        match self.peek() {
+            Some(Token { kind: TokenKind::Tree(inner, len), span }) if *inner == delimiter => {
+                // The start of the tree is the actual `Tree` token, and then we slice
+                // from it up to the specified `len` of the tree.
+                let start = self.position() + 1;
+
+                self.skip_token(); // We want to update our position, when we return to this generator.
+                self.new_frame(start, *len as usize, *span, g)
+            }
+            token => self.err_with_location(
+                error.unwrap_or(ParseErrorKind::UnExpected),
+                ExpectedItem::from(delimiter),
+                token.map(|tok| tok.kind),
+                token.map_or_else(|| self.current_pos(), |tok| tok.span),
+            ),
+        }
+    }
 
     /// Function to parse a token atom optionally. If the appropriate token atom
     /// is present we advance the token count, if not then just return [None].
