@@ -435,21 +435,6 @@ define_tree! {
         root_module: bl_ast::ast,
     }}
 
-    #[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
-    #[node]
-    pub enum Op {
-        /// +
-        Add,
-        /// -
-        Sub,
-        /// *
-        Mul,
-        /// /
-        Div,
-        /// %
-        Modulo,
-    }
-
     /// All logic operators
     #[derive(Copy, Clone, Debug, PartialEq)]
     #[node]
