@@ -106,7 +106,6 @@ dependencies = [
  "bl_utils",
  "derive_more",
  "index_vec",
- "itertools",
  "line-span",
  "once_cell",
  "parking_lot",

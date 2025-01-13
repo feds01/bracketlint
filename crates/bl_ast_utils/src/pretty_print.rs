@@ -23,6 +23,24 @@ fn labelled(label: impl ToString, contents: impl ToString, quote_str: &str) -> S
 
 impl AstVisitor for AstTreePrinter<'_> {
 
+    type DocumentRet = TreeNode;
+    fn visit_document(
+        &self,
+        node: ast::AstNodeRef<ast::Document>,
+    ) -> Result<Self::DocumentRet, Self::Error> {
+        let walk::Document { children } = walk::walk_document(self, node)?;
+        Ok(TreeNode::branch("document", children))
+    }
+
+    type CommentRet = TreeNode;
+
+    fn visit_comment(
+        &self,
+        _: ast::AstNodeRef<ast::Comment>,
+    ) -> Result<Self::CommentRet, Self::Error> {
+        Ok(TreeNode::leaf("comment"))
+    }
+
     type BoolLitRet = TreeNode;
 
     fn visit_bool_lit(
