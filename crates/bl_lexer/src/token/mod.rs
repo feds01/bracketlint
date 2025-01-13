@@ -72,21 +72,64 @@ impl TryFrom<char> for Delimiter {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum TokenKind {
+    /// Colon, `:`
     Colon,
+
+    /// Comma, `,`
     Comma,
+
+    /// Dot, `.`
     Dot,
+
+    /// Assignment, `=`
     Eq,
+
+    /// Equal to, `==`
     EqEq,
+
+    /// Not equal to, `!=`
+    NotEq,
+
+    /// Greater than, `>`
     Gt,
+
+    /// Greater than or equal to, `>=`
     GtEq,
+
+    /// Less than, `<`
     Lt,
+
+    /// Less than or equal to, `<=`
     LtEq,
+
+    /// Minus, `-`
     Minus,
+
+    /// Plus, `+`
+    Plus,
+
+    /// Exclamation, `!`
     Exclamation,
+
+    /// Pound, `#`
     Pound,
+
+    /// Pipe, `|`
+    Pipe,
+
+    /// Percent, `%`
     Percent,
+
+    /// An identifier.
     Ident,
     Number,
+
+    /// A string literal.
+    ///
+    /// This is a token that represents a string literal, e.g. `"hello world"`.
+    ///
+    /// N.B. String literals don't support escaping, everything within the
+    /// string is considered verbatim.
     Str,
 
     /// Effectively a hunk of text within the source that isn't tokenised from
@@ -125,17 +168,20 @@ impl fmt::Display for TokenKind {
         match self {
             TokenKind::Eq => write!(f, "="),
             TokenKind::EqEq => write!(f, "=="),
+            TokenKind::NotEq => write!(f, "!="),
             TokenKind::Lt => write!(f, "<"),
             TokenKind::LtEq => write!(f, "<="),
             TokenKind::Gt => write!(f, ">"),
             TokenKind::GtEq => write!(f, ">="),
             TokenKind::Minus => write!(f, "-"),
+            TokenKind::Plus => write!(f, "+"),
             TokenKind::Percent => write!(f, "%"),
             TokenKind::Exclamation => write!(f, "!"),
             TokenKind::Dot => write!(f, "."),
             TokenKind::Colon => write!(f, ":"),
             TokenKind::Pound => write!(f, "#"),
             TokenKind::Comma => write!(f, ","),
+            TokenKind::Pipe => write!(f, "|"),
             TokenKind::LeftDelim(delim) => write!(f, "{}", delim.left()),
             TokenKind::RightDelim(delim) => write!(f, "{}", delim.right()),
             TokenKind::Tree(delim, _) => write!(f, "{}...{}", delim.left(), delim.right()),
