@@ -209,6 +209,18 @@ impl AstVisitor for AstTreePrinter<'_> {
     fn visit_break(&self, _: ast::AstNodeRef<ast::Break>) -> Result<Self::BreakRet, Self::Error> {
         Ok(TreeNode::leaf("break"))
     }
+
+    type IncludeRet = TreeNode;
+
+    fn visit_include(
+        &self,
+        node: ast::AstNodeRef<ast::Include>,
+    ) -> Result<Self::IncludeRet, Self::Error> {
+        let walk::Include { template, context } = walk::walk_include(self, node)?;
+
+        Ok(TreeNode::branch("include", vec![template, TreeNode::branch("context", context)]))
+    }
+
     type IntLitRet = TreeNode;
 
     fn visit_int_lit(

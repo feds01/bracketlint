@@ -546,6 +546,7 @@ impl<'s> Parser<'s> {
 
                 // Effectively, special functions that we keep track of.
                 token::Keyword::Extends => self.parse_extends_statement(),
+                token::Keyword::Include => self.parse_include_statement(),
                 token::Keyword::Import => self.parse_import_statement(),
                 _ => self.err_with_location(
                     ParseErrorKind::Tag,
@@ -1132,6 +1133,33 @@ impl<'s> Parser<'s> {
 
             Ok(g.node_with_span(
                 ast::Statement::Tag(ast::Tag::Extends(ast::Extends { template })),
+                g.range(),
+            ))
+        })
+    }
+
+    /// Parse an `include` statement, i.e.
+    ///
+    /// ```html
+    /// {% include "header.html" with title="Header" %}
+    /// ```
+    ///
+    /// Based on: https://www.w3schools.com/django/django_tags_include.php
+    fn parse_include_statement(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+        // Parse the header first, we should get `block <name>`.
+        self.in_tree(Delimiter::Percent, None, |g| {
+            g.parse_token(TokenKind::Keyword(token::Keyword::Include))?;
+            let template = g.parse_expr()?;
+
+            let context = if g.parse_token_fast(TokenKind::Keyword(token::Keyword::With)).is_some()
+            {
+                g.parse_args()?
+            } else {
+                g.nodes_with_span(thin_vec![], g.range())
+            };
+
+            Ok(g.node_with_span(
+                ast::Statement::Tag(ast::Tag::Include(ast::Include { template, context })),
                 g.range(),
             ))
         })

@@ -708,7 +708,16 @@ define_tree! {
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct Include {
-        path: Child!(Path),
+        pub template: Child!(Expr),
+
+        /// Optionally, this also has a notion of arguments in the form of key
+        /// value pairs, which follow the scheme `<key ~ ident> = <value ~ expr>`.
+        /// For example:
+        ///
+        /// ```html
+        /// {% include "file" with x = 10 %}
+        /// ```
+        pub context: Children!(Arg),
     }
 
     /// Extend the current template with the contents of another file.
