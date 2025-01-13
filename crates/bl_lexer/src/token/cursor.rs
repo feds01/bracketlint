@@ -99,7 +99,7 @@ impl<'t> TokenCursor<'t> {
     /// Get the current token, and advance to the next token if there
     /// exists another token in the [TokenStream].
     #[inline(always)]
-    pub fn current_token_and_advance(&self) -> Option<&Token> {
+    pub fn advance(&self) -> Option<&Token> {
         // Look at the current token, and check if we need
         // skip over a tree...
         let value = self.stream.get(self.pos.get())?;

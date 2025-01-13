@@ -538,6 +538,9 @@ impl<'s> Parser<'s> {
                 // Control flow tags, that are effectively standalone.
                 token::Keyword::Break => self.parse_break_statement(),
                 token::Keyword::Continue => self.parse_continue_statement(),
+                token::Keyword::Raw => {
+                    self.with_tag_context(TagContext::Raw, |g| g.parse_raw_block())
+                }
                 token::Keyword::Comment => {
                     self.with_tag_context(TagContext::Comment, |g| g.parse_comment_block())
                 }
@@ -1063,6 +1066,30 @@ impl<'s> Parser<'s> {
                 g.range(),
             ))
         })
+    }
+
+
+    fn parse_raw_block(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+        let start = self.current_pos();
+
+        self.in_tree(Delimiter::Percent, None, |g| {
+            g.parse_token(TokenKind::Keyword(token::Keyword::Comment))
+        })?;
+
+        // Now eat until the end of the block.
+        let (block_body, _) = self.parse_body_until_block_footer(
+            ExpectedItem::empty(),
+            |kind| matches!(kind, TokenKind::Keyword(token::Keyword::EndRaw)),
+            |g| {
+                g.skip_fast(TokenKind::Keyword(token::Keyword::EndRaw)); // `<endraw>` Skip the endraw token.
+                Ok(())
+            },
+        )?;
+
+        Ok(self.node_with_joined_span(
+            ast::Statement::Tag(ast::Tag::Raw(ast::Raw { block_body })),
+            start,
+        ))
     }
 
     fn parse_comment_block(&mut self) -> ParseResult<AstNode<ast::Statement>> {
