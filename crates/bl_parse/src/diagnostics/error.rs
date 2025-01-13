@@ -29,6 +29,28 @@ pub enum ParseErrorKind {
     /// Generic error specifying an expected token atom.
     UnExpected,
 
+    /// Expected a top level statement, either being some block or
+    /// just text. This is effectively an invariant as tokens at the
+    /// top level can only be [TokenKind::Text] or delimited [TokenKind::Tree]s.
+    Statement,
+
+    /// Expected a statement to be a tag, or the block has tokens that begin
+    /// a tag, e.g.
+    ///
+    /// ```django
+    /// {% if user.is_active %}
+    /// ```
+    Tag,
+
+    /// For tags that expect a termination, e.g. `{% endif %}`, this error
+    /// represents the case where the termination is missing, e.g.
+    /// ```
+    /// {% if user.is_active %}
+    ///   ...
+    ///
+    /// <EOF>
+    /// ```
+    UnclosedTag,
 }
 
 impl From<ParseError> for Reports {
@@ -46,6 +68,9 @@ impl From<ParseError> for Reports {
                 Some(kind) => format!("unexpectedly encountered {}", kind.as_error_string()),
                 None => "unexpectedly reached the end of input".to_string(),
             },
+            ParseErrorKind::Statement => "expected a statement".to_string(),
+            ParseErrorKind::Tag => "expected a tag".to_string(),
+            ParseErrorKind::UnclosedTag => "expected a closing tag".to_string(),
         };
 
         // `ParseErrorKind::Expected` format the error message in their own way,
