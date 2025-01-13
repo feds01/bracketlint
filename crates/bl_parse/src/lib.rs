@@ -1,10 +1,12 @@
 //! Contains all of the parsing logic for the `bl` project.
-#![allow(dead_code)]
+#![feature(let_chains, if_let_guard)]
 
-use bl_ast::{AstNode, Document, LocalSpanMap, SourceId, SpanMap, SpannedSource};
-use bl_lexer::{Lexer, LexerMetadata};
-use bl_reporting::{DiagnosticsMut, Report, Reports};
+use bl_ast::{
+    AstNode, AstVisitor, Document, LocalSpanMap, SourceId, Span, SpanMap, SpannedSource,
+    TempSourceMap,
+};
 use bl_ast_utils::{AstTreePrinter, TreeWriter, TreeWriterConfig};
+use bl_lexer::{Lexer, LexerMetadata, token::Token};
 use bl_reporting::{
     DiagnosticsMut, Report, Reports,
     inline::{InlineSnippet, note_on_span},
@@ -87,12 +89,12 @@ pub fn parse_source(query: ParseQuery) -> ParseQueryResult {
     let LexerMetadata { tokens, mut diagnostics } = Lexer::new(spanned, id).tokenise();
     let mut spans = LocalSpanMap::with_capacity(tokens.len() * 2);
 
+    // @@Todo: Make this a query instead so that we can call it as a debugging
+    // tool.
+    //
     // Print the tokens that we produce.
-    // let temp_map = TempSourceMap::from((&member).with_id(id));
-    // for token in &tokens {
-    //     let snippet = InlineSnippet::new(&temp_map, Span::new(token.span, id));
-    //     note_on_span(snippet, format!("token: {}", token.kind));
-    // }
+    //
+    // emit_tokens(id, member, &tokens);
 
     // Check if the lexer has errors...
     if diagnostics.has_errors() {
@@ -131,4 +133,12 @@ pub fn emit_source_tree(member: &Member) {
         path.display(),
         TreeWriter::new_with_config(&tree, config)
     );
+}
+
+pub fn emit_tokens(id: SourceId, member: &Member, tokens: &[Token]) {
+    let temp_map = TempSourceMap::from(member.with_id(id));
+    for token in tokens {
+        let snippet = InlineSnippet::new(&temp_map, Span::new(token.span, id));
+        note_on_span(snippet, format!("token: {}", token.kind));
+    }
 }
