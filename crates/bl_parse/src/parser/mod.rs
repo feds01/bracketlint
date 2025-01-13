@@ -293,6 +293,44 @@ impl<'s> Parser<'s> {
         self.make_err(ParseErrorKind::UnExpected, ExpectedItem::empty(), None, None)
     }
 
+
+    /// Function to parse the next [Token] with the specified [TokenKind].
+    ///
+    /// ##Note: Don't use `parse_token()` to parse a tree token.
+    pub(crate) fn parse_token(&self, atom: TokenKind) -> ParseResult<()> {
+        debug_assert!(!atom.is_tree());
+
+        match self.peek() {
+            Some(token) if token.kind == atom => {
+                self.skip_fast(token.kind); // non-tree
+                Ok(())
+            }
+            token => self.err_with_location(
+                ParseErrorKind::UnExpected,
+                ExpectedItem::from(atom),
+                token.map(|t| t.kind),
+                token.map_or_else(|| self.eof_pos(), |t| t.span),
+            ),
+        }
+    }
+
+
+    /// Function to parse a token atom optionally. If the appropriate token atom
+    /// is present we advance the token count, if not then just return [None].
+    ///
+    /// ##Note: Don't use `parse_token_fast()` to parse a tree token.
+    pub(crate) fn parse_token_fast(&self, kind: TokenKind) -> Option<()> {
+        debug_assert!(!kind.is_tree());
+
+        match self.peek() {
+            Some(token) if token.kind == kind => {
+                self.skip_fast(kind); // token, non-tree
+                Some(())
+            }
+            _ => None,
+        }
+    }
+
     pub fn parse_document(&mut self) -> AstNode<ast::Document> {
         // if self.options.recovery {
         //     log::info!("recovery mode enabled");
@@ -303,5 +341,54 @@ impl<'s> Parser<'s> {
 
         let children = self.nodes_with_joined_span(children, start);
         self.node_with_joined_span(Document { children }, start)
+
+    fn parse_lit(&self) -> ParseResult<ast::Lit> {
+        let token = self.current_token();
+
+        match token.kind {
+            TokenKind::Keyword(token::Keyword::False) => {
+                self.skip_fast(TokenKind::Keyword(token::Keyword::False)); // `<false>` Skip the false token.
+                Ok(ast::Lit::Bool(ast::BoolLit { value: false }))
+            }
+            TokenKind::Keyword(token::Keyword::True) => {
+                self.skip_fast(TokenKind::Keyword(token::Keyword::True)); // `<true>` Skip the true token.
+                Ok(ast::Lit::Bool(ast::BoolLit { value: true }))
+            }
+            TokenKind::Str => {
+                self.skip_fast(TokenKind::Str); // `<string>` Skip the string token.
+                Ok(ast::Lit::Str(ast::StrLit {}))
+            }
+            TokenKind::Number(flags) => {
+                self.skip_fast(TokenKind::Number(flags)); // `<number>` Skip the number token.
+                match flags {
+                    NumberFlags::Int => Ok(ast::Lit::Int(ast::IntLit { value: 0 })),
+                    NumberFlags::Float => Ok(ast::Lit::Float(ast::FloatLit { value: 0.0 })),
+                }
+            }
+            _ => self.err_with_location(
+                ParseErrorKind::UnExpected,
+                ExpectedItem::Literal,
+                Some(token.kind),
+                token.span,
+            ),
+        }
+    }
+
+
+    fn parse_string(&mut self) -> ParseResult<AstNode<ast::StrLit>> {
+        match self.peek() {
+            Some(Token { kind: TokenKind::Str, span }) => {
+                self.skip_fast(TokenKind::Str); // `<string>` Skip the string token.
+
+                Ok(self.node_with_span(ast::StrLit {}, *span))
+            }
+            token => self.err_with_location(
+                ParseErrorKind::UnExpected,
+                ExpectedItem::Literal,
+                token.map(|tok| tok.kind),
+                self.expected_pos(),
+            ),
+        }
+    }
     }
 }
