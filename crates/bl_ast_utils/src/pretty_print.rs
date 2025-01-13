@@ -125,6 +125,18 @@ impl AstVisitor for AstTreePrinter<'_> {
         walk::walk_expr_same_children(self, node)
     }
 
+    type ImportRet = TreeNode;
+
+    fn visit_import(
+        &self,
+        node: ast::AstNodeRef<ast::Import>,
+    ) -> Result<Self::ImportRet, Self::Error> {
+        let walk::Import { template, names } = walk::walk_import(self, node)?;
+
+        Ok(TreeNode::branch("import", vec![
+            TreeNode::branch("template", vec![template]),
+            TreeNode::branch("names", names),
+        ]))
     }
 
     type FilteredExprRet = TreeNode;

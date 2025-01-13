@@ -721,8 +721,8 @@ define_tree! {
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct Import {
-        path: Child!(Path),
-        name: OptionalChild!(Name),
+        pub template: Child!(StrLit),
+        pub names: Children!(Name),
     }
 
     /// A tag to set a value in place, i.e.
@@ -873,7 +873,7 @@ define_tree! {
         /// The `{% extends "file" %}` tag
         Extends(Extends),
 
-        /// The `{% import %}` tag
+        /// The `{% import "file" %}` tag
         Import(Import),
 
         /// The `{% if condition %}` tag
