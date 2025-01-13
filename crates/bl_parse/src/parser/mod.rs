@@ -544,6 +544,7 @@ impl<'s> Parser<'s> {
                     return Ok(None);
                 }
 
+                token::Keyword::Import => self.parse_import_statement(),
                 _ => self.err_with_location(
                     ParseErrorKind::Tag,
                     ExpectedItem::Ident,
@@ -1114,6 +1115,49 @@ impl<'s> Parser<'s> {
         Ok(self.nodes_with_joined_span(args, start))
     }
 
+
+    /// Parse a Jinja import statement, i.e.
+    ///
+    /// ```html
+    /// {% import "forms.html" as forms %}
+    /// ```
+    ///
+    /// Reference: https://jinja.palletsprojects.com/en/stable/templates/#import
+    fn parse_import_statement(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+        self.in_tree(Delimiter::Percent, None, |g| {
+            g.parse_token(TokenKind::Keyword(token::Keyword::Import))?;
+            let template = g.parse_string()?;
+
+            let names = if g.parse_token_fast(TokenKind::Keyword(token::Keyword::As)).is_some() {
+                g.parse_names()?
+            } else {
+                // This is effectively a dummy range, since we don't have an alias.
+                g.nodes_with_span(thin_vec![], g.range())
+            };
+
+            Ok(g.node_with_span(
+                ast::Statement::Tag(ast::Tag::Import(ast::Import { template, names })),
+                g.range(),
+            ))
+        })
+    }
+
+    fn parse_names(&mut self) -> ParseResult<AstNodes<ast::Name>> {
+        let mut names = thin_vec![];
+        let start = self.current_pos();
+
+        while self.peek().is_some() {
+            match self.parse_name() {
+                Ok(name) => names.push(name),
+                Err(err) => {
+                    self.add_error(err);
+                    break;
+                }
+            }
+        }
+
+        Ok(self.nodes_with_joined_span(names, start))
+    }
 
     fn parse_name(&mut self) -> ParseResult<AstNode<ast::Name>> {
         match self.peek() {
