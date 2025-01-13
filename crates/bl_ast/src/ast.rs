@@ -2,6 +2,7 @@
 //! `bracketlint` supports parsing.
 
 use std::{
+    fmt,
     iter::repeat,
     ops::{Deref, DerefMut},
 };
@@ -442,11 +443,11 @@ define_tree! {
         /// >
         Gt,
         /// >=
-        Gte,
+        GtEq,
         /// <
         Lt,
         /// <=
-        Lte,
+        LtEq,
         /// ==
         Eq,
         /// !=
@@ -455,8 +456,33 @@ define_tree! {
         And,
         /// `or`
         Or,
+        /// `not in`
+        NotIn,
         /// `in`
-        In
+        In,
+        /// `is`
+        Is,
+        /// `is not`
+        IsNot
+    }
+
+    impl fmt::Display for BinOp {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match self {
+                BinOp::Gt => write!(f, ">"),
+                BinOp::GtEq => write!(f, ">="),
+                BinOp::Lt => write!(f, "<"),
+                BinOp::LtEq => write!(f, "<="),
+                BinOp::Eq => write!(f, "=="),
+                BinOp::NotEq => write!(f, "!="),
+                BinOp::And => write!(f, "and"),
+                BinOp::Or => write!(f, "or"),
+                BinOp::NotIn => write!(f, "not in"),
+                BinOp::In => write!(f, "in"),
+                BinOp::Is => write!(f, "is"),
+                BinOp::IsNot => write!(f, "is not"),
+            }
+        }
     }
 
     /// Unary operators
@@ -469,6 +495,14 @@ define_tree! {
         Neg,
     }
 
+    impl fmt::Display for UnaryOp {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match self {
+                UnaryOp::Not => write!(f, "not"),
+                UnaryOp::Neg => write!(f, "-"),
+            }
+        }
+    }
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub enum Lit {
