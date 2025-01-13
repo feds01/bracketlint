@@ -337,11 +337,37 @@ impl<'s> Parser<'s> {
         // }
 
         let start = self.current_pos();
-        let children = thin_vec![];
+        let mut children = thin_vec![];
+
+        while self.peek().is_some() {
+            match self.parse_statement() {
+                Ok(Some(node)) => children.push(node),
+                Ok(None) => panic!("unexpected None value"),
+                Err(err) => {
+                    // Parsing the statement failed, we proceed onwards.
+                    self.skip_token();
+                    self.add_error(err)
+                }
+            }
+        }
 
         let children = self.nodes_with_joined_span(children, start);
-        self.node_with_joined_span(Document { children }, start)
+        self.node_with_joined_span(ast::Document { children }, start)
+    }
 
+    fn parse_statement(&mut self) -> ParseResult<Option<AstNode<ast::Statement>>> {
+        let token = self.peek().ok_or_else(|| self.make_unexpected_eof())?;
+        let statement = match token.kind {
+            _ => self.err_with_location(
+                ParseErrorKind::Statement,
+                ExpectedItem::empty(),
+                None,
+                self.expected_pos(),
+            ),
+        }?;
+
+        Ok(Some(statement))
+    }
     fn parse_lit(&self) -> ParseResult<ast::Lit> {
         let token = self.current_token();
 
