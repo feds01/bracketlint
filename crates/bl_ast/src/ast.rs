@@ -748,9 +748,31 @@ define_tree! {
     /// ```
     #[derive(Clone, Debug, PartialEq)]
     #[node]
-    pub struct Set {
-        name: Child!(Name),
-        value: Child!(Expr),
+    pub struct With {
+        pub assignments: Children!(Assignment),
+        pub block_body: Child!(Body),
+        pub kind: AssignmentKind,
+    }
+
+    #[derive(Clone, Debug, PartialEq, Copy)]
+    pub enum AssignmentKind {
+        /// A `set` block, which is used to set a value in place.
+        Set,
+
+        /// A `with` block, which is used to set a value in place, and then
+        /// restore the original value after the block has been executed.
+        With,
+    }
+
+    /// A tag to set a value in place, i.e.
+    ///
+    /// This represents a single assignment in the form of `name = value` which
+    /// can either be present within a `with` block or a `set` block.
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct Assignment {
+        pub name: Child!(Name),
+        pub value: Child!(Expr),
     }
 
     #[derive(Clone, Debug, PartialEq)]
@@ -865,17 +887,24 @@ define_tree! {
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub enum Tag {
-        /// A generic
+        /// A generic tag, which hasn't been terminated.
         Generic(GenericTag),
 
         /// The `{% block name %}` tag, ending with `{% endblock %}`
         Block(Block),
 
+        /// The `{% with x = 10 %}` tag, ending with `{% endwith %}`
+        With(With),
+
+        /// Assignment, just like `with` but with a single inline assignment.
+        ///
+        /// ```html
+        /// {% 10 as x %}
+        /// ```
+        Assignment(Assignment),
+
         /// The `{% macro name() %}` tag, ending with `{% endmacro %}`
         MacroDef(MacroDef),
-
-        /// The `{% set val = something %}` tag
-        Set(Set),
 
         /// The `{% include "file" %}` tag
         Include(Include),

@@ -74,6 +74,18 @@ impl AstVisitor for AstTreePrinter<'_> {
     }
 
 
+    type WithRet = TreeNode;
+
+    fn visit_with(&self, node: ast::AstNodeRef<ast::With>) -> Result<Self::WithRet, Self::Error> {
+        let walk::With { assignments, block_body } = walk::walk_with(self, node)?;
+
+        Ok(TreeNode::branch("set", vec![
+            TreeNode::branch("assignments", assignments),
+            // @@Todo: we should probably not show these if the `kind` is `Set`.
+            block_body,
+        ]))
+    }
+
     type TextRet = TreeNode;
 
     fn visit_text(&self, _: ast::AstNodeRef<ast::Text>) -> Result<Self::TextRet, Self::Error> {
@@ -364,6 +376,17 @@ impl AstVisitor for AstTreePrinter<'_> {
         }
 
         Ok(TreeNode::branch("for", children))
+    }
+
+    type AssignmentRet = TreeNode;
+
+    fn visit_assignment(
+        &self,
+        node: ast::AstNodeRef<ast::Assignment>,
+    ) -> Result<Self::AssignmentRet, Self::Error> {
+        let walk::Assignment { name, value } = walk::walk_assignment(self, node)?;
+
+        Ok(TreeNode::branch("assignment", vec![name, value]))
     }
 
     type ContinueRet = TreeNode;
