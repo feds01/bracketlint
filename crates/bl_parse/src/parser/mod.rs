@@ -533,6 +533,9 @@ impl<'s> Parser<'s> {
                     self.with_tag_context(TagContext::For, |g| g.parse_for_loop())
                 }
 
+                // Control flow tags, that are effectively standalone.
+                token::Keyword::Break => self.parse_break_statement(),
+                token::Keyword::Continue => self.parse_continue_statement(),
                 kwd if let Some(ctx) = self.tag_context()
                     && ctx.applies_to(kwd) =>
                 {
@@ -951,6 +954,23 @@ impl<'s> Parser<'s> {
         let items = self.nodes_with_joined_span(items, start);
         Ok(self.node_with_joined_span(ast::ForTarget { items }, start))
     }
+
+
+    fn parse_break_statement(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+        self.in_tree(Delimiter::Percent, None, |g| {
+            g.parse_token(TokenKind::Keyword(token::Keyword::Break))?;
+            Ok(g.node_with_span(ast::Statement::Tag(ast::Tag::Break(ast::Break {})), g.range()))
+        })
+    }
+
+    fn parse_continue_statement(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+        self.in_tree(Delimiter::Percent, None, |g| {
+            g.parse_token(TokenKind::Keyword(token::Keyword::Continue))?;
+            Ok(g.node_with_span(
+                ast::Statement::Tag(ast::Tag::Continue(ast::Continue {})),
+                g.range(),
+            ))
+        })
     }
 
     fn parse_body_until_block_footer<U>(
