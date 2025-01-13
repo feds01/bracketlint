@@ -526,6 +526,42 @@ impl<'s> Parser<'s> {
 
         let token = self.peek_raw(1).copied().ok_or_else(|| self.make_unexpected_eof())?;
         let statement = match token.kind {
+            TokenKind::Ident => self.in_tree(Delimiter::Percent, None, |g| {
+                let name = g.parse_name()?;
+                let args = g.parse_args()?;
+
+                if g.parse_token_fast(TokenKind::Keyword(Keyword::As)).is_some() {
+                    let subject = g.node_with_span(
+                        ast::Expr::Var(VarExpr {
+                            name: ast::Name::new(ast::Identifier::from(0u32)),
+                        }),
+                        token.span,
+                    );
+                    let value = g.node_with_joined_span(
+                        ast::Expr::Call(ast::CallExpr { subject, args }),
+                        token.span,
+                    );
+
+                    let name = g.parse_name()?;
+
+                    Ok(g.node_with_joined_span(
+                        ast::Statement::Tag(ast::Tag::Assignment(ast::Assignment { name, value })),
+                        g.range(),
+                    ))
+                } else if !g.exhausted() {
+                    g.exhaust();
+                    Ok(g.node_with_joined_span(
+                        ast::Statement::Tag(ast::Tag::Unprocessable(ast::UnprocessableTag {})),
+                        g.current_pos(),
+                    ))
+                } else {
+                    Ok(g.node_with_joined_span(
+                        ast::Statement::Tag(ast::Tag::Generic(ast::GenericTag { name, args })),
+                        g.range(),
+                    ))
+                }
+            }),
+
             TokenKind::Keyword(keyword) => match keyword {
                 // Key control flow components, once that imply a more complex structure
                 // of subsequent tags.

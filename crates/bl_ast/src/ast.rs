@@ -785,8 +785,20 @@ define_tree! {
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct GenericTag {
-        name: Child!(Name),
-        args: Children!(Arg),
+        pub name: Child!(Name),
+        pub args: Children!(Arg),
+    }
+
+    /// A tag that has some combination of unprocessable characters, this is used to represent
+    /// tags that are not recognized by the parser, and are not part of the standard tags like
+    /// `block` or `extends`.
+    ///
+    /// This is different from an error since it might be a valid tag, but it is not recognized
+    /// by the parser. It might be a custom tag which defines a custom parser.
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct UnprocessableTag {
+
     }
 
     /// A hunk of text, the [Span] of this node exactly represents the range
@@ -799,7 +811,7 @@ define_tree! {
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct Var {
-        identifier: Child!(Name),
+        name: Child!(Name),
     }
 
     #[derive(Clone, Debug, PartialEq)]
@@ -890,6 +902,9 @@ define_tree! {
         /// A generic tag, which hasn't been terminated.
         Generic(GenericTag),
 
+        /// A tag that has some combination of characters that are unprocessable.
+        Unprocessable(UnprocessableTag),
+
         /// The `{% block name %}` tag, ending with `{% endblock %}`
         Block(Block),
 
@@ -938,6 +953,25 @@ define_tree! {
 
         pub fn _break() -> Self {
             Tag::Break(Break {})
+        }
+
+        pub fn kind(&self) -> &'static str {
+            match self {
+                Tag::Unprocessable(_) => "unprocessable",
+                Tag::Generic(_) => "generic tag",
+                Tag::Assignment(_) => "assignment",
+                Tag::Block(_) => "block",
+                Tag::With(_) => "with",
+                Tag::MacroDef(_) => "macro",
+                Tag::Include(_) => "include",
+                Tag::Extends(_) => "extends",
+                Tag::Import(_) => "import",
+                Tag::If(_) => "if",
+                Tag::For(_) => "for",
+                Tag::Continue(_) => "continue",
+                Tag::Break(_) => "break",
+                Tag::Raw(_) => "raw",
+            }
         }
 
     }
