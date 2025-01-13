@@ -544,6 +544,8 @@ impl<'s> Parser<'s> {
                     return Ok(None);
                 }
 
+                // Effectively, special functions that we keep track of.
+                token::Keyword::Extends => self.parse_extends_statement(),
                 token::Keyword::Import => self.parse_import_statement(),
                 _ => self.err_with_location(
                     ParseErrorKind::Tag,
@@ -1115,6 +1117,25 @@ impl<'s> Parser<'s> {
         Ok(self.nodes_with_joined_span(args, start))
     }
 
+    /// Parse an `extends` statement, i.e.
+    ///
+    ///
+    /// ```html
+    /// {% extends "base.html" %}
+    /// ```
+    ///
+    /// Based on: https://www.w3schools.com/django/django_tags_extends.php
+    fn parse_extends_statement(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+        self.in_tree(Delimiter::Percent, None, |g| {
+            g.parse_token(TokenKind::Keyword(token::Keyword::Extends))?;
+            let template = g.parse_expr()?;
+
+            Ok(g.node_with_span(
+                ast::Statement::Tag(ast::Tag::Extends(ast::Extends { template })),
+                g.range(),
+            ))
+        })
+    }
 
     /// Parse a Jinja import statement, i.e.
     ///

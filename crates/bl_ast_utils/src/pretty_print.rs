@@ -183,6 +183,16 @@ impl AstVisitor for AstTreePrinter<'_> {
     }
 
 
+    type ExtendsRet = TreeNode;
+
+    fn visit_extends(
+        &self,
+        node: ast::AstNodeRef<ast::Extends>,
+    ) -> Result<Self::ExtendsRet, Self::Error> {
+        let walk::Extends { template } = walk::walk_extends(self, node)?;
+        Ok(TreeNode::branch("extends", vec![template]))
+    }
+
     type LitExprRet = TreeNode;
 
     fn visit_lit_expr(
