@@ -692,8 +692,8 @@ define_tree! {
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct Block {
-        label: OptionalChild!(Name),
-        children: Children!(Statement),
+        pub label: OptionalChild!(Name),
+        pub block_body: Child!(Body),
     }
 
     #[derive(Clone, Debug, PartialEq)]

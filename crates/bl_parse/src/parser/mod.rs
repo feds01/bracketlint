@@ -538,6 +538,9 @@ impl<'s> Parser<'s> {
                 // Control flow tags, that are effectively standalone.
                 token::Keyword::Break => self.parse_break_statement(),
                 token::Keyword::Continue => self.parse_continue_statement(),
+                token::Keyword::Block => {
+                    self.with_tag_context(TagContext::Block, |g| g.parse_block_statement())
+                }
                 token::Keyword::Raw => {
                     self.with_tag_context(TagContext::Raw, |g| g.parse_raw_block())
                 }
@@ -1068,6 +1071,50 @@ impl<'s> Parser<'s> {
         })
     }
 
+
+    fn parse_block_statement(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+        let token = *self.current_token();
+
+        // Parse the header first, we should get `block <name>`.
+        let label = self.in_tree(Delimiter::Percent, None, |g| {
+            g.parse_token(TokenKind::Keyword(token::Keyword::Block))?;
+
+            // If the next token is a string literal, we still accept it but
+            // we emit a warning since it technically not a legal block name.
+            if g.parse_token_fast(TokenKind::Str).is_some() {
+                let span = g.previous_pos();
+                g.add_warning(ParseWarning::new(
+                    ParseWarningKind::BlockLabelIsStringLiteral,
+                    g.make_span(span),
+                ));
+                Ok(g.node_with_span(ast::Name::new(ast::Identifier::from(0u32)), span))
+            } else {
+                g.parse_name()
+            }
+        })?;
+
+        // Now parse a bunch of general statements until we reach the end of the block.
+        let (block_body, _) = self.parse_body_until_block_footer(
+            ExpectedItem::empty(),
+            |kind| matches!(kind, TokenKind::Keyword(token::Keyword::EndBlock)),
+            |g| {
+                g.skip_fast(TokenKind::Keyword(token::Keyword::EndBlock)); // `<endblock>` Skip the endblock token.
+
+                if g.peek().is_some() {
+                    // @@Todo: check if the name matches the label, if the labels mismatch then
+                    // we should generate an error.
+                    let _ = g.parse_name()?;
+                }
+
+                Ok(())
+            },
+        )?;
+
+        Ok(self.node_with_joined_span(
+            ast::Statement::Tag(ast::Tag::Block(ast::Block { label: Some(label), block_body })),
+            token.span,
+        ))
+    }
 
     fn parse_raw_block(&mut self) -> ParseResult<AstNode<ast::Statement>> {
         let start = self.current_pos();
