@@ -10,10 +10,7 @@ use bl_reporting::{DiagnosticStore, DiagnosticsMut, HasDiagnosticsMut};
 use self::{error::ParseError, warning::ParseWarning};
 use crate::parser::Parser;
 
-/// Shorthand for the parser diagnostics.
-pub type ParserDiagnostics = DiagnosticStore<ParseError, ParseWarning>;
-
-impl<'s> HasDiagnosticsMut for Parser<'s> {
+impl HasDiagnosticsMut for Parser<'_> {
     type Diagnostics = ParserDiagnostics;
 
     fn diagnostics(&mut self) -> &mut Self::Diagnostics {
@@ -29,3 +26,8 @@ impl<'s> HasDiagnosticsMut for Parser<'s> {
         self.diagnostics().add_error(error);
     }
 }
+
+pub type ParseResult<T> = Result<T, ParseError>;
+
+/// Shorthand for the parser diagnostics.
+pub type ParserDiagnostics = DiagnosticStore<ParseError, ParseWarning>;
