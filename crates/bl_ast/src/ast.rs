@@ -466,6 +466,19 @@ define_tree! {
         IsNot
     }
 
+    impl BinOp {
+        /// Compute the precedence for an operator
+        pub fn infix_binding_power(&self) -> (u8, u8) {
+            match self {
+                BinOp::Or => (2, 3),
+                BinOp::And => (4, 5),
+                BinOp::In | BinOp::NotIn => (6, 7),
+                BinOp::Eq | BinOp::NotEq | BinOp::Is | BinOp::IsNot => (6, 5),
+                BinOp::Gt | BinOp::GtEq | BinOp::Lt | BinOp::LtEq => (7, 8),
+            }
+        }
+    }
+
     impl fmt::Display for BinOp {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             match self {
@@ -551,9 +564,9 @@ define_tree! {
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct BinExpr {
-        lhs: Child!(Expr),
-        rhs: Child!(Expr),
-        op: Child!(BinOp),
+        pub lhs: Child!(Expr),
+        pub rhs: Child!(Expr),
+        pub op: Child!(BinOp),
     }
 
     pub type Identifier = u32;

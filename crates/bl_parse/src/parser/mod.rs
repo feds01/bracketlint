@@ -452,6 +452,40 @@ impl<'s> Parser<'s> {
         Ok(self.node_with_joined_span(ast::Statement::Inline(ast::Inline { expr }), token.span))
     }
 
+    fn parse_compound_expr(&mut self, min_prec: u8) -> ParseResult<AstNode<ast::Expr>> {
+        // first of all, we want to get the lhs...
+        let (mut lhs, lhs_span) = self.track_span(|this| this.parse_expr())?;
+
+        loop {
+            let op_start = self.current_pos();
+            // this doesn't consider operators that have an 'eq' variant because that is
+            // handled at the statement level, since it isn't really a binary
+            // operator...
+            let (Some(op), consumed_tokens) = self.parse_bin_op() else {
+                break;
+            };
+
+            // check if we have higher precedence than the lhs expression...
+            let (l_prec, r_prec) = op.infix_binding_power();
+
+            if l_prec < min_prec {
+                break;
+            }
+
+            // Now skip the consumed tokens...
+            self.skip(consumed_tokens);
+
+            let op_span = op_start.join(self.current_pos());
+            let rhs = self.parse_compound_expr(r_prec)?;
+
+            //v transform the operator into an `BinaryExpr`
+            let op = self.node_with_span(op, op_span);
+            lhs =
+                self.node_with_joined_span(ast::Expr::Bin(ast::BinExpr { lhs, rhs, op }), lhs_span);
+        }
+
+        Ok(lhs)
+    }
 
     fn parse_expr(&mut self) -> ParseResult<AstNode<ast::Expr>> {
         let token = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
@@ -621,6 +655,42 @@ impl<'s> Parser<'s> {
 
         Ok(self.node_with_joined_span(ast::Filter { name, args }, subject_span))
     }
+
+    fn parse_bin_op(&mut self) -> (Option<ast::BinOp>, u8) {
+        let token = self.peek();
+
+        // check if there is a token that we can peek at ahead...
+        if token.is_none() {
+            return (None, 0);
+        }
+
+        match &(token.unwrap()).kind {
+            TokenKind::EqEq => (Some(ast::BinOp::Eq), 1),
+            TokenKind::NotEq => (Some(ast::BinOp::NotEq), 1),
+            TokenKind::Lt => (Some(ast::BinOp::Lt), 1),
+            TokenKind::LtEq => (Some(ast::BinOp::LtEq), 1),
+            TokenKind::Gt => (Some(ast::BinOp::Gt), 1),
+            TokenKind::GtEq => (Some(ast::BinOp::GtEq), 1),
+
+            TokenKind::Keyword(token::Keyword::And) => (Some(ast::BinOp::And), 1),
+            TokenKind::Keyword(token::Keyword::Or) => (Some(ast::BinOp::Or), 1),
+            TokenKind::Keyword(token::Keyword::In) => (Some(ast::BinOp::In), 1),
+            TokenKind::Keyword(token::Keyword::Is) => match self.peek_second() {
+                Some(Token { kind: TokenKind::Keyword(token::Keyword::Not), .. }) => {
+                    (Some(ast::BinOp::NotEq), 2)
+                }
+                _ => (Some(ast::BinOp::Is), 1),
+            },
+            TokenKind::Keyword(token::Keyword::Not) => match self.peek_second() {
+                Some(Token { kind: TokenKind::Keyword(token::Keyword::In), .. }) => {
+                    (Some(ast::BinOp::NotEq), 2)
+                }
+                _ => (None, 0),
+            },
+            _ => (None, 0),
+        }
+    }
+
     fn parse_lit(&self) -> ParseResult<ast::Lit> {
         let token = self.current_token();
 

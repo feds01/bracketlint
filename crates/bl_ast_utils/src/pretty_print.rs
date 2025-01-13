@@ -72,6 +72,20 @@ impl AstVisitor for AstTreePrinter<'_> {
         walk::walk_lit_same_children(self, node)
     }
 
+    type BinExprRet = TreeNode;
+
+    fn visit_bin_expr(
+        &self,
+        node: ast::AstNodeRef<ast::BinExpr>,
+    ) -> Result<Self::BinExprRet, Self::Error> {
+        let walk::BinExpr { lhs, op, rhs } = walk::walk_bin_expr(self, node)?;
+
+        Ok(TreeNode::branch("bin_expr", vec![
+            TreeNode::branch("lhs", vec![lhs]),
+            op,
+            TreeNode::branch("rhs", vec![rhs]),
+        ]))
+    }
 
     type ExprRet = TreeNode;
 
