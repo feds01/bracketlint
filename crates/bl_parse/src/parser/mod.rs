@@ -345,6 +345,7 @@ impl<'s> Parser<'s> {
 
         Ok((result, start.join(end)))
     }
+
     /// Function to parse the next [Token] with the specified [TokenKind].
     ///
     /// ##Note: Don't use `parse_token()` to parse a tree token.
@@ -439,6 +440,8 @@ impl<'s> Parser<'s> {
                 self.skip_fast(TokenKind::Text); // `<text>` Skip the text token.
                 Ok(self.node_with_span(ast::Statement::text(), token.span))
             }
+            // For parsing `{% ... %}` blocks.
+            TokenKind::Tree(Delimiter::Percent, _) => return self.parse_tag(),
             // For parsing `{{ ... }}` blocks.
             TokenKind::Tree(Delimiter::Brace, _) => self.parse_variable_block(),
             TokenKind::Comment => self.parse_comment(),
@@ -460,6 +463,32 @@ impl<'s> Parser<'s> {
         Ok(self.node_with_joined_span(ast::Statement::Comment(ast::Comment {}), token.span))
     }
 
+    fn parse_tag(&mut self) -> ParseResult<Option<AstNode<ast::Statement>>> {
+        // The last token must be a percent tree, but we ensure this since
+        // we pass the responsibility of consuming the header token to then child
+        // functions.
+        debug_assert!(self.peek().is_some_and(|tok| tok.kind.is_percent_tree()));
+
+        let token = self.peek_raw(1).copied().ok_or_else(|| self.make_unexpected_eof())?;
+        let statement = match token.kind {
+            TokenKind::Keyword(keyword) => match keyword {
+                _ => self.err_with_location(
+                    ParseErrorKind::Tag,
+                    ExpectedItem::Ident,
+                    Some(token.kind),
+                    token.span,
+                ),
+            },
+            _ => self.err_with_location(
+                ParseErrorKind::Tag,
+                ExpectedItem::Ident,
+                Some(token.kind),
+                token.span,
+            ),
+        }?;
+
+        Ok(Some(statement))
+    }
 
     fn parse_variable_block(&mut self) -> ParseResult<AstNode<ast::Statement>> {
         let token = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
