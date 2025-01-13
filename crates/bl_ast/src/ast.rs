@@ -783,7 +783,7 @@ define_tree! {
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct Body {
-        contents: Children!(Statement),
+        pub contents: Children!(Statement),
     }
 
     #[derive(Debug, PartialEq, Clone)]
@@ -854,6 +854,7 @@ define_tree! {
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct Raw {
+        pub block_body: Child!(Body),
     }
 
     #[derive(Clone, Debug, PartialEq)]

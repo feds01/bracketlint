@@ -80,6 +80,14 @@ impl AstVisitor for AstTreePrinter<'_> {
         Ok(TreeNode::leaf("text"))
     }
 
+    type RawRet = TreeNode;
+
+    fn visit_raw(&self, node: ast::AstNodeRef<ast::Raw>) -> Result<Self::RawRet, Self::Error> {
+        let walk::Raw { block_body } = walk::walk_raw(self, node)?;
+
+        Ok(TreeNode::branch("raw", vec![block_body]))
+    }
+
     type VarRet = TreeNode;
 
     fn visit_var(&self, node: ast::AstNodeRef<ast::Var>) -> Result<Self::VarRet, Self::Error> {
@@ -182,6 +190,13 @@ impl AstVisitor for AstTreePrinter<'_> {
         Ok(TreeNode::leaf(labelled("float_lit", self.source.hunk(node.span().range), "")))
     }
 
+    type BodyRet = TreeNode;
+
+    fn visit_body(&self, node: ast::AstNodeRef<ast::Body>) -> Result<Self::BodyRet, Self::Error> {
+        let walk::Body { contents } = walk::walk_body(self, node)?;
+
+        Ok(TreeNode::branch("body", contents))
+    }
 
     type ExtendsRet = TreeNode;
 
@@ -345,6 +360,26 @@ impl AstVisitor for AstTreePrinter<'_> {
     ) -> Result<Self::ContinueRet, Self::Error> {
         Ok(TreeNode::leaf("continue"))
     }
+
+    type StatementRet = TreeNode;
+
+    fn visit_statement(
+        &self,
+        node: ast::AstNodeRef<ast::Statement>,
+    ) -> Result<Self::StatementRet, Self::Error> {
+        walk::walk_statement_same_children(self, node)
+    }
+
+    type InlineRet = TreeNode;
+
+    fn visit_inline(
+        &self,
+        node: ast::AstNodeRef<ast::Inline>,
+    ) -> Result<Self::InlineRet, Self::Error> {
+        let walk::Inline { expr } = walk::walk_inline(self, node)?;
+        Ok(TreeNode::branch("inline", vec![expr]))
+    }
+
     type AccessExprRet = TreeNode;
 
     fn visit_access_expr(
