@@ -189,12 +189,46 @@ impl<'s> Parser<'s> {
         self.current_token().span
     }
 
-    pub fn node_with_joined_span<N>(&mut self, body: N, start: ByteRange) -> AstNode<N> {
+    /// Function to create a [Span] from a [ByteRange] by using the
+    /// provided resolver
+    pub(crate) fn make_span(&self, range: ByteRange) -> Span {
+        Span { range, id: self.id }
+    }
+
+    /// Report an error to the parser diagnostics.
+    ///
+    /// This function is used to report an error to the parser diagnostics.
+    #[inline(always)]
+    pub fn _note_on_span(&self, span: ByteRange, note: impl Into<String>) {
+        note_on_span(InlineSnippet::new(&self._source, self.make_span(span)), note.into());
+    }
+
+    /// Create a new [AstNode] from the information provided by the [AstGen]
+    #[inline(always)]
+    pub fn node_with_span<T>(&mut self, inner: T, location: ByteRange) -> AstNode<T> {
+        let id = self.span_map.add(location);
+        AstNode::with_id(inner, id)
+    }
+
+    /// Create a new [AstNode] with a span that ranges from the start
+    /// [ByteRange] to join with the [ByteRange].
+    #[inline(always)]
+    pub(crate) fn node_with_joined_span<T>(&mut self, body: T, start: ByteRange) -> AstNode<T> {
         // We get the previous token, before the current since we want to
         // know the span up to the current token, not including it.
 
         let id = self.span_map.add(start.join(self.previous_pos()));
         AstNode::with_id(body, id)
+    }
+
+    /// Create [AstNodes] with a span.
+    pub(crate) fn nodes_with_span<T>(
+        &mut self,
+        nodes: ThinVec<AstNode<T>>,
+        location: ByteRange,
+    ) -> AstNodes<T> {
+        let id = self.span_map.add(location);
+        AstNodes::with_id(nodes, id)
     }
 
     /// Create [AstNodes] with a span that ranges from the start [ByteRange] to
