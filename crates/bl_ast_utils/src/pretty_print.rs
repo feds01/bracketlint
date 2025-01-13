@@ -47,6 +47,15 @@ impl AstVisitor for AstTreePrinter<'_> {
     fn visit_text(&self, _: ast::AstNodeRef<ast::Text>) -> Result<Self::TextRet, Self::Error> {
         Ok(TreeNode::leaf("text"))
     }
+
+    type VarRet = TreeNode;
+
+    fn visit_var(&self, node: ast::AstNodeRef<ast::Var>) -> Result<Self::VarRet, Self::Error> {
+        let walk::Var { name } = walk::walk_var(self, node)?;
+
+        Ok(TreeNode::branch("var", vec![name]))
+    }
+
     type BoolLitRet = TreeNode;
 
     fn visit_bool_lit(
@@ -63,6 +72,48 @@ impl AstVisitor for AstTreePrinter<'_> {
         walk::walk_lit_same_children(self, node)
     }
 
+
+    type ExprRet = TreeNode;
+
+    fn visit_expr(&self, node: ast::AstNodeRef<ast::Expr>) -> Result<Self::ExprRet, Self::Error> {
+        walk::walk_expr_same_children(self, node)
+    }
+
+    }
+
+    type FilteredExprRet = TreeNode;
+
+    fn visit_filtered_expr(
+        &self,
+        node: ast::AstNodeRef<ast::FilteredExpr>,
+    ) -> Result<Self::FilteredExprRet, Self::Error> {
+        let walk::FilteredExpr { subject, filter } = walk::walk_filtered_expr(self, node)?;
+
+        Ok(TreeNode::branch("filtered_expr", vec![
+            TreeNode::branch("subject", vec![subject]),
+            filter,
+        ]))
+    }
+
+    type CallExprRet = TreeNode;
+
+    fn visit_call_expr(
+        &self,
+        node: ast::AstNodeRef<ast::CallExpr>,
+    ) -> Result<Self::CallExprRet, Self::Error> {
+        let walk::CallExpr { subject, args } = walk::walk_call_expr(self, node)?;
+
+        Ok(TreeNode::branch("call_expr", vec![
+            TreeNode::branch("subject", vec![subject]),
+            TreeNode::branch("args", args),
+        ]))
+    }
+
+    type SuperRet = TreeNode;
+
+    fn visit_super(&self, _: ast::AstNodeRef<ast::Super>) -> Result<Self::SuperRet, Self::Error> {
+        Ok(TreeNode::leaf("super"))
+    }
 
     type FloatLitRet = TreeNode;
 
@@ -94,6 +145,22 @@ impl AstVisitor for AstTreePrinter<'_> {
         Ok(TreeNode::leaf(labelled("int_lit", self.source.hunk(node.span().range), "")))
     }
 
+    type UnaryExprRet = TreeNode;
+
+    fn visit_unary_expr(
+        &self,
+        node: ast::AstNodeRef<ast::UnaryExpr>,
+    ) -> Result<Self::UnaryExprRet, Self::Error> {
+        let walk::UnaryExpr { op, expr } = walk::walk_unary_expr(self, node)?;
+
+        Ok(TreeNode::branch("unary_expr", vec![op, expr]))
+    }
+
+    type NameRet = TreeNode;
+
+    fn visit_name(&self, node: ast::AstNodeRef<ast::Name>) -> Result<Self::NameRet, Self::Error> {
+        Ok(TreeNode::leaf(labelled("name", self.source.hunk(node.span().range), "\"")))
+    }
 
     type StrLitRet = TreeNode;
 
@@ -103,4 +170,81 @@ impl AstVisitor for AstTreePrinter<'_> {
     ) -> Result<Self::StrLitRet, Self::Error> {
         Ok(TreeNode::leaf(labelled("str_lit", self.source.hunk(node.span().range), "")))
     }
+
+    type ArrayExprRet = TreeNode;
+
+    fn visit_array_expr(
+        &self,
+        node: ast::AstNodeRef<ast::ArrayExpr>,
+    ) -> Result<Self::ArrayExprRet, Self::Error> {
+        let walk::ArrayExpr { children } = walk::walk_array_expr(self, node)?;
+
+        Ok(TreeNode::branch("array_expr", children))
+    }
+
+    type UnaryOpRet = TreeNode;
+
+    fn visit_unary_op(
+        &self,
+        node: ast::AstNodeRef<ast::UnaryOp>,
+    ) -> Result<Self::UnaryOpRet, Self::Error> {
+        Ok(TreeNode::leaf(format!("unary operator `{}`", node.body())))
+    }
+
+    type VarExprRet = TreeNode;
+
+    fn visit_var_expr(
+        &self,
+        node: ast::AstNodeRef<ast::VarExpr>,
+    ) -> Result<Self::VarExprRet, Self::Error> {
+        let walk::VarExpr { name } = walk::walk_var_expr(self, node)?;
+
+        Ok(TreeNode::branch("var_expr", vec![name]))
+    }
+
+    type BinOpRet = TreeNode;
+
+    fn visit_bin_op(
+        &self,
+        node: ast::AstNodeRef<ast::BinOp>,
+    ) -> Result<Self::BinOpRet, Self::Error> {
+        Ok(TreeNode::leaf(format!("operator `{}`", node.body())))
+    }
+
+    type AccessExprRet = TreeNode;
+
+    fn visit_access_expr(
+        &self,
+        node: ast::AstNodeRef<ast::AccessExpr>,
+    ) -> Result<Self::AccessExprRet, Self::Error> {
+        let walk::AccessExpr { subject, field } = walk::walk_access_expr(self, node)?;
+        Ok(TreeNode::branch("access_expr", vec![
+            TreeNode::branch("subject", vec![subject]),
+            TreeNode::branch("field", vec![field]),
+        ]))
+    }
+
+    type IndexExprRet = TreeNode;
+
+    fn visit_index_expr(
+        &self,
+        node: ast::AstNodeRef<ast::IndexExpr>,
+    ) -> Result<Self::IndexExprRet, Self::Error> {
+        let walk::IndexExpr { subject, index } = walk::walk_index_expr(self, node)?;
+        Ok(TreeNode::branch("index_expr", vec![
+            TreeNode::branch("subject", vec![subject]),
+            TreeNode::branch("index", vec![index]),
+        ]))
+    }
+
+    type FilterRet = TreeNode;
+
+    fn visit_filter(
+        &self,
+        node: ast::AstNodeRef<ast::Filter>,
+    ) -> Result<Self::FilterRet, Self::Error> {
+        let walk::Filter { name, args } = walk::walk_filter(self, node)?;
+        Ok(TreeNode::branch("filter", vec![name, TreeNode::branch("args", args)]))
+    }
+
 }

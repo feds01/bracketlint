@@ -311,6 +311,20 @@ impl<'s> Parser<'s> {
         result
     }
 
+    /// Record the [ByteRange] that a parse function `f` traversed during
+    /// its execution. This is useful for tracking the span of a node that
+    /// is generated from a parse function.
+    #[inline]
+    pub(crate) fn track_span<T, E>(
+        &mut self,
+        mut f: impl FnMut(&mut Self) -> Result<T, E>,
+    ) -> Result<(T, ByteRange), E> {
+        let start = self.current_pos();
+        let result = f(self)?;
+        let end = self.previous_pos();
+
+        Ok((result, start.join(end)))
+    }
     /// Function to parse the next [Token] with the specified [TokenKind].
     ///
     /// ##Note: Don't use `parse_token()` to parse a tree token.
@@ -405,6 +419,8 @@ impl<'s> Parser<'s> {
                 self.skip_fast(TokenKind::Text); // `<text>` Skip the text token.
                 Ok(self.node_with_span(ast::Statement::text(), token.span))
             }
+            // For parsing `{{ ... }}` blocks.
+            TokenKind::Tree(Delimiter::Brace, _) => self.parse_variable_block(),
             TokenKind::Comment => self.parse_comment(),
             _ => self.err_with_location(
                 ParseErrorKind::Statement,
@@ -424,6 +440,187 @@ impl<'s> Parser<'s> {
         Ok(self.node_with_joined_span(ast::Statement::Comment(ast::Comment {}), token.span))
     }
 
+
+    fn parse_variable_block(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+        let token = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
+        let expr = self.in_tree(Delimiter::Brace, None, |g| {
+            let subject = g.parse_expr()?;
+
+            Ok(subject)
+        })?;
+
+        Ok(self.node_with_joined_span(ast::Statement::Inline(ast::Inline { expr }), token.span))
+    }
+
+
+    fn parse_expr(&mut self) -> ParseResult<AstNode<ast::Expr>> {
+        let token = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
+
+        // Firstly, we have to get the initial part of the expression,
+        // and then we can check if there are any additional parts in the
+        // forms of either property accesses, indexing or method calls
+        let (subject, subject_span) = self.track_span(|this| this.parse_expr_component(token))?;
+
+        self.parse_singular_expr(subject, subject_span)
+    }
+
+    fn parse_expr_component(&mut self, token: Token) -> ParseResult<AstNode<ast::Expr>> {
+        // ##Note: Each child path is responsible for skipping the current `token`.
+        Ok(match token.kind {
+            kind if kind.is_unary_op() => return self.parse_unary_expr(token),
+
+            kw @ TokenKind::Keyword(keyword) if keyword.identifier_like() => {
+                self.skip_fast(kw); // `<kw>` Skip the identifier token.
+                self.node_with_joined_span(
+                    ast::Expr::Var(ast::VarExpr {
+                        name: ast::Name::new(ast::Identifier::from(0u32)),
+                    }),
+                    token.span,
+                )
+            }
+            TokenKind::Ident => {
+                self.skip_fast(TokenKind::Ident); // `<ident>` Skip the identifier token.
+                self.node_with_joined_span(
+                    ast::Expr::Var(ast::VarExpr {
+                        name: ast::Name::new(ast::Identifier::from(0u32)),
+                    }),
+                    token.span,
+                )
+            }
+            kind if kind.is_lit() => self.node_with_joined_span(
+                ast::Expr::Lit(ast::LitExpr { lit: self.parse_lit()? }),
+                token.span,
+            ),
+            _ => {
+                return self.err_with_location(
+                    ParseErrorKind::UnExpected,
+                    ExpectedItem::Expr,
+                    Some(token.kind),
+                    token.span,
+                );
+            }
+        })
+    }
+
+    /// Provided an initial subject expression that is parsed by the parent
+    /// caller, this function will check if there are any additional
+    /// components to the expression; in the form of either property access,
+    /// method calls, indexing, etc.
+    pub(crate) fn parse_singular_expr(
+        &mut self,
+        mut subject: AstNode<ast::Expr>,
+        mut subject_span: ByteRange,
+    ) -> ParseResult<AstNode<ast::Expr>> {
+        // so here we need to peek to see if this is either a index_access, field access
+        // or a function call...
+        while let Some(token) = self.peek() {
+            // @@Todo: do we need to explicitly break on whitespace??
+            //
+            // if there exists a space between the `subject` and the
+            // next fragment of the expression, we treat them as explicitly
+            // non-singular expressions.
+            //
+            //
+            // if !token.span.is_right_before(subject_span) {
+            //     break;
+            // }
+
+            subject = match token.kind {
+                // Property access or method call
+                TokenKind::Dot => self.parse_property_access(subject, subject_span)?,
+                // Array index access syntax: ident[...]
+                TokenKind::Tree(Delimiter::Bracket, _) => {
+                    let span = token.span;
+                    let index = self.in_tree(Delimiter::Bracket, None, |g| g.parse_expr())?;
+
+                    self.node_with_joined_span(
+                        ast::Expr::Index(ast::IndexExpr { subject, index }),
+                        span,
+                    )
+                }
+                // Filter
+                TokenKind::Pipe => {
+                    self.skip_fast(TokenKind::Pipe); // `<pipe>` Skip the pipe token.
+                    let filter = self.parse_filter(subject_span)?;
+                    self.node_with_joined_span(
+                        ast::Expr::FilteredExpr(ast::FilteredExpr { subject, filter }),
+                        subject_span,
+                    )
+                }
+                // Function call
+                // TokenKind::Tree(Delimiter::Paren, _) => self.parse_call(subject, subject_span)?,
+                _ => break,
+            };
+
+            // We need to adjust the subject_span so we can compute whether
+            // we're still "physically" connected to the end of the expression.
+            subject_span = subject_span.join(self.previous_pos())
+        }
+
+        Ok(subject)
+    }
+
+    fn parse_unary_expr(&mut self, token: Token) -> ParseResult<AstNode<ast::Expr>> {
+        let op = self.node_with_span(
+            match token.kind {
+                TokenKind::Keyword(token::Keyword::Not) => ast::UnaryOp::Not,
+                TokenKind::Minus => ast::UnaryOp::Neg,
+                _ => unreachable!(),
+            },
+            token.span,
+        );
+
+        self.skip_fast(token.kind); // `<op>` Skip the operator token.
+        let expr = self.parse_expr()?;
+        Ok(self.node_with_joined_span(ast::Expr::Unary(ast::UnaryExpr { op, expr }), token.span))
+    }
+
+    fn parse_property_access(
+        &mut self,
+        subject: AstNode<ast::Expr>,
+        subject_span: ByteRange,
+    ) -> ParseResult<AstNode<ast::Expr>> {
+        self.skip_fast(TokenKind::Dot); // `<dot>` Skip the dot token.
+
+        let token = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
+
+        match token.kind {
+            kind if kind.is_ident_like() => {
+                let field = self.parse_name()?;
+
+                Ok(self.node_with_joined_span(
+                    ast::Expr::Access(ast::AccessExpr { subject, field }),
+                    subject_span,
+                ))
+            }
+            TokenKind::Number(NumberFlags::Int) => {
+                self.skip_fast(TokenKind::Number(NumberFlags::Int)); // `<number>` Skip the number token.
+
+                let field = self.node_with_span(ast::Name::new(Identifier::from(0u32)), token.span);
+                Ok(self.node_with_joined_span(
+                    ast::Expr::Access(ast::AccessExpr { subject, field }),
+                    subject_span,
+                ))
+            }
+            _ => self.err_with_location(
+                ParseErrorKind::UnExpected,
+                ExpectedItem::Ident,
+                Some(token.kind),
+                token.span,
+            ),
+        }
+    }
+
+    fn parse_filter(&mut self, subject_span: ByteRange) -> ParseResult<AstNode<ast::Filter>> {
+        let name = self.parse_name()?;
+        let args = if self.parse_token_fast(TokenKind::Colon).is_some() {
+            self.parse_args()?
+        } else {
+            AstNodes::empty(self.make_span(subject_span))
+        };
+
+        Ok(self.node_with_joined_span(ast::Filter { name, args }, subject_span))
+    }
     fn parse_lit(&self) -> ParseResult<ast::Lit> {
         let token = self.current_token();
 
