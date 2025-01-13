@@ -108,7 +108,7 @@ pub fn parse_source(query: ParseQuery) -> ParseQueryResult {
     // Create a new import resolver in the event of more modules that
     // are encountered whilst parsing this module.
     let mut diagnostics = ParserDiagnostics::new();
-    let mut parser = Parser::new(spanned, &tokens, &mut diagnostics, &mut spans, options);
+    let mut parser = Parser::new(id, spanned, &tokens, &mut diagnostics, &mut spans, options);
 
     // Perform the parsing operation now... and send the result through the
     // message queue, regardless of it being an error or not.

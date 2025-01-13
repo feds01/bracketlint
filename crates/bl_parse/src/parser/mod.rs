@@ -1,15 +1,36 @@
 //! The parser module is responsible for converting a stream of tokens into an
 //! abstract syntax tree.
-#![allow(dead_code)]
+//!
+//! Based on several documentation sources:
+//!
+//! - https://jinja.palletsprojects.com/en/stable/templates/
 
 use std::cell::Cell;
 
-use bl_ast::{AstNode, AstNodes, ByteRange, Document, LocalSpanMap, SpannedSource};
-use bl_lexer::token::{cursor::TokenCursor, Token};
+use bl_ast::{
+    self as ast, AstNode, AstNodes, ByteRange, Identifier, LocalSpanMap, SourceId, Span,
+    SpannedSource, VarExpr,
+};
+use bl_lexer::token::{
+    self, Delimiter, Keyword, NumberFlags, Token, TokenKind, cursor::TokenCursor,
+};
+use bl_reporting::{
+    HasDiagnosticsMut,
+    inline::{InlineSnippet, note_on_span},
+};
 use derive_more::Deref;
-use thin_vec::{thin_vec, ThinVec};
+use thin_vec::{ThinVec, thin_vec};
 
-use crate::{diagnostics::ParserDiagnostics, ParseOptions};
+use crate::{
+    ParseOptions,
+    diagnostics::{
+        ParseResult, ParserDiagnostics,
+        error::{ParseError, ParseErrorKind},
+        expected::ExpectedItem,
+        warning::{ParseWarning, ParseWarningKind},
+    },
+};
+
 
 #[derive(Deref)]
 pub struct ParseFrame<'s> {
@@ -99,10 +120,21 @@ impl<'s> ParseFrame<'s> {
 /// into an abstract syntax tree.
 #[derive(Deref)]
 pub struct Parser<'s> {
-    source: SpannedSource<'s>,
+    /// The [SourceId] of the source that the parser is currently parsing.
+    id: SourceId,
 
-    stream: &'s [Token],
+    /// The source that the parser is currently parsing. A useful wrapper and
+    /// utility for the parser to access the source, i.e. especially when
+    /// reporting errors.
+    _source: SpannedSource<'s>,
 
+    /// The current frame of the parser. A frame represents a particular
+    /// token stream, like the file, or a subtree within the source, i.e.
+    /// ```
+    /// {% some_tag ... %}
+    /// ```
+    ///
+    /// The frame would represent the token stream between the `{%` and `%}`.
     #[deref]
     frame: ParseFrame<'s>,
 
@@ -113,11 +145,15 @@ pub struct Parser<'s> {
     /// its mode of operation.
     options: ParseOptions,
 
+    /// The local span map that is used to store created [Span]s for [AstNode]s
+    /// that will be synced when the parsing is complete, i.e. at the end of
+    /// the `parse_source` query.
     span_map: &'s mut LocalSpanMap,
 }
 
 impl<'s> Parser<'s> {
     pub fn new(
+        id: SourceId,
         source: SpannedSource<'s>,
         stream: &'s [Token],
         diagnostics: &'s mut ParserDiagnostics,
@@ -133,8 +169,8 @@ impl<'s> Parser<'s> {
         };
 
         Self {
-            source,
-            stream,
+            id,
+            _source: source,
             diagnostics,
             span_map,
             options,
