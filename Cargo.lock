@@ -106,6 +106,7 @@ dependencies = [
  "bl_utils",
  "derive_more",
  "index_vec",
+ "itertools",
  "line-span",
  "once_cell",
  "parking_lot",
@@ -117,8 +118,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "bl_diagnostics"
+name = "bl_ast_utils"
 version = "0.1.0"
+dependencies = [
+ "bl_ast",
+ "bl_utils",
+ "derive_more",
+ "itertools",
+ "replace_with",
+]
 
 [[package]]
 name = "bl_lexer"
@@ -155,6 +163,7 @@ version = "0.1.0"
 dependencies = [
  "bitflags",
  "bl_ast",
+ "bl_ast_utils",
  "bl_lexer",
  "bl_reporting",
  "bl_workspace",

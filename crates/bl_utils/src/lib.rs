@@ -7,5 +7,6 @@ pub mod logging;
 pub mod printing;
 pub mod stream;
 mod timers;
+pub mod tree_writing;
 
 pub use timers::timed;

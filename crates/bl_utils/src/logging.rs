@@ -8,7 +8,7 @@ use clap::ValueEnum;
 use once_cell::sync::OnceCell;
 
 use crate::{
-    highlight::{highlight, Colour, Modifier},
+    highlight::{Colour, Modifier, highlight},
     stream::CompilerOutputStream,
     stream_writeln,
 };
