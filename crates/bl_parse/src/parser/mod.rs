@@ -533,6 +533,8 @@ impl<'s> Parser<'s> {
                     self.with_tag_context(TagContext::For, |g| g.parse_for_loop())
                 }
 
+                token::Keyword::If => self.with_tag_context(TagContext::If, |g| g.parse_if_block()),
+
                 // Control flow tags, that are effectively standalone.
                 token::Keyword::Break => self.parse_break_statement(),
                 token::Keyword::Continue => self.parse_continue_statement(),
@@ -955,6 +957,87 @@ impl<'s> Parser<'s> {
         Ok(self.node_with_joined_span(ast::ForTarget { items }, start))
     }
 
+    fn parse_if_block(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+        let mut clauses = thin_vec![];
+        let mut otherwise = None;
+        let start = self.current_pos();
+
+        let parse_body = |this: &mut Self, preceding_token: TokenKind| {
+            let start = this.current_pos();
+            let mut contents = thin_vec![];
+
+            while let Some(token) = this.peek() {
+                if token.kind.is_percent_tree() {
+                    let maybe_token = this.peek_raw(1).map(|t| t.kind);
+                    if let Some(kind) = maybe_token
+                        && kind.is_control_flow_for(preceding_token)
+                    {
+                        break;
+                    }
+                }
+
+                if let (Some(statement), _) = this.track_span(|g| g.parse_statement())? {
+                    contents.push(statement);
+                } else {
+                    break;
+                }
+            }
+
+            let contents = this.nodes_with_joined_span(contents, start);
+            Ok(this.node_with_joined_span(ast::Body { contents }, start))
+        };
+
+        while let Some(token) = self.peek() {
+            // If it's a percent tree (and of length 1), then we can check if it's the end
+            // of the block.
+            if let TokenKind::Tree(Delimiter::Percent, len) = token.kind
+                && len > 0
+            {
+                let token = self.peek_raw(1).copied().unwrap();
+
+                match token {
+                    Token { kind: TokenKind::Keyword(Keyword::If | Keyword::Elif), .. } => {
+                        let condition = self.in_tree(Delimiter::Percent, None, |g| {
+                            g.skip_token();
+                            g.parse_compound_expr(0)
+                        })?;
+
+                        let if_body = parse_body(self, token.kind)?;
+                        clauses.push(
+                            self.node_with_joined_span(ast::IfClause { condition, if_body }, start),
+                        );
+                    }
+                    Token { kind: TokenKind::Keyword(Keyword::Else), .. } => {
+                        self.in_tree(Delimiter::Percent, None, |g| {
+                            g.parse_token(TokenKind::Keyword(Keyword::Else))?;
+                            Ok(())
+                        })?;
+
+                        otherwise = Some(parse_body(self, token.kind)?);
+                    }
+                    Token { kind: TokenKind::Keyword(Keyword::EndIf), .. } => {
+                        self.in_tree(Delimiter::Percent, None, |g| {
+                            g.parse_token(TokenKind::Keyword(Keyword::EndIf))?;
+                            Ok(())
+                        })?;
+                        break;
+                    }
+                    _ => self.err_with_location(
+                        ParseErrorKind::UnExpected,
+                        ExpectedItem::empty(),
+                        Some(token.kind),
+                        token.span,
+                    )?,
+                }
+            }
+        }
+
+        let clauses = self.nodes_with_joined_span(clauses, start);
+        Ok(self.node_with_joined_span(
+            ast::Statement::Tag(ast::Tag::If(ast::If { clauses, otherwise })),
+            start,
+        ))
+    }
 
     fn parse_break_statement(&mut self) -> ParseResult<AstNode<ast::Statement>> {
         self.in_tree(Delimiter::Percent, None, |g| {
