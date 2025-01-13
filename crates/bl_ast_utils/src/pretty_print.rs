@@ -22,6 +22,20 @@ fn labelled(label: impl ToString, contents: impl ToString, quote_str: &str) -> S
 }
 
 impl AstVisitor for AstTreePrinter<'_> {
+    type Error = Infallible;
+
+    type IfClauseRet = TreeNode;
+    fn visit_if_clause(
+        &self,
+        node: ast::AstNodeRef<ast::IfClause>,
+    ) -> Result<Self::IfClauseRet, Self::Error> {
+        let walk::IfClause { condition, if_body } = walk::walk_if_clause(self, node)?;
+
+        Ok(TreeNode::branch("if_clause", vec![
+            TreeNode::branch("condition", vec![condition]),
+            TreeNode::branch("if_body", vec![if_body]),
+        ]))
+    }
 
     type DocumentRet = TreeNode;
     fn visit_document(
@@ -248,6 +262,19 @@ impl AstVisitor for AstTreePrinter<'_> {
         Ok(TreeNode::leaf(format!("operator `{}`", node.body())))
     }
 
+    type IfRet = TreeNode;
+
+    fn visit_if(&self, node: ast::AstNodeRef<ast::If>) -> Result<Self::IfRet, Self::Error> {
+        let walk::If { clauses, otherwise } = walk::walk_if(self, node)?;
+
+        let mut children = vec![TreeNode::branch("clauses", clauses)];
+
+        if let Some(otherwise) = otherwise {
+            children.push(TreeNode::branch("otherwise", vec![otherwise]));
+        }
+
+        Ok(TreeNode::branch("if", children))
+    }
 
     type ForRet = TreeNode;
 
