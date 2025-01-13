@@ -64,7 +64,7 @@ impl<'a> ParseQuery<'a> {
 }
 
 /// A structure that represents the result of the parsing operation.
-pub struct ParseResult {
+pub struct ParseQueryResult {
     /// The resultant parsed module.
     ///
     /// If the node is `None`, then an unrecoverable error occurred during the
@@ -77,7 +77,7 @@ pub struct ParseResult {
 }
 
 /// An entry point for the general framework to parse a module.
-pub fn parse_source(query: ParseQuery) -> ParseResult {
+pub fn parse_source(query: ParseQuery) -> ParseQueryResult {
     // let mut timings = StageMetrics::default();
     let ParseQuery { id, member, options } = query;
 
@@ -97,7 +97,7 @@ pub fn parse_source(query: ParseQuery) -> ParseResult {
     // Check if the lexer has errors...
     if diagnostics.has_errors() {
         SpanMap::add_local_map(id, spans);
-        return ParseResult {
+        return ParseQueryResult {
             node: None,
             diagnostics: diagnostics.into_reports(Reports::from, Reports::from),
         };
@@ -113,7 +113,7 @@ pub fn parse_source(query: ParseQuery) -> ParseResult {
     let node = parser.parse_document();
 
     SpanMap::add_local_map(id, spans);
-    ParseResult {
+    ParseQueryResult {
         node: Some(node),
         diagnostics: diagnostics.into_reports(Reports::from, Reports::from),
     }

@@ -3,7 +3,7 @@
 use std::{fs, path::PathBuf};
 
 use anyhow::Result;
-use bl_parse::{parse_source, ParseQuery, ParseResult};
+use bl_parse::{ParseQuery, ParseQueryResult, emit_source_tree, parse_source};
 use bl_reporting::Reports;
 use bl_utils::timed;
 use bl_workspace::{Workspace, resolver::find_files_in_paths};
@@ -47,7 +47,7 @@ pub fn check(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
                         let id = workspace.members.reserve_member(file.into_path(), contents);
                         let member = workspace.members.member(id);
 
-                        let ParseResult { node, diagnostics } =
+                        let ParseQueryResult { node, diagnostics } =
                             parse_source(ParseQuery::new(id, member));
 
                         pipeline_diagnostics.extend(diagnostics);
