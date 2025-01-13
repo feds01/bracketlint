@@ -302,6 +302,20 @@ impl AstVisitor for AstTreePrinter<'_> {
         Ok(TreeNode::branch("var_expr", vec![name]))
     }
 
+    type BlockRet = TreeNode;
+
+    fn visit_block(
+        &self,
+        node: ast::AstNodeRef<ast::Block>,
+    ) -> Result<Self::BlockRet, Self::Error> {
+        let walk::Block { label, block_body } = walk::walk_block(self, node)?;
+
+        let children =
+            if let Some(name) = label { vec![name, block_body] } else { vec![block_body] };
+
+        Ok(TreeNode::branch("block", children))
+    }
+
     type BinOpRet = TreeNode;
 
     fn visit_bin_op(
