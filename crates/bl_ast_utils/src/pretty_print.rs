@@ -41,6 +41,12 @@ impl AstVisitor for AstTreePrinter<'_> {
         Ok(TreeNode::leaf("comment"))
     }
 
+
+    type TextRet = TreeNode;
+
+    fn visit_text(&self, _: ast::AstNodeRef<ast::Text>) -> Result<Self::TextRet, Self::Error> {
+        Ok(TreeNode::leaf("text"))
+    }
     type BoolLitRet = TreeNode;
 
     fn visit_bool_lit(
