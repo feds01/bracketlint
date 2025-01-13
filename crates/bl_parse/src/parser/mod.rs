@@ -31,6 +31,39 @@ use crate::{
     },
 };
 
+/// The context of the tag that the parser is currently in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TagContext {
+    /// When the parser has encountered an `if` block.
+    If,
+
+    /// When the parser has encountered a `block` tag.
+    Block,
+
+    /// With the parser has encountered a `with`.
+    With,
+
+    /// When the parser has encountered a `comment`.
+    Comment,
+
+    /// When the parser has encountered a `raw` block.
+    Raw,
+
+    /// When the parser has encountered a `for` loop.
+    For,
+}
+impl TagContext {
+    fn applies_to(&self, kwd: token::Keyword) -> bool {
+        match self {
+            TagContext::If => matches!(kwd, token::Keyword::Else | token::Keyword::Elif),
+            TagContext::Block => matches!(kwd, token::Keyword::EndBlock),
+            TagContext::With => matches!(kwd, token::Keyword::EndWith),
+            TagContext::Comment => matches!(kwd, token::Keyword::EndComment),
+            TagContext::Raw => matches!(kwd, token::Keyword::EndRaw),
+            TagContext::For => matches!(kwd, token::Keyword::EndFor | token::Keyword::Empty),
+        }
+    }
+}
 
 #[derive(Deref)]
 pub struct ParseFrame<'s> {
@@ -40,11 +73,15 @@ pub struct ParseFrame<'s> {
 
     /// If the current frame has an error.
     error: Cell<bool>,
+
+    /// An optional tag context that can be used to determine parsing
+    /// behaviour.
+    tag_context: Option<TagContext>,
 }
 
 impl<'s> ParseFrame<'s> {
     pub fn from_stream(stream: &'s [Token], span: ByteRange) -> Self {
-        Self { error: Cell::new(false), cursor: TokenCursor::new(stream, span) }
+        Self { error: Cell::new(false), cursor: TokenCursor::new(stream, span), tag_context: None }
     }
 
     /// Skip `n` number of tokens.
@@ -392,6 +429,24 @@ impl<'s> Parser<'s> {
         }
     }
 
+    /// Get the current [TagContext] that the parser is in, if any.
+    pub(crate) fn tag_context(&self) -> Option<TagContext> {
+        self.frame.tag_context
+    }
+
+    /// Run a function with a specified tag context.
+    pub(crate) fn with_tag_context<T>(
+        &mut self,
+        ctx: TagContext,
+        g: impl FnOnce(&mut Self) -> T,
+    ) -> T {
+        let old_ctx = self.frame.tag_context;
+        self.frame.tag_context = Some(ctx);
+        let result = g(self);
+        self.frame.tag_context = old_ctx;
+        result
+    }
+
     /// Function to parse a token atom optionally. If the appropriate token atom
     /// is present we advance the token count, if not then just return [None].
     ///
@@ -472,6 +527,18 @@ impl<'s> Parser<'s> {
         let token = self.peek_raw(1).copied().ok_or_else(|| self.make_unexpected_eof())?;
         let statement = match token.kind {
             TokenKind::Keyword(keyword) => match keyword {
+                // Key control flow components, once that imply a more complex structure
+                // of subsequent tags.
+                token::Keyword::For => {
+                    self.with_tag_context(TagContext::For, |g| g.parse_for_loop())
+                }
+
+                kwd if let Some(ctx) = self.tag_context()
+                    && ctx.applies_to(kwd) =>
+                {
+                    return Ok(None);
+                }
+
                 _ => self.err_with_location(
                     ParseErrorKind::Tag,
                     ExpectedItem::Ident,
@@ -783,6 +850,12 @@ impl<'s> Parser<'s> {
         }
     }
 
+    fn parse_for_loop(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+        let start = self.current_pos();
+
+    }
+    }
+    }
 
     fn parse_args(&mut self) -> ParseResult<AstNodes<ast::Arg>> {
         let mut args = thin_vec![];
