@@ -853,8 +853,147 @@ impl<'s> Parser<'s> {
     fn parse_for_loop(&mut self) -> ParseResult<AstNode<ast::Statement>> {
         let start = self.current_pos();
 
+        // Parse the header first, which is within the current token.
+        let (target, iterator, reverse_modifier, guard) =
+            self.in_tree(Delimiter::Percent, None, |g| {
+                g.parse_token(TokenKind::Keyword(token::Keyword::For))?;
+                let target = g.parse_for_target()?;
+
+                g.parse_token(TokenKind::Keyword(token::Keyword::In))?;
+                let iterator = g.parse_expr()?;
+
+                let reverse_modifier =
+                    if g.parse_token_fast(TokenKind::Keyword(token::Keyword::Reversed)).is_some() {
+                        Some(g.node_with_span(
+                            ast::Name::new(ast::Identifier::from(0u32)),
+                            g.previous_pos(),
+                        ))
+                    } else {
+                        None
+                    };
+
+                if g.parse_token_fast(TokenKind::Keyword(token::Keyword::If)).is_some() {
+                    let guard = g.parse_expr()?;
+                    Ok((target, iterator, reverse_modifier, Some(guard)))
+                } else {
+                    Ok((target, iterator, reverse_modifier, None))
+                }
+            })?;
+
+        // Next, parse either until we reach an `endfor` or `empty` token.
+        //
+        // If it's an empty token, then we reach the end of the loop.
+        let (loop_body, ending_token) = self.parse_body_until_block_footer(
+            ExpectedItem::empty(),
+            |kind| {
+                matches!(kind, TokenKind::Keyword(token::Keyword::EndFor | token::Keyword::Empty))
+            },
+            |g| {
+                g.skip_token(); // `<empty>` | `<end_for>` Skip the empty token.
+                Ok(())
+            },
+        )?;
+
+        // If we ended with an `{% empty %}` token, then we parse the empty block.
+        let loop_empty = if ending_token == TokenKind::Keyword(token::Keyword::Empty) {
+            let (body, _) = self.parse_body_until_block_footer(
+                ExpectedItem::empty(),
+                |kind| matches!(kind, TokenKind::Keyword(token::Keyword::EndFor)),
+                |g| {
+                    g.skip_token(); // `<end_for>` Skip the empty token.
+                    Ok(())
+                },
+            )?;
+
+            Some(body)
+        } else {
+            None
+        };
+
+        Ok(self.node_with_joined_span(
+            ast::Statement::Tag(ast::Tag::For(ast::For {
+                target,
+                iterator,
+                guard,
+                loop_body,
+                loop_empty,
+                reverse_modifier,
+            })),
+            start,
+        ))
+    }
+
+    /// Parse the destructuring target of a for loop, i.e. the assigned variable
+    /// or variables per iteration, e.g.
+    /// ```
+    /// {% for x in y %}
+    ///     ...
+    /// {% endfor %}
+    ///
+    /// {% for x, y in z %}
+    ///    ...
+    /// {% endfor %}
+    /// ```
+    fn parse_for_target(&mut self) -> ParseResult<AstNode<ast::ForTarget>> {
+        let start = self.current_pos();
+        let key = self.parse_name()?;
+        let mut items = thin_vec![key];
+
+        loop {
+            if self.parse_token_fast(TokenKind::Comma).is_none() {
+                break;
+            }
+
+            let key = self.parse_name()?;
+            items.push(key);
+        }
+
+        let items = self.nodes_with_joined_span(items, start);
+        Ok(self.node_with_joined_span(ast::ForTarget { items }, start))
     }
     }
+
+    fn parse_body_until_block_footer<U>(
+        &mut self,
+        expected: ExpectedItem,
+        peek_fn: impl Fn(TokenKind) -> bool,
+        g: impl FnMut(&mut Self) -> ParseResult<U>,
+    ) -> ParseResult<(AstNode<ast::Body>, TokenKind)> {
+        let mut statements = thin_vec![];
+        let start = self.current_pos();
+        let mut end: Option<_> = None;
+
+        while let Some(token) = self.peek() {
+            // If it's a percent tree (and of length 1), then we can check if it's the end
+            // of the block.
+            if let TokenKind::Tree(Delimiter::Percent, _) = token.kind {
+                let maybe_token = self.peek_raw(1);
+                if let Some(inner) = maybe_token
+                    && peek_fn(inner.kind)
+                {
+                    // Parse the end of the block now and record the span.
+                    end = Some(*inner);
+                    self.in_tree(Delimiter::Percent, None, g)?;
+                    break;
+                }
+            }
+
+            if let Some(statement) = self.parse_statement()? {
+                statements.push(statement);
+            } else {
+                break;
+            }
+        }
+
+        // If there is no end, then we generate an error about an un-closed
+        // block.
+        if let Some(end) = end {
+            let span = start.join(end.span);
+            let contents = self.nodes_with_span(statements, span);
+            Ok((self.node_with_joined_span(ast::Body { contents }, span), end.kind))
+        } else {
+            self.err_with_location(ParseErrorKind::UnclosedTag, expected, None, self.eof_pos())
+        }
     }
 
     fn parse_args(&mut self) -> ParseResult<AstNodes<ast::Arg>> {
