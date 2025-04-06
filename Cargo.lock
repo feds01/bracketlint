@@ -594,6 +594,11 @@ dependencies = [
 [[package]]
 name = "bl_lints"
 version = "0.1.0"
+dependencies = [
+ "bl_utils",
+ "colored",
+ "similar",
+]
 
 [[package]]
 name = "bl_macros"

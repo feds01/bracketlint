@@ -5,3 +5,7 @@ authors = { workspace = true }
 edition = { workspace = true }
 
 [dependencies]
+bl_utils = { workspace = true}
+
+similar = { workspace = true }
+colored = { workspace = true }

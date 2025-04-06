@@ -1,12 +1,13 @@
 //! Implementation of the `check` command.
 
-use std::{fs, path::PathBuf};
+use std::{fs, io::Write, path::PathBuf};
 
 use anyhow::Result;
 use bl_fmt::{FmtOptions, FmtQuery, FmtQueryResult, fmt_module};
+use bl_lints::{diff::Diff, settings};
 use bl_parse::{ParseQuery, ParseQueryResult, parse_source};
 use bl_reporting::Reports;
-use bl_utils::timed;
+use bl_utils::{stream_writeln, timed};
 use bl_workspace::{Workspace, resolver::find_files_in_paths};
 use log::{Level, info};
 
@@ -70,6 +71,7 @@ pub fn fmt(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
     );
 
     let options = FmtOptions::default();
+    let settings = &workspace.settings;
 
     // Now let's try and "format" all of the documents that we got
     // in the project.
@@ -79,6 +81,27 @@ pub fn fmt(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
         let FmtQueryResult { buffer, diagnostics } =
             fmt_module(FmtQuery { member, source, options });
         pipeline_diagnostics.extend(diagnostics);
+
+        // @@Todo: factor this out into a general interface for emitting
+        // changes/applying them.
+        match settings.linter_settings.fix_mode {
+            settings::FixMode::Diff => {
+                let diff = Diff::new(member.contents(), &buffer);
+                let mut stderr = workspace.error_stream();
+
+                stream_writeln!(stderr, "{}", diff);
+            }
+            settings::FixMode::Generate => {}
+            settings::FixMode::Apply => {
+                let mut file = fs::OpenOptions::new()
+                    .write(true)
+                    .truncate(true)
+                    .open(&member.path)
+                    .expect("failed to open file");
+
+                file.write_all(buffer.as_bytes()).expect("failed to write to file");
+            }
+        }
     }
 
     Ok(pipeline_diagnostics)
