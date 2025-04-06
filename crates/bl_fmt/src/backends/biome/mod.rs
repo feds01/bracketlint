@@ -1,7 +1,10 @@
 //! The Biome backend, which utilises the `biome` crate to parse and format
 //! code.
 
+use biome_css_formatter::{self as css_formatter, context::CssFormatOptions};
+use biome_css_parser::{self as css_parser, CssParserOptions};
 use biome_diagnostics::DiagnosticExt;
+use biome_html_formatter::{HtmlFormatOptions, format_node};
 use biome_html_parser::parse_html;
 use biome_js_formatter::{self as js_formatter, context::JsFormatOptions};
 use bl_ast::{ByteRange, SourceId};
@@ -20,6 +23,9 @@ use crate::{
 pub struct BiomeFormatterOptions {
     /// The options for the HTML formatter.
     html: HtmlFormatOptions,
+
+    /// The options for the CSS formatter.
+    css: CssFormatOptions,
 }
 
 /// The adapter implementation for the "Biome JS" formatter. This is a wrapper
@@ -41,6 +47,7 @@ impl BiomeFormatter {
             source,
             options: BiomeFormatterOptions {
                 html: HtmlFormatOptions::default(),
+                css: CssFormatOptions::default(),
             },
         }
     }
@@ -103,3 +110,78 @@ impl HasHtmlParsing for BiomeFormatter {
         Some(TerminalState { language: LanguageType::Html })
     }
 }
+
+impl HasCssParsing for BiomeFormatter {
+    /// Format the CSS contents using the Biome formatter.
+    ///
+    /// This will follow the algorithm:
+    ///
+    /// 1. Parse the CSS contents using the `biome_css_parser`.
+    ///
+    /// 2. If there are any errors, return them as a `FmtError`.
+    ///
+    /// 3. Format the parsed CSS using the `biome_css_formatter`.
+    ///
+    /// 4. Return the formatted CSS as a `String`.
+    ///
+    /// @@Todo: for (2 & 4) we may not want to do this, and simply return the
+    /// contents as verbatim. We could emit an event for debugging purposes
+    /// that parsing this content failed for some reason.
+    fn format_css(&self, contents: &str) -> FmtResult<String> {
+        // @@Todo: consider using `parse_css_with_cache` here, and store the cache
+        // within our caching system.
+        let parsed = css_parser::parse_css(
+            contents,
+            CssParserOptions::default().allow_wrong_line_comments().allow_metavariables(),
+        );
+        let language = LanguageType::Css;
+        let mut diagnostics = vec![];
+        let mut has_errors = false;
+
+        for diagnostic in parsed.diagnostics() {
+            has_errors |= diagnostic.is_error();
+
+            let message = format!("{}", diagnostic.message);
+            let err = diagnostic.clone().with_file_source_code("");
+
+            // Extract this span from the error.
+            diagnostics.push(FmtError::new(
+                FmtErrorKind::ExternalLanguageParseError { language, message },
+                err.location().span.map(|text_range| {
+                    bl_ast::Span::new(
+                        ByteRange::new(text_range.start().into(), text_range.end().into()),
+                        self.source,
+                    )
+                }),
+            ));
+        }
+
+        // If there are any errors, return them.
+        if has_errors {
+            return Err(FmtError::compound(diagnostics));
+        }
+
+        // Now, format the CSS.
+        let options = self.options.css.clone();
+
+        match css_formatter::format_node(options, &parsed.syntax()) {
+            Ok(formatted) => {
+                // @@Temp: for now, just return the original contents.
+                Ok(formatted.print().unwrap().into_code())
+            }
+            Err(_) => {
+                Err(FmtError::new(FmtErrorKind::ExternalLanguageFormatError { language }, None))
+            }
+        }
+    }
+
+    /// Returns the terminal state of the CSS formatter.
+    ///
+    /// Since a CSS block is a terminal "node" in the context of a template i.e.
+    /// there may not be any other embedded languages within the CSS block,
+    /// we can safely assume that the terminal state is `Css`.
+    fn terminal_state(&self) -> Option<TerminalState> {
+        Some(TerminalState { language: LanguageType::Css })
+    }
+}
+

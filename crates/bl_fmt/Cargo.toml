@@ -14,6 +14,8 @@ bl_reporting = { workspace = true }
 bl_macros = { workspace = true }
 
 biome_console = { git = "https://github.com/feds01/biome.git", branch = "html-unclosed-2", package = "biome_console" }
+biome_css_formatter = { git = "https://github.com/feds01/biome.git", branch = "html-unclosed-2", package = "biome_css_formatter" }
+biome_css_parser = { git = "https://github.com/feds01/biome.git", branch = "html-unclosed-2", package = "biome_css_parser" }
 biome_diagnostics = { git = "https://github.com/feds01/biome.git", branch = "html-unclosed-2", package = "biome_diagnostics" }
 biome_html_formatter = { git = "https://github.com/feds01/biome.git", branch = "html-unclosed-2", package = "biome_html_formatter" }
 biome_html_parser = { git = "https://github.com/feds01/biome.git", branch = "html-unclosed-2", package = "biome_html_parser" }
