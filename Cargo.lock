@@ -124,6 +124,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "biome_aria"
+version = "0.5.7"
+source = "git+https://github.com/feds01/biome.git?branch=html-unclosed-2#66bf8a40e8a7daa94ba1c8038e691191c65b5506"
+dependencies = [
+ "biome_aria_metadata",
+]
+
+[[package]]
+name = "biome_aria_metadata"
+version = "0.5.7"
+source = "git+https://github.com/feds01/biome.git?branch=html-unclosed-2#66bf8a40e8a7daa94ba1c8038e691191c65b5506"
+dependencies = [
+ "biome_deserialize",
+ "biome_deserialize_macros",
+ "biome_string_case",
+ "prettyplease",
+ "proc-macro2",
+ "quote",
+ "serde",
+ "serde_json",
+ "syn 2.0.100",
+]
+
+[[package]]
 name = "biome_console"
 version = "0.5.7"
 source = "git+https://github.com/feds01/biome.git?branch=html-unclosed-2#66bf8a40e8a7daa94ba1c8038e691191c65b5506"
@@ -320,6 +344,71 @@ dependencies = [
 ]
 
 [[package]]
+name = "biome_js_factory"
+version = "0.5.7"
+source = "git+https://github.com/feds01/biome.git?branch=html-unclosed-2#66bf8a40e8a7daa94ba1c8038e691191c65b5506"
+dependencies = [
+ "biome_js_syntax",
+ "biome_rowan",
+]
+
+[[package]]
+name = "biome_js_formatter"
+version = "0.5.7"
+source = "git+https://github.com/feds01/biome.git?branch=html-unclosed-2#66bf8a40e8a7daa94ba1c8038e691191c65b5506"
+dependencies = [
+ "biome_deserialize",
+ "biome_deserialize_macros",
+ "biome_diagnostics_categories",
+ "biome_formatter",
+ "biome_js_factory",
+ "biome_js_syntax",
+ "biome_rowan",
+ "biome_string_case",
+ "biome_suppression",
+ "biome_text_size",
+ "biome_unicode_table",
+ "camino",
+ "smallvec",
+ "unicode-width 0.1.14",
+]
+
+[[package]]
+name = "biome_js_parser"
+version = "0.5.7"
+source = "git+https://github.com/feds01/biome.git?branch=html-unclosed-2#66bf8a40e8a7daa94ba1c8038e691191c65b5506"
+dependencies = [
+ "biome_console",
+ "biome_diagnostics",
+ "biome_js_factory",
+ "biome_js_syntax",
+ "biome_parser",
+ "biome_rowan",
+ "biome_unicode_table",
+ "drop_bomb",
+ "enumflags2",
+ "indexmap 2.9.0",
+ "rustc-hash",
+ "serde_json",
+ "smallvec",
+ "tracing",
+]
+
+[[package]]
+name = "biome_js_syntax"
+version = "0.5.7"
+source = "git+https://github.com/feds01/biome.git?branch=html-unclosed-2#66bf8a40e8a7daa94ba1c8038e691191c65b5506"
+dependencies = [
+ "biome_aria",
+ "biome_aria_metadata",
+ "biome_rowan",
+ "biome_string_case",
+ "camino",
+ "enumflags2",
+ "serde",
+]
+
+[[package]]
 name = "biome_json_factory"
 version = "0.5.7"
 source = "git+https://github.com/feds01/biome.git?branch=html-unclosed-2#66bf8a40e8a7daa94ba1c8038e691191c65b5506"
@@ -477,6 +566,8 @@ dependencies = [
  "biome_diagnostics",
  "biome_html_formatter",
  "biome_html_parser",
+ "biome_js_formatter",
+ "biome_js_parser",
  "bl_ast",
  "bl_macros",
  "bl_reporting",
@@ -1156,6 +1247,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3b3cff922bd51709b605d9ead9aa71031d81447142d828eb4a6eba76fe619f9b"
 
 [[package]]
+name = "prettyplease"
+version = "0.2.32"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "664ec5419c51e34154eec046ebcba56312d5a2fc3b09a06da188e1ad21afadf6"
+dependencies = [
+ "proc-macro2",
+ "syn 2.0.100",
+]
+
+[[package]]
 name = "proc-macro-error"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1387,6 +1488,9 @@ name = "smallvec"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8917285742e9f3e1683f0a9c4e6b57960b7314d0b08d30d1ecd426713ee2eee9"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "strsim"
