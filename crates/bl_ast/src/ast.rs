@@ -3,7 +3,6 @@
 
 use std::{
     fmt,
-    iter::repeat,
     ops::{Deref, DerefMut},
 };
 
@@ -132,7 +131,7 @@ impl SpanMap {
     fn extend_map(writer: &mut RwLockWriteGuard<Vec<Span>>, id: AstNodeId) {
         let len = (id.to_usize() + 1).saturating_sub(writer.len());
         if len > 0 {
-            writer.extend(repeat(Span::null()).take(len));
+            writer.extend(std::iter::repeat_n(Span::null(), len));
         }
     }
 
