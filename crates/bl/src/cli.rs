@@ -21,14 +21,17 @@ pub struct Cli {
 pub enum Command {
     /// The check command checks the given files or directories for linting
     /// errors.
-    Check(CheckCommand),
+    Check(LintCommand),
+
+    /// Format the given files or directories.
+    Fmt(LintCommand),
 
     /// Command to print the version of the `bl` binary.
     Version,
 }
 
 #[derive(Clone, Debug, clap::Parser)]
-pub struct CheckCommand {
+pub struct LintCommand {
     /// List of files or directories to check.
     #[clap(help = "List of files or directories to check [default: .]")]
     pub files: Vec<PathBuf>,
