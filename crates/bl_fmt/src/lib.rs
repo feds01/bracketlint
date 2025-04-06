@@ -1,4 +1,8 @@
-use adapters::ExternalLanguagesEngine;
+//! The bracketlint formatter.
+
+#![feature(impl_trait_in_assoc_type)]
+
+use adapters::ExternalLanguagesEngineAdaptor;
 use bl_ast::{AstVisitorMutSelf, SourceId};
 use bl_reporting::Reports;
 use bl_workspace::Member;
@@ -8,14 +12,14 @@ mod backends;
 mod diagnostics;
 mod visitor;
 
-fn configured_formatter(source: SourceId) -> impl ExternalLanguagesEngine {
-    backends::biome::BiomeFormatter::new(source)
+fn configured_formatter() -> impl ExternalLanguagesEngineAdaptor {
+    backends::biome::BiomeFormatter::new()
 }
 
 /// Various options for the formatter.
 #[derive(Debug, Clone, Copy)]
 pub struct FmtOptions {
-    indent_size: usize,
+    indent_size: u16,
 }
 
 impl Default for FmtOptions {
@@ -50,8 +54,8 @@ pub fn fmt_module(query: FmtQuery) -> FmtQueryResult {
     // We assume that the formatting will be near to the original length of the
     // document.
     let buffer = String::with_capacity(spanned.len());
-    let engine = configured_formatter(source);
-    let mut formatter = visitor::Formatter::new(engine, options, spanned, buffer);
+    let engine = configured_formatter();
+    let mut formatter = visitor::Formatter::new(engine, options, source, spanned, buffer);
 
     match formatter.visit_document(document.ast_ref()) {
         Ok(_) => FmtQueryResult { buffer: formatter.into_buffer(), diagnostics: Reports::new() },
