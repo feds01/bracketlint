@@ -62,6 +62,12 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         self.buffer.push('\n');
     }
 
+    /// Push a hunk on the current line.
+    #[inline(always)]
+    pub fn push_hunk(&mut self, hunk: &str) {
+        self.buffer.push_str(hunk);
+    }
+
     /// Run a function with an increased indent level.
     ///
     /// Assume that the formatter function is called within a block, meaning
