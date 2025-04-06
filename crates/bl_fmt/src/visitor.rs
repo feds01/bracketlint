@@ -239,4 +239,15 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             Ok(())
         })
     }
+
+    type VarExprRet = ();
+
+    fn visit_var_expr(
+        &mut self,
+        node: bl_ast::AstNodeRef<bl_ast::VarExpr>,
+    ) -> Result<Self::VarExprRet, Self::Error> {
+        let name = self.source.hunk(node.span().range);
+        self.push_hunk(name);
+        Ok(())
+    }
 }
