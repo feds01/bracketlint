@@ -830,7 +830,9 @@ fn emit_default_impl_macros(
             };
             (hiding: [$($node:ident),* $(,)?]) => {
                 // Here we call the difference! macro to implement all the nodes that are not given
-                hash_tree_def::difference!(#(#all_nodes),*; $($node),*; #default_impl_name, node);
+                //
+                // @@Cleanup: figure out how to import this from this crate directly.
+                bl_macros::difference!(#(#all_nodes),*; $($node),*; #default_impl_name, node);
             };
             #(#default_impl_macro_cases)*
             // Last case is error
