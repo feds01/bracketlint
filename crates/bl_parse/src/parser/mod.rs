@@ -1059,10 +1059,11 @@ impl<'s> Parser<'s> {
                             g.parse_compound_expr(0)
                         })?;
 
-                        let if_body = parse_body(self, token.kind)?;
-                        clauses.push(
-                            self.node_with_joined_span(ast::IfClause { condition, if_body }, start),
-                        );
+                        let clause_body = parse_body(self, token.kind)?;
+                        clauses.push(self.node_with_joined_span(
+                            ast::IfClause { condition, clause_body },
+                            start,
+                        ));
                     }
                     Token { kind: TokenKind::Keyword(Keyword::Else), .. } => {
                         self.in_tree(Delimiter::Percent, None, |g| {
