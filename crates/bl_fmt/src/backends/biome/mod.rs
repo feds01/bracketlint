@@ -8,12 +8,12 @@ use biome_html_formatter::{HtmlFormatOptions, format_node};
 use biome_html_parser::parse_html;
 use biome_js_formatter::{self as js_formatter, context::JsFormatOptions};
 use biome_js_parser::{self as js_parser, JsFileSource, JsParserOptions};
-use bl_ast::{ByteRange, SourceId};
+use bl_ast::ByteRange;
 
 use crate::{
     adapters::{
-        ExternalLanguagesEngine, HasCssParsing, HasHtmlParsing, HasJsParsing, LanguageType,
-        TerminalState,
+        ExternalLanguagesEngineAdaptor, FormatterContext, HasCSSParsing, HasHTMLParsing,
+        HasJSParsing, LanguageType, TerminalState,
     },
     diagnostics::{FmtError, FmtErrorKind, FmtResult},
 };
@@ -21,6 +21,7 @@ use crate::{
 /// A wrapper around the options for the Biome formatter. These options
 /// represent the configurability of the formatter from the perspective of
 /// `biome`.
+#[derive(Debug, Clone)]
 pub struct BiomeFormatterOptions {
     /// The options for the HTML formatter.
     html: HtmlFormatOptions,
@@ -37,18 +38,13 @@ pub struct BiomeFormatterOptions {
 /// for formatting external languages like JS, CSS and HTML, which are embedded
 /// within the template.
 pub struct BiomeFormatter {
-    /// The source of the module that is being formatted. This is mostly
-    /// useful for diagnostics.
-    source: SourceId,
-
     /// The options for the formatter, encapsulating backend specific options.
     options: BiomeFormatterOptions,
 }
 
 impl BiomeFormatter {
-    pub fn new(source: SourceId) -> Self {
+    pub fn new() -> Self {
         Self {
-            source,
             options: BiomeFormatterOptions {
                 html: HtmlFormatOptions::default(),
                 css: CssFormatOptions::default(),
@@ -61,7 +57,16 @@ impl BiomeFormatter {
     }
 }
 
-impl HasHtmlParsing for BiomeFormatter {
+struct HTMLBiomeFormatter {
+    context: FormatterContext,
+
+    /// The options for the formatter, encapsulating backend specific options.
+    options: BiomeFormatterOptions,
+
+    state: Option<TerminalState>,
+}
+
+impl HasHTMLParsing for HTMLBiomeFormatter {
     /// Format the HTML contents using the Biome formatter.
     ///
     /// /// This will follow the algorithm:
@@ -78,7 +83,7 @@ impl HasHtmlParsing for BiomeFormatter {
     /// @@Todo: for (2 & 4) we may not want to do this, and simply return the
     /// contents as verbatim. We could emit an event for debugging purposes
     /// that parsing this content failed for some reason.
-    fn format_html(&self, contents: &str) -> FmtResult<String> {
+    fn format(&mut self, contents: &str) -> FmtResult<String> {
         let parsed = parse_html(contents);
         let language = LanguageType::Html;
         let mut errors = Vec::new();
@@ -94,7 +99,7 @@ impl HasHtmlParsing for BiomeFormatter {
                     err.location().span.map(|text_range| {
                         bl_ast::Span::new(
                             ByteRange::new(text_range.start().into(), text_range.end().into()),
-                            self.source,
+                            self.context.source(),
                         )
                     }),
                 ));
@@ -105,8 +110,8 @@ impl HasHtmlParsing for BiomeFormatter {
 
         match format_node(options, &parsed.syntax()) {
             Ok(formatted) => {
-                // @@Temp: for now, just return the original contents.
-                Ok(formatted.print().unwrap().into_code())
+                let indent = self.context.indent();
+                Ok(formatted.print_with_indent(indent).unwrap().into_code())
             }
             Err(_) => {
                 Err(FmtError::new(FmtErrorKind::ExternalLanguageFormatError { language }, None))
@@ -119,7 +124,14 @@ impl HasHtmlParsing for BiomeFormatter {
     }
 }
 
-impl HasCssParsing for BiomeFormatter {
+struct CSSBiomeFormatter {
+    context: FormatterContext,
+
+    /// The options for the formatter, encapsulating backend specific options.
+    options: BiomeFormatterOptions,
+}
+
+impl HasCSSParsing for CSSBiomeFormatter {
     /// Format the CSS contents using the Biome formatter.
     ///
     /// This will follow the algorithm:
@@ -135,7 +147,7 @@ impl HasCssParsing for BiomeFormatter {
     /// @@Todo: for (2 & 4) we may not want to do this, and simply return the
     /// contents as verbatim. We could emit an event for debugging purposes
     /// that parsing this content failed for some reason.
-    fn format_css(&self, contents: &str) -> FmtResult<String> {
+    fn format(&self, contents: &str) -> FmtResult<String> {
         // @@Todo: consider using `parse_css_with_cache` here, and store the cache
         // within our caching system.
         let parsed = css_parser::parse_css(
@@ -158,7 +170,7 @@ impl HasCssParsing for BiomeFormatter {
                 err.location().span.map(|text_range| {
                     bl_ast::Span::new(
                         ByteRange::new(text_range.start().into(), text_range.end().into()),
-                        self.source,
+                        self.context.source(),
                     )
                 }),
             ));
@@ -193,7 +205,14 @@ impl HasCssParsing for BiomeFormatter {
     }
 }
 
-impl HasJsParsing for BiomeFormatter {
+struct JSBiomeFormatter {
+    context: FormatterContext,
+
+    /// The options for the formatter, encapsulating backend specific options.
+    options: BiomeFormatterOptions,
+}
+
+impl HasJSParsing for JSBiomeFormatter {
     /// Format the JS contents using the Biome formatter.
     ///
     /// This will follow the algorithm:
@@ -209,7 +228,7 @@ impl HasJsParsing for BiomeFormatter {
     /// @@Todo: for (2 & 4) we may not want to do this, and simply return the
     /// contents as verbatim. We could emit an event for debugging purposes
     /// that parsing this content failed for some reason.
-    fn format_js(&self, contents: &str) -> FmtResult<String> {
+    fn format(&self, contents: &str) -> FmtResult<String> {
         // @@Todo: consider using `parse_js_with_cache` here, and store the
         // cache within our caching system.
         let parsed = js_parser::parse_script(contents, JsParserOptions::default());
@@ -230,7 +249,7 @@ impl HasJsParsing for BiomeFormatter {
                 err.location().span.map(|text_range| {
                     bl_ast::Span::new(
                         ByteRange::new(text_range.start().into(), text_range.end().into()),
-                        self.source,
+                        self.context.source(),
                     )
                 }),
             ));
@@ -267,4 +286,20 @@ impl HasJsParsing for BiomeFormatter {
 // We've implemented the `ExternalLanguagesEngine` trait for the
 // `BiomeFormatter` by implementing the `HasHtmlParsing`, `HasCssParsing` and
 // `HasJsParsing` traits.
-impl ExternalLanguagesEngine for BiomeFormatter {}
+impl ExternalLanguagesEngineAdaptor for BiomeFormatter {
+    type HTMLEngine = impl HasHTMLParsing;
+    type CSSEngine = impl HasCSSParsing;
+    type JSEngine = impl HasJSParsing;
+
+    fn html_engine(&self, context: &FormatterContext) -> Self::HTMLEngine {
+        HTMLBiomeFormatter { context: context.clone(), options: self.options.clone(), state: None }
+    }
+
+    fn css_engine(&self, context: &FormatterContext) -> Self::CSSEngine {
+        CSSBiomeFormatter { context: context.clone(), options: self.options.clone() }
+    }
+
+    fn js_engine(&self, context: &FormatterContext) -> Self::JSEngine {
+        JSBiomeFormatter { context: context.clone(), options: self.options.clone() }
+    }
+}
