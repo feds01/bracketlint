@@ -137,6 +137,54 @@ dependencies = [
 ]
 
 [[package]]
+name = "biome_css_factory"
+version = "0.5.7"
+source = "git+https://github.com/feds01/biome.git?branch=html-unclosed-2#66bf8a40e8a7daa94ba1c8038e691191c65b5506"
+dependencies = [
+ "biome_css_syntax",
+ "biome_rowan",
+]
+
+[[package]]
+name = "biome_css_formatter"
+version = "0.5.7"
+source = "git+https://github.com/feds01/biome.git?branch=html-unclosed-2#66bf8a40e8a7daa94ba1c8038e691191c65b5506"
+dependencies = [
+ "biome_css_syntax",
+ "biome_diagnostics",
+ "biome_formatter",
+ "biome_rowan",
+ "biome_string_case",
+ "biome_suppression",
+]
+
+[[package]]
+name = "biome_css_parser"
+version = "0.5.7"
+source = "git+https://github.com/feds01/biome.git?branch=html-unclosed-2#66bf8a40e8a7daa94ba1c8038e691191c65b5506"
+dependencies = [
+ "biome_console",
+ "biome_css_factory",
+ "biome_css_syntax",
+ "biome_diagnostics",
+ "biome_parser",
+ "biome_rowan",
+ "biome_unicode_table",
+ "tracing",
+]
+
+[[package]]
+name = "biome_css_syntax"
+version = "0.5.7"
+source = "git+https://github.com/feds01/biome.git?branch=html-unclosed-2#66bf8a40e8a7daa94ba1c8038e691191c65b5506"
+dependencies = [
+ "biome_rowan",
+ "biome_string_case",
+ "camino",
+ "serde",
+]
+
+[[package]]
 name = "biome_deserialize"
 version = "0.6.0"
 source = "git+https://github.com/feds01/biome.git?branch=html-unclosed-2#66bf8a40e8a7daa94ba1c8038e691191c65b5506"
@@ -424,6 +472,8 @@ name = "bl_fmt"
 version = "0.1.0"
 dependencies = [
  "biome_console",
+ "biome_css_formatter",
+ "biome_css_parser",
  "biome_diagnostics",
  "biome_html_formatter",
  "biome_html_parser",
