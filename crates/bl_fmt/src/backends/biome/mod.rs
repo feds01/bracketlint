@@ -6,8 +6,10 @@ use biome_css_parser::{self as css_parser, CssParserOptions};
 use biome_diagnostics::DiagnosticExt;
 use biome_html_formatter::{HtmlFormatOptions, format_node};
 use biome_html_parser::parse_html;
+use biome_html_syntax::HtmlElementList;
 use biome_js_formatter::{self as js_formatter, context::JsFormatOptions};
 use biome_js_parser::{self as js_parser, JsFileSource, JsParserOptions};
+use biome_rowan::AstNodeList;
 use bl_ast::ByteRange;
 
 use crate::{
@@ -85,6 +87,18 @@ impl HasHTMLParsing for HTMLBiomeFormatter {
     /// that parsing this content failed for some reason.
     fn format(&mut self, contents: &str) -> FmtResult<String> {
         let parsed = parse_html(contents);
+        let html = parsed.tree().html();
+
+        // In order to compute the terminal state, we're going to check
+        // the top most node of the HTML document, and remember the value
+        // so that we can inspect, the following traits:
+        //
+        // - What language did we "finish" with?
+        //    - If `style``, then we must be in a CSS block.
+        //    - If `script`, then we must be in a JS block.
+        //    - Otherwise, we are in a HTML block.
+        self.state = terminal_state_from_rightmost_child(&html);
+
         let language = LanguageType::Html;
         let mut errors = Vec::new();
 
@@ -202,6 +216,64 @@ impl HasCSSParsing for CSSBiomeFormatter {
     /// we can safely assume that the terminal state is `Css`.
     fn terminal_state(&self) -> Option<TerminalState> {
         Some(TerminalState { language: LanguageType::Css })
+    }
+}
+
+enum TerminalCalculationState {
+    None,
+    Some(TerminalState),
+    UseParent,
+}
+
+/// A utility function to get the rightmost child of a node.
+///
+/// This is used to determine the last child of a node, which is useful for
+/// determining the terminal state of the parser.
+fn terminal_state_from_rightmost_child(node: &HtmlElementList) -> Option<TerminalState> {
+    match find_rightmost_child_and_extract_state(node) {
+        TerminalCalculationState::Some(state) => Some(state),
+        _ => None,
+    }
+}
+
+fn find_rightmost_child_and_extract_state(node: &HtmlElementList) -> TerminalCalculationState {
+    if let Some(child) = node.into_iter().last() {
+        // If the child is an HTML element, we need to check if it has any
+        // children.
+        let biome_html_syntax::AnyHtmlElement::HtmlElement(html_element) = child else {
+            // If we get an element that is auxiliary, it means that we can
+            // backtrack and in fact use the parent element which should be
+            // the last "tag" child.
+            return TerminalCalculationState::UseParent;
+        };
+
+        let nodes = html_element.children();
+
+        if !nodes.is_empty() {
+            // Handle the case where the child is an HTML element, and it has
+            // children.
+            match find_rightmost_child_and_extract_state(&nodes) {
+                TerminalCalculationState::UseParent => {}
+                state => return state,
+            }
+        }
+
+        // @@Todo: clean this up so that we can gracefully handle these
+        // unwraps.
+        let name_token =
+            html_element.opening_element().unwrap().name().unwrap().value_token().unwrap();
+
+        match name_token.text().trim() {
+            "style" => {
+                TerminalCalculationState::Some(TerminalState { language: LanguageType::Css })
+            }
+            "script" => {
+                TerminalCalculationState::Some(TerminalState { language: LanguageType::Js })
+            }
+            _ => TerminalCalculationState::Some(TerminalState { language: LanguageType::Html }),
+        }
+    } else {
+        TerminalCalculationState::None
     }
 }
 

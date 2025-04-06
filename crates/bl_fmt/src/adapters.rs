@@ -35,6 +35,8 @@ impl fmt::Display for LanguageType {
     }
 }
 
+/// The state of the terminal. This is used to determine the language that
+#[derive(Debug, Clone, Copy)]
 pub struct TerminalState {
     pub language: LanguageType,
 }
