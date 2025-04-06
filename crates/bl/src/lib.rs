@@ -19,7 +19,7 @@ use bl_lints::settings::FixMode;
 use bl_reporting::{Reporter, Reports, pluralise};
 use bl_utils::{logging::ToolLogger, stream::CompilerOutputStream, stream_writeln};
 use bl_workspace::{Workspace, WorkspaceBuilder, settings::Settings};
-use cli::CheckCommand;
+use cli::LintCommand;
 use crash::crash_handler;
 
 #[derive(Copy, Clone)]
@@ -63,6 +63,7 @@ pub fn run(cli::Cli { command }: cli::Cli) -> Result<ExitStatus> {
 
     match command {
         cli::Command::Check(args) => check(args),
+        cli::Command::Fmt(args) => fmt(args),
         cli::Command::Version => version(),
     }
 }
@@ -81,7 +82,7 @@ fn resolve_default_files(files: Vec<PathBuf>, is_stdin: bool) -> Vec<PathBuf> {
     }
 }
 
-fn check(args: CheckCommand) -> Result<ExitStatus> {
+fn check(args: LintCommand) -> Result<ExitStatus> {
     let files = resolve_default_files(args.files, false); // @@Todo: add stdin support.
 
     // Fix rules are as follows:
@@ -107,6 +108,35 @@ fn check(args: CheckCommand) -> Result<ExitStatus> {
     let mut workspace = builder.build();
 
     let messages = commands::check::check(&files, &mut workspace)?;
+    consume_diagnostics(&workspace, messages)
+}
+
+fn fmt(args: LintCommand) -> Result<ExitStatus> {
+    let files = resolve_default_files(args.files, false); // @@Todo: add stdin support.
+
+    // Fix rules are as follows:
+    // - By default, generate all fixes, but don't apply them to the filesystem.
+    // - If `--fix` or `--fix-only` is set, apply applicable fixes to the filesystem
+    //   (or print them to stdout, if we're reading from stdin).
+    // - If `--diff` or `--fix-only` are set, don't print any violations (only
+    //   applicable fixes)
+
+    let fix_mode = if args.diff {
+        FixMode::Diff
+    } else if args.fix {
+        FixMode::Apply
+    } else {
+        FixMode::Generate
+    };
+
+    let settings = Settings::new(args.respect_gitignore, fix_mode, args.dump_ast);
+    let builder = WorkspaceBuilder::new()
+        .with_settings(settings)
+        .with_stdout(CompilerOutputStream::stdout())
+        .with_stderr(CompilerOutputStream::stderr());
+    let mut workspace = builder.build();
+
+    let messages = commands::fmt::fmt(&files, &mut workspace)?;
     consume_diagnostics(&workspace, messages)
 }
 
