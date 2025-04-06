@@ -5,12 +5,13 @@ authors = { workspace = true }
 edition = { workspace = true }
 
 [dependencies]
-bl_utils = { workspace = true }
 bl_ast = { workspace = true }
-bl_workspace = { workspace = true }
+bl_fmt = { workspace = true }
 bl_lints = { workspace = true }
 bl_parse = { workspace = true }
 bl_reporting = { workspace = true }
+bl_utils = { workspace = true }
+bl_workspace = { workspace = true }
 
 anyhow = { workspace = true }
 argfile = { workspace = true }

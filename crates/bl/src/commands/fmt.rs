@@ -3,6 +3,7 @@
 use std::{fs, path::PathBuf};
 
 use anyhow::Result;
+use bl_fmt::{FmtOptions, FmtQuery, FmtQueryResult, fmt_module};
 use bl_parse::{ParseQuery, ParseQueryResult, parse_source};
 use bl_reporting::Reports;
 use bl_utils::timed;
@@ -67,6 +68,18 @@ pub fn fmt(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
             info!("parsed files in {duration:?}");
         },
     );
+
+    let options = FmtOptions::default();
+
+    // Now let's try and "format" all of the documents that we got
+    // in the project.
+    //
+    // @@Temp: for now we will just print the produced contents.
+    for (source, member) in workspace.members.iter() {
+        let FmtQueryResult { buffer, diagnostics } =
+            fmt_module(FmtQuery { member, source, options });
+        pipeline_diagnostics.extend(diagnostics);
+    }
 
     Ok(pipeline_diagnostics)
 }
