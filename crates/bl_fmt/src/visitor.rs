@@ -125,6 +125,11 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
 
 impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
     type Error = FmtError;
+
+    ast_visitor_mut_self_default_impl!(
+        hiding: Document, Text, For, If, IfClause, Comment, Inline, VarExpr
+    );
+
     type DocumentRet = ();
 
     fn visit_document(
