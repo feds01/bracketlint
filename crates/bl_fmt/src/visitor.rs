@@ -226,6 +226,23 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         Ok(())
     }
 
+    type TextRet = ();
+
+    fn visit_text(
+        &mut self,
+        node: bl_ast::AstNodeRef<bl_ast::Text>,
+    ) -> Result<Self::TextRet, Self::Error> {
+        let text = self.source.hunk(node.span().range);
+        let result = self.adaptor.html_engine(&self.ctx).format(text)?;
+
+        // @@Temp: for now, lets just push the HTML into the buffer.
+        for line in result.lines() {
+            self.push_line(line);
+        }
+
+        Ok(())
+    }
+
     type CommentRet = ();
 
     /// Visit a comment node.
