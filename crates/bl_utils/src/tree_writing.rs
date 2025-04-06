@@ -167,7 +167,7 @@ impl<'t> TreeWriter<'t, '_> {
         });
 
         let extra_pad =
-            iter::repeat(self.config.pad).take(self.config.child_prefix.chars().count());
+            std::iter::repeat_n(self.config.pad, self.config.child_prefix.chars().count());
 
         let new_pad = self.pad.chars().chain(vertical_line_or_pad).chain(extra_pad).collect();
 
