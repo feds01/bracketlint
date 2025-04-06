@@ -131,7 +131,7 @@ impl fmt::Display for ByteRange {
 /// [ByteRange].
 ///
 /// [Span]s are only used when printing reports within the
-/// `hash_reporting` crate. Ideally, data structures that need to store
+/// `bl_reporting` crate. Ideally, data structures that need to store
 /// locations of various items should use [ByteRange] and then convert into
 /// [Span]s.
 #[derive(Debug, Clone, Copy, Constructor, PartialEq, Eq, Hash, JsonSchema, Serialize)]
@@ -190,6 +190,16 @@ impl<'s> SpannedSource<'s> {
         // clamp the end to the `length` of the contents
         let end = cmp::min(self.source.len(), range.end() + 1);
         &self.source[range.start()..end]
+    }
+
+    /// Get the length of the source.
+    pub fn len(&self) -> usize {
+        self.source.len()
+    }
+
+    /// Check if the source is empty.
+    pub fn is_empty(&self) -> bool {
+        self.source.is_empty()
     }
 }
 

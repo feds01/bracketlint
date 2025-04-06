@@ -137,7 +137,7 @@ impl SpanMap {
     }
 
     /// Get a mutable reference to the [`SPAN_MAP`]. This is only
-    /// internal to the `hash-ast` crate since it creates entries
+    /// internal to the `bl-ast` crate since it creates entries
     /// in the span map when creating new AST nodes.
     fn add_span(span: Span) -> AstNodeId {
         let mut writer = SPAN_MAP.write();
