@@ -825,7 +825,7 @@ define_tree! {
         /// The condition of the `if` block.
         pub condition: Child!(Expr),
         /// The body of the `if-statement`
-        pub if_body: Child!(Body),
+        pub clause_body: Child!(Body),
     }
 
     /// An `if` block consisting of the condition, block and an optional else clause

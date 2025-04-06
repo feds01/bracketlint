@@ -28,13 +28,13 @@ impl AstVisitor for AstTreePrinter<'_> {
         &self,
         node: ast::AstNodeRef<ast::IfClause>,
     ) -> Result<Self::IfClauseRet, Self::Error> {
-        let walk::IfClause { condition, if_body } = walk::walk_if_clause(self, node)?;
+        let walk::IfClause { condition, clause_body } = walk::walk_if_clause(self, node)?;
 
         Ok(TreeNode::branch(
             "if_clause",
             vec![
                 TreeNode::branch("condition", vec![condition]),
-                TreeNode::branch("if_body", vec![if_body]),
+                TreeNode::branch("clause_body", vec![clause_body]),
             ],
         ))
     }
