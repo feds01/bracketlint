@@ -226,6 +226,29 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         Ok(())
     }
 
+    type CommentRet = ();
+
+    /// Visit a comment node.
+    ///
+    /// For comments, we just emit the content of the comment as a verbatim.
+    fn visit_comment(
+        &mut self,
+        node: bl_ast::AstNodeRef<bl_ast::Comment>,
+    ) -> Result<Self::CommentRet, Self::Error> {
+        // @@Todo: we need to be more sophisticated about this, as we want to remember
+        // where the "anchor" points of the comment are, so we can treat the whole
+        // area as verbatim.
+        self.within_tag(TagKind::Comment, |this| {
+            this.push_hunk(" ");
+
+            let text = this.source.hunk(node.span().range);
+            this.push_hunk(text);
+
+            this.push_hunk(" ");
+            Ok(())
+        })
+    }
+
     type InlineRet = ();
 
     fn visit_inline(
