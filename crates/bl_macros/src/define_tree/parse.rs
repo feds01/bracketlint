@@ -108,10 +108,10 @@ impl TryFrom<&Type> for NodeFieldData {
                 } else if type_macro.mac.path.is_ident(OPTIONAL_NODE_TYPE_NAME) {
                     Ok(NodeFieldData::OptionalChild { node_name: node_name()? })
                 } else {
-                    Ok(NodeFieldData::Other { ty: value.clone() })
+                    Ok(NodeFieldData::Other { ty: Box::new(value.clone()) })
                 }
             }
-            _ => Ok(NodeFieldData::Other { ty: value.clone() }),
+            _ => Ok(NodeFieldData::Other { ty: Box::new(value.clone()) }),
         }
     }
 }
