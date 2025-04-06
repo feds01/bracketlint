@@ -225,4 +225,18 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
 
         Ok(())
     }
+
+    type InlineRet = ();
+
+    fn visit_inline(
+        &mut self,
+        node: bl_ast::AstNodeRef<bl_ast::Inline>,
+    ) -> Result<Self::InlineRet, Self::Error> {
+        let bl_ast::Inline { expr } = node.body();
+
+        self.within_tag(TagKind::Inline, |this| {
+            this.visit_expr(expr.ast_ref())?;
+            Ok(())
+        })
+    }
 }
