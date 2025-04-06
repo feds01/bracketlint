@@ -13,6 +13,7 @@ edition = "2024"
 [workspace.dependencies]
 bl_ast  = {  path = "crates/bl_ast" }
 bl_ast_utils = { path = "crates/bl_ast_utils" }
+bl_fmt = { path = "crates/bl_fmt" }
 bl_lexer = { path = "crates/bl_lexer" }
 bl_lints = { path = "crates/bl_lints" }
 bl_macros = { path = "crates/bl_macros" }

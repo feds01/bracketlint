@@ -1,0 +1,20 @@
+[package]
+name = "bl_fmt"
+version = "0.1.0"
+authors = { workspace = true }
+edition = { workspace = true }
+
+[dependencies]
+derive_more = { workspace = true }
+itertools = { workspace = true }
+
+bl_ast = { workspace = true }
+bl_workspace = { workspace = true }
+bl_reporting = { workspace = true }
+bl_macros = { workspace = true }
+
+
+biome_html_formatter = { git = "https://github.com/feds01/biome.git", branch = "html-unclosed-2", package = "biome_html_formatter" }
+biome_html_parser = { git = "https://github.com/feds01/biome.git", branch = "html-unclosed-2", package = "biome_html_parser" }
+biome_diagnostics = { git = "https://github.com/feds01/biome.git", branch = "html-unclosed-2", package = "biome_diagnostics" }
+biome_console = { git = "https://github.com/feds01/biome.git", branch = "html-unclosed-2", package = "biome_console" }
