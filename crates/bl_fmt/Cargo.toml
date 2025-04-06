@@ -7,6 +7,7 @@ edition = { workspace = true }
 [dependencies]
 derive_more = { workspace = true }
 itertools = { workspace = true }
+log = { workspace = true }
 
 bl_ast = { workspace = true }
 bl_workspace = { workspace = true }
@@ -19,5 +20,7 @@ biome_css_parser = { git = "https://github.com/feds01/biome.git", branch = "html
 biome_diagnostics = { git = "https://github.com/feds01/biome.git", branch = "html-unclosed-2", package = "biome_diagnostics" }
 biome_html_formatter = { git = "https://github.com/feds01/biome.git", branch = "html-unclosed-2", package = "biome_html_formatter" }
 biome_html_parser = { git = "https://github.com/feds01/biome.git", branch = "html-unclosed-2", package = "biome_html_parser" }
+biome_html_syntax = { git = "https://github.com/feds01/biome.git", branch = "html-unclosed-2", package = "biome_html_syntax" }
 biome_js_formatter = { git = "https://github.com/feds01/biome.git", branch = "html-unclosed-2", package = "biome_js_formatter" }
 biome_js_parser = { git = "https://github.com/feds01/biome.git", branch = "html-unclosed-2", package = "biome_js_parser" }
+biome_rowan = { git = "https://github.com/feds01/biome.git", branch = "html-unclosed-2", package = "biome_rowan" }
