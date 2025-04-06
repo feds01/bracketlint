@@ -1,6 +1,6 @@
 //! Contains all of AST definitions for HTML templates.
 
-mod ast;
+pub mod ast;
 mod location;
 mod source;
 

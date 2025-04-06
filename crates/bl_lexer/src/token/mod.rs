@@ -218,7 +218,6 @@ impl TokenKind {
         matches!(self, TokenKind::Keyword(Keyword::Not) | TokenKind::Minus)
     }
 
-
     #[allow(clippy::match_like_matches_macro)]
     pub fn is_control_flow_for(&self, preceding_token: TokenKind) -> bool {
         match (preceding_token, self) {

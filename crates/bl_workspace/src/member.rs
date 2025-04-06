@@ -4,7 +4,7 @@
 
 use std::path::PathBuf;
 
-use bl_ast::{self as ast, SourceId, TempSourceMap};
+use bl_ast::{self as ast, SourceId, SpannedSource, TempSourceMap};
 
 #[derive(Clone)]
 pub struct Member {
@@ -26,6 +26,10 @@ impl Member {
         document: Option<ast::AstNode<ast::Document>>,
     ) -> Self {
         Member { path, contents, document }
+    }
+
+    pub fn spanned(&self) -> SpannedSource<'_> {
+        SpannedSource::new(&self.contents, &self.path)
     }
 
     pub fn contents(&self) -> &str {
