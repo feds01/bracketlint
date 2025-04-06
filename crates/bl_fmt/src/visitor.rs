@@ -65,4 +65,3 @@ impl<'fmt, Engine: ExternalLanguagesEngine> Formatter<'fmt, Engine> {
         Ok(())
     }
 }
-
