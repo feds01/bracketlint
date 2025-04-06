@@ -122,3 +122,16 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         Ok(())
     }
 }
+
+impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
+    type Error = FmtError;
+    type DocumentRet = ();
+
+    fn visit_document(
+        &mut self,
+        node: bl_ast::AstNodeRef<bl_ast::Document>,
+    ) -> Result<Self::DocumentRet, Self::Error> {
+        let _ = walk_mut_self::walk_document(self, node)?;
+        Ok(())
+    }
+}
