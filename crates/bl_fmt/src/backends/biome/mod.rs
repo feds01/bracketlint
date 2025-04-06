@@ -7,6 +7,7 @@ use biome_diagnostics::DiagnosticExt;
 use biome_html_formatter::{HtmlFormatOptions, format_node};
 use biome_html_parser::parse_html;
 use biome_js_formatter::{self as js_formatter, context::JsFormatOptions};
+use biome_js_parser::{self as js_parser, JsFileSource, JsParserOptions};
 use bl_ast::{ByteRange, SourceId};
 
 use crate::{
@@ -26,6 +27,9 @@ pub struct BiomeFormatterOptions {
 
     /// The options for the CSS formatter.
     css: CssFormatOptions,
+
+    /// The options for the JS formatter.
+    js: JsFormatOptions,
 }
 
 /// The adapter implementation for the "Biome JS" formatter. This is a wrapper
@@ -48,6 +52,10 @@ impl BiomeFormatter {
             options: BiomeFormatterOptions {
                 html: HtmlFormatOptions::default(),
                 css: CssFormatOptions::default(),
+                // @@Temp: we might need to change this based on the source of the module, however
+                // for now we can assume that is in-fact a script that we are formatting, since
+                // we are selecting snippets from the templates.
+                js: JsFormatOptions::new(JsFileSource::js_script()),
             },
         }
     }
@@ -185,3 +193,73 @@ impl HasCssParsing for BiomeFormatter {
     }
 }
 
+impl HasJsParsing for BiomeFormatter {
+    /// Format the JS contents using the Biome formatter.
+    ///
+    /// This will follow the algorithm:
+    ///
+    /// 1. Parse the JS contents using the `biome_js_parser`.
+    ///
+    /// 2. If there are any errors, return them as a `FmtError`.
+    ///
+    /// 3. Format the parsed JS using the `biome_js_formatter`.
+    ///
+    /// 4. Return the formatted JS as a `String`.
+    ///
+    /// @@Todo: for (2 & 4) we may not want to do this, and simply return the
+    /// contents as verbatim. We could emit an event for debugging purposes
+    /// that parsing this content failed for some reason.
+    fn format_js(&self, contents: &str) -> FmtResult<String> {
+        // @@Todo: consider using `parse_js_with_cache` here, and store the
+        // cache within our caching system.
+        let parsed = js_parser::parse_script(contents, JsParserOptions::default());
+
+        let language = LanguageType::Js;
+        let mut diagnostics = vec![];
+
+        let mut has_errors = false;
+        for diagnostic in parsed.diagnostics() {
+            has_errors |= diagnostic.is_error();
+
+            let message = format!("{}", diagnostic.message);
+            let err = diagnostic.clone().with_file_source_code("");
+
+            // Extract this span from the error.
+            diagnostics.push(FmtError::new(
+                FmtErrorKind::ExternalLanguageParseError { language, message },
+                err.location().span.map(|text_range| {
+                    bl_ast::Span::new(
+                        ByteRange::new(text_range.start().into(), text_range.end().into()),
+                        self.source,
+                    )
+                }),
+            ));
+        }
+
+        // If there are any errors, return them.
+        if has_errors {
+            return Err(FmtError::compound(diagnostics));
+        }
+
+        // Now, format the JS.
+        let options = self.options.js.clone();
+        let formatted = js_formatter::format_node(options, &parsed.syntax());
+
+        // @@Temp: for now, just return the original contents.
+        match formatted {
+            Ok(formatted) => Ok(formatted.print().unwrap().into_code()),
+            Err(_) => {
+                Err(FmtError::new(FmtErrorKind::ExternalLanguageFormatError { language }, None))
+            }
+        }
+    }
+
+    /// Returns the terminal state of the JS formatter.
+    ///
+    /// Since a JS block is a terminal "node" in the context of a template i.e.
+    /// there may not be any other embedded languages within the JS block,
+    /// we can safely assume that the terminal state is `Js`.
+    fn terminal_state(&self) -> Option<TerminalState> {
+        Some(TerminalState { language: LanguageType::Js })
+    }
+}
