@@ -819,9 +819,18 @@ define_tree! {
         pub contents: Children!(Statement),
     }
 
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub enum ClauseKind {
+        If,
+        Elif,
+    }
+
     #[derive(Debug, PartialEq, Clone)]
     #[node]
     pub struct IfClause {
+        /// The opening tag of the `if` block.
+        pub kind: ClauseKind,
+
         /// The condition of the `if` block.
         pub condition: Child!(Expr),
         /// The body of the `if-statement`

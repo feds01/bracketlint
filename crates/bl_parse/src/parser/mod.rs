@@ -1059,9 +1059,14 @@ impl<'s> Parser<'s> {
                             g.parse_compound_expr(0)
                         })?;
 
+                        let clause_kind = match token.kind {
+                            TokenKind::Keyword(Keyword::If) => bl_ast::ClauseKind::If,
+                            TokenKind::Keyword(Keyword::Elif) => bl_ast::ClauseKind::Elif,
+                            _ => unreachable!(),
+                        };
                         let clause_body = parse_body(self, token.kind)?;
                         clauses.push(self.node_with_joined_span(
-                            ast::IfClause { condition, clause_body },
+                            ast::IfClause { kind: clause_kind, condition, clause_body },
                             start,
                         ));
                     }
