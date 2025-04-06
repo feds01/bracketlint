@@ -6,6 +6,7 @@ pub mod highlight;
 pub mod logging;
 pub mod printing;
 pub mod stream;
+pub mod text;
 mod timers;
 pub mod tree_writing;
 
