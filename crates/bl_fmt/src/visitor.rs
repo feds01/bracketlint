@@ -26,8 +26,29 @@ pub(crate) struct Formatter<'fmt, EngineAdaptor: ExternalLanguagesEngineAdaptor>
     /// The context of the formatter.
     ctx: FormatterContext,
 }
+
+pub enum TagKind {
+    Block,
+    Inline,
+    Comment,
 }
 
+impl TagKind {
+    pub fn left(&self) -> &'static str {
+        match self {
+            TagKind::Block => "{%",
+            TagKind::Inline => "{{",
+            TagKind::Comment => "{#",
+        }
+    }
+
+    pub fn right(&self) -> &'static str {
+        match self {
+            TagKind::Block => "%}",
+            TagKind::Inline => "}}",
+            TagKind::Comment => "#}",
+        }
+    }
 }
 
 impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
@@ -82,6 +103,22 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         f(self)?;
         self.ctx.indent -= 1;
 
+        Ok(())
+    }
+
+    fn within_tag<F: FnOnce(&mut Self) -> Result<(), FmtError>>(
+        &mut self,
+        kind: TagKind,
+        f: F,
+    ) -> Result<(), FmtError> {
+        self.add_indent();
+        self.push_hunk(kind.left());
+
+        // Run F without an indent level.
+        f(self)?;
+
+        // Add the closing tag.
+        self.push_hunk(kind.right());
         Ok(())
     }
 }
