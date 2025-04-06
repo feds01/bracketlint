@@ -179,4 +179,50 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         self.push_line("{% endfor %}");
         Ok(())
     }
+
+    type IfRet = ();
+
+    fn visit_if(
+        &mut self,
+        node: bl_ast::AstNodeRef<bl_ast::If>,
+    ) -> Result<Self::IfRet, Self::Error> {
+        let bl_ast::If { clauses, otherwise } = node.body();
+
+        // Walk the clauses, and format each one of them.
+        for clause in clauses.iter() {
+            walk_mut_self::walk_if_clause(self, clause.ast_ref())?;
+        }
+
+        if let Some(otherwise) = otherwise {
+            self.push_line("{% else %}");
+            self.with_block(|formatter| formatter.visit_body(otherwise.ast_ref()))?;
+        }
+
+        self.push_line("{% endif %}");
+
+        Ok(())
+    }
+
+    type IfClauseRet = ();
+    fn visit_if_clause(
+        &mut self,
+        node: bl_ast::AstNodeRef<bl_ast::IfClause>,
+    ) -> Result<Self::IfClauseRet, Self::Error> {
+        let bl_ast::IfClause { kind, condition, clause_body } = node.body();
+
+        self.within_tag(TagKind::Block, |this| {
+            match kind {
+                bl_ast::ClauseKind::If => this.push_hunk(" if "),
+                bl_ast::ClauseKind::Elif => this.push_hunk(" elif "),
+            }
+            this.visit_expr(condition.ast_ref())?;
+            this.push_hunk(" ");
+            Ok(())
+        })?;
+
+        // Now visit the loop body.
+        self.with_block(|formatter| formatter.visit_body(clause_body.ast_ref()))?;
+
+        Ok(())
+    }
 }
