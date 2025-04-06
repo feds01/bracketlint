@@ -30,10 +30,13 @@ impl AstVisitor for AstTreePrinter<'_> {
     ) -> Result<Self::IfClauseRet, Self::Error> {
         let walk::IfClause { condition, if_body } = walk::walk_if_clause(self, node)?;
 
-        Ok(TreeNode::branch("if_clause", vec![
-            TreeNode::branch("condition", vec![condition]),
-            TreeNode::branch("if_body", vec![if_body]),
-        ]))
+        Ok(TreeNode::branch(
+            "if_clause",
+            vec![
+                TreeNode::branch("condition", vec![condition]),
+                TreeNode::branch("if_body", vec![if_body]),
+            ],
+        ))
     }
 
     type DocumentRet = TreeNode;
@@ -88,11 +91,14 @@ impl AstVisitor for AstTreePrinter<'_> {
     fn visit_with(&self, node: ast::AstNodeRef<ast::With>) -> Result<Self::WithRet, Self::Error> {
         let walk::With { assignments, block_body } = walk::walk_with(self, node)?;
 
-        Ok(TreeNode::branch("set", vec![
-            TreeNode::branch("assignments", assignments),
-            // @@Todo: we should probably not show these if the `kind` is `Set`.
-            block_body,
-        ]))
+        Ok(TreeNode::branch(
+            "set",
+            vec![
+                TreeNode::branch("assignments", assignments),
+                // @@Todo: we should probably not show these if the `kind` is `Set`.
+                block_body,
+            ],
+        ))
     }
 
     type TextRet = TreeNode;
@@ -151,11 +157,14 @@ impl AstVisitor for AstTreePrinter<'_> {
     ) -> Result<Self::MacroCallExprRet, Self::Error> {
         let walk::MacroCallExpr { name, namespace, args } = walk::walk_macro_call_expr(self, node)?;
 
-        Ok(TreeNode::branch("macro_call_expr", vec![
-            name,
-            TreeNode::branch("namespace", vec![namespace]),
-            TreeNode::branch("args", args),
-        ]))
+        Ok(TreeNode::branch(
+            "macro_call_expr",
+            vec![
+                name,
+                TreeNode::branch("namespace", vec![namespace]),
+                TreeNode::branch("args", args),
+            ],
+        ))
     }
 
     type LitRet = TreeNode;
@@ -172,11 +181,10 @@ impl AstVisitor for AstTreePrinter<'_> {
     ) -> Result<Self::BinExprRet, Self::Error> {
         let walk::BinExpr { lhs, op, rhs } = walk::walk_bin_expr(self, node)?;
 
-        Ok(TreeNode::branch("bin_expr", vec![
-            TreeNode::branch("lhs", vec![lhs]),
-            op,
-            TreeNode::branch("rhs", vec![rhs]),
-        ]))
+        Ok(TreeNode::branch(
+            "bin_expr",
+            vec![TreeNode::branch("lhs", vec![lhs]), op, TreeNode::branch("rhs", vec![rhs])],
+        ))
     }
 
     type ExprRet = TreeNode;
@@ -193,10 +201,10 @@ impl AstVisitor for AstTreePrinter<'_> {
     ) -> Result<Self::ImportRet, Self::Error> {
         let walk::Import { template, names } = walk::walk_import(self, node)?;
 
-        Ok(TreeNode::branch("import", vec![
-            TreeNode::branch("template", vec![template]),
-            TreeNode::branch("names", names),
-        ]))
+        Ok(TreeNode::branch(
+            "import",
+            vec![TreeNode::branch("template", vec![template]), TreeNode::branch("names", names)],
+        ))
     }
 
     type FilteredExprRet = TreeNode;
@@ -207,10 +215,10 @@ impl AstVisitor for AstTreePrinter<'_> {
     ) -> Result<Self::FilteredExprRet, Self::Error> {
         let walk::FilteredExpr { subject, filter } = walk::walk_filtered_expr(self, node)?;
 
-        Ok(TreeNode::branch("filtered_expr", vec![
-            TreeNode::branch("subject", vec![subject]),
-            filter,
-        ]))
+        Ok(TreeNode::branch(
+            "filtered_expr",
+            vec![TreeNode::branch("subject", vec![subject]), filter],
+        ))
     }
 
     type CallExprRet = TreeNode;
@@ -221,10 +229,10 @@ impl AstVisitor for AstTreePrinter<'_> {
     ) -> Result<Self::CallExprRet, Self::Error> {
         let walk::CallExpr { subject, args } = walk::walk_call_expr(self, node)?;
 
-        Ok(TreeNode::branch("call_expr", vec![
-            TreeNode::branch("subject", vec![subject]),
-            TreeNode::branch("args", args),
-        ]))
+        Ok(TreeNode::branch(
+            "call_expr",
+            vec![TreeNode::branch("subject", vec![subject]), TreeNode::branch("args", args)],
+        ))
     }
 
     type SuperRet = TreeNode;
@@ -464,10 +472,13 @@ impl AstVisitor for AstTreePrinter<'_> {
         node: ast::AstNodeRef<ast::AccessExpr>,
     ) -> Result<Self::AccessExprRet, Self::Error> {
         let walk::AccessExpr { subject, field } = walk::walk_access_expr(self, node)?;
-        Ok(TreeNode::branch("access_expr", vec![
-            TreeNode::branch("subject", vec![subject]),
-            TreeNode::branch("field", vec![field]),
-        ]))
+        Ok(TreeNode::branch(
+            "access_expr",
+            vec![
+                TreeNode::branch("subject", vec![subject]),
+                TreeNode::branch("field", vec![field]),
+            ],
+        ))
     }
 
     type IndexExprRet = TreeNode;
@@ -477,10 +488,13 @@ impl AstVisitor for AstTreePrinter<'_> {
         node: ast::AstNodeRef<ast::IndexExpr>,
     ) -> Result<Self::IndexExprRet, Self::Error> {
         let walk::IndexExpr { subject, index } = walk::walk_index_expr(self, node)?;
-        Ok(TreeNode::branch("index_expr", vec![
-            TreeNode::branch("subject", vec![subject]),
-            TreeNode::branch("index", vec![index]),
-        ]))
+        Ok(TreeNode::branch(
+            "index_expr",
+            vec![
+                TreeNode::branch("subject", vec![subject]),
+                TreeNode::branch("index", vec![index]),
+            ],
+        ))
     }
 
     type FilterRet = TreeNode;
