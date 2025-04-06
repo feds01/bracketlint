@@ -263,3 +263,8 @@ impl HasJsParsing for BiomeFormatter {
         Some(TerminalState { language: LanguageType::Js })
     }
 }
+
+// We've implemented the `ExternalLanguagesEngine` trait for the
+// `BiomeFormatter` by implementing the `HasHtmlParsing`, `HasCssParsing` and
+// `HasJsParsing` traits.
+impl ExternalLanguagesEngine for BiomeFormatter {}
