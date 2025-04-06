@@ -536,7 +536,6 @@ dependencies = [
  "anyhow",
  "argfile",
  "bl_ast",
- "bl_fmt",
  "bl_lints",
  "bl_parse",
  "bl_reporting",
