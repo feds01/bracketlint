@@ -134,4 +134,49 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         let _ = walk_mut_self::walk_document(self, node)?;
         Ok(())
     }
+
+    type ForRet = ();
+
+    fn visit_for(
+        &mut self,
+        node: bl_ast::AstNodeRef<bl_ast::For>,
+    ) -> Result<Self::ForRet, Self::Error> {
+        let bl_ast::For { target, iterator, guard, reverse_modifier, loop_body, loop_empty } =
+            node.body();
+
+        // @@ Proof of concept: for now, we will just push a for loop into the buffer.
+        self.within_tag(TagKind::Block, |this| {
+            this.push_hunk(" for ");
+            this.visit_for_target(target.ast_ref())?;
+            this.push_hunk(" in ");
+            this.visit_expr(iterator.ast_ref())?;
+
+            // Check if we have an if guard on the loop itself.
+            if let Some(guard) = guard {
+                this.push_hunk(" if ");
+                this.visit_expr(guard.ast_ref())?;
+            }
+
+            // Check if there's a reverse modifier on the loop.
+            if let Some(reverse_modifier) = reverse_modifier {
+                this.push_hunk(" reverse");
+                this.visit_name(reverse_modifier.ast_ref())?;
+            }
+
+            this.push_hunk(" ");
+            Ok(())
+        })?;
+
+        // Now visit the loop body.
+        self.with_block(|formatter| formatter.visit_body(loop_body.ast_ref()))?;
+
+        // Check if we have an empty loop body.
+        if let Some(loop_empty) = loop_empty {
+            self.push_line("{% empty %}");
+            self.with_block(|formatter| formatter.visit_body(loop_empty.ast_ref()))?;
+        }
+
+        self.push_line("{% endfor %}");
+        Ok(())
+    }
 }
