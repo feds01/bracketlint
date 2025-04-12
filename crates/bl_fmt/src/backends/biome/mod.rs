@@ -1,6 +1,11 @@
 //! The Biome backend, which utilises the `biome` crate to parse and format
 //! code.
 
+use std::{
+    convert::Infallible,
+    ops::{FromResidual, Try},
+};
+
 use biome_css_formatter::{self as css_formatter, context::CssFormatOptions};
 use biome_css_parser::{self as css_parser, CssParserOptions};
 use biome_diagnostics::DiagnosticExt;
@@ -225,6 +230,40 @@ enum TerminalCalculationState {
     UseParent,
 }
 
+impl Try for TerminalCalculationState {
+    type Output = TerminalCalculationState;
+    type Residual = TerminalCalculationState;
+
+    fn from_output(output: Self::Output) -> Self {
+        output
+    }
+
+    fn branch(self) -> std::ops::ControlFlow<Self::Residual, Self::Output> {
+        match self {
+            // Define which values should short-circuit when using ?
+            TerminalCalculationState::UseParent => std::ops::ControlFlow::Break(self),
+
+            // Define which values represent "success" and should continue execution
+            val @ (TerminalCalculationState::None | TerminalCalculationState::Some(_)) => {
+                std::ops::ControlFlow::Continue(val)
+            }
+        }
+    }
+}
+
+impl FromResidual for TerminalCalculationState {
+    fn from_residual(residual: <Self as Try>::Residual) -> Self {
+        residual
+    }
+}
+
+impl<E> FromResidual<Result<Infallible, E>> for TerminalCalculationState {
+    fn from_residual(_: Result<Infallible, E>) -> Self {
+        // When Result::Err is encountered with ?, return TerminalCalculationState::None
+        TerminalCalculationState::None
+    }
+}
+
 /// A utility function to get the rightmost child of a node.
 ///
 /// This is used to determine the last child of a node, which is useful for
@@ -258,10 +297,7 @@ fn find_rightmost_child_and_extract_state(node: &HtmlElementList) -> TerminalCal
             }
         }
 
-        // @@Todo: clean this up so that we can gracefully handle these
-        // unwraps.
-        let name_token =
-            html_element.opening_element().unwrap().name().unwrap().value_token().unwrap();
+        let name_token = html_element.opening_element()?.name()?.value_token()?;
 
         match name_token.text().trim() {
             "style" => {
