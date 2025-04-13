@@ -12,7 +12,7 @@ use index_vec::Idx;
 use schemars::{self, JsonSchema};
 use serde::{self, Serialize};
 
-use crate::HasSource;
+use crate::{HasSource, source::LineRanges};
 
 pub static SOURCE_COUNT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
 
@@ -177,12 +177,13 @@ impl Span {
 pub struct SpannedSource<'s> {
     pub source: &'s str,
     pub path: &'s PathBuf,
+    pub line_ranges: &'s LineRanges,
 }
 
 impl<'s> SpannedSource<'s> {
     /// Create a [SpannedSource] from a [String].
-    pub fn new(s: &'s str, path: &'s PathBuf) -> Self {
-        Self { source: s, path }
+    pub fn new(source: &'s str, path: &'s PathBuf, line_ranges: &'s LineRanges) -> Self {
+        Self { source, path, line_ranges }
     }
 
     /// Get a hunk of the source by the specified [ByteRange].

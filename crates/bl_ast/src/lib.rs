@@ -6,7 +6,7 @@ mod source;
 
 pub use ast::*;
 pub use location::{ByteRange, SourceId, Span, SpannedSource};
-pub use source::{HasSource, TempSourceMap};
+pub use source::{HasSource, LineRanges, TempSourceMap};
 
 pub mod visitor {
     pub use super::ast::{
