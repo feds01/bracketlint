@@ -7,44 +7,35 @@ use bl_ast::{AstVisitorMutSelf, SourceId};
 use bl_reporting::Reports;
 use bl_workspace::Member;
 
+pub use crate::options::FormatterOptions;
+
 mod adapters;
 mod backends;
 mod diagnostics;
+mod options;
 mod visitor;
 
 fn configured_formatter() -> impl ExternalLanguagesEngineAdaptor {
     backends::biome::BiomeFormatter::new()
 }
 
-/// Various options for the formatter.
-#[derive(Debug, Clone, Copy)]
-pub struct FmtOptions {
-    indent_size: u16,
-}
-
-impl Default for FmtOptions {
-    fn default() -> Self {
-        Self { indent_size: 4 }
-    }
-}
-
 /// A query for formatting the document of a [`bl_workspace::Member`].
-pub struct FmtQuery<'q> {
-    pub options: FmtOptions,
+pub struct FormatQuery<'q> {
+    pub options: FormatterOptions,
     pub source: SourceId,
     pub member: &'q Member,
 }
 
 /// The result of formatting a [`bl_ast::Document`]. This returns the formatted
 /// content and the diagnostics that were generated during the formatting.
-pub struct FmtQueryResult {
+pub struct FormatQueryResult {
     pub buffer: String,
     pub diagnostics: Reports,
 }
 
 /// A query that returns the result of formatting a [`bl_ast::Document`].
-pub fn fmt_module(query: FmtQuery) -> FmtQueryResult {
-    let FmtQuery { member, source, options } = query;
+pub fn fmt_module(query: FormatQuery) -> FormatQueryResult {
+    let FormatQuery { member, source, options } = query;
 
     let spanned = member.spanned();
     let Some(ref document) = member.document else {
@@ -58,9 +49,9 @@ pub fn fmt_module(query: FmtQuery) -> FmtQueryResult {
     let mut formatter = visitor::Formatter::new(engine, options, source, spanned, buffer);
 
     match formatter.visit_document(document.ast_ref()) {
-        Ok(_) => FmtQueryResult { buffer: formatter.into_buffer(), diagnostics: Reports::new() },
+        Ok(_) => FormatQueryResult { buffer: formatter.into_buffer(), diagnostics: Reports::new() },
         Err(error) => {
-            FmtQueryResult { buffer: formatter.into_buffer(), diagnostics: Reports::from(error) }
+            FormatQueryResult { buffer: formatter.into_buffer(), diagnostics: Reports::from(error) }
         }
     }
 }

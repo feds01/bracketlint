@@ -3,7 +3,7 @@
 use std::{fs, io::Write, path::PathBuf};
 
 use anyhow::Result;
-use bl_fmt::{FmtOptions, FmtQuery, FmtQueryResult, fmt_module};
+use bl_fmt::{FormatQuery, FormatQueryResult, FormatterOptions, fmt_module};
 use bl_lints::{diff::Diff, settings};
 use bl_parse::{ParseQuery, ParseQueryResult, parse_source};
 use bl_reporting::Reports;
@@ -70,7 +70,7 @@ pub fn fmt(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
         },
     );
 
-    let options = FmtOptions::default();
+    let options = FormatterOptions::default();
     let settings = &workspace.settings;
 
     // Now let's try and "format" all of the documents that we got
@@ -78,8 +78,8 @@ pub fn fmt(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
     //
     // @@Temp: for now we will just print the produced contents.
     for (source, member) in workspace.members.iter() {
-        let FmtQueryResult { buffer, diagnostics } =
-            fmt_module(FmtQuery { member, source, options });
+        let FormatQueryResult { buffer, diagnostics } =
+            fmt_module(FormatQuery { member, source, options });
         pipeline_diagnostics.extend(diagnostics);
 
         // @@Todo: factor this out into a general interface for emitting

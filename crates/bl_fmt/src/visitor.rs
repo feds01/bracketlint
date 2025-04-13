@@ -3,9 +3,9 @@ use bl_ast::{
 };
 
 use crate::{
-    FmtOptions,
     adapters::{ExternalLanguagesEngineAdaptor, FormatterContext, HasHTMLParsing},
     diagnostics::FmtError,
+    options::FormatterOptions,
 };
 
 pub(crate) struct Formatter<'fmt, EngineAdaptor: ExternalLanguagesEngineAdaptor> {
@@ -54,7 +54,7 @@ impl TagKind {
 impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
     pub fn new(
         adaptor: Adaptor,
-        options: FmtOptions,
+        options: FormatterOptions,
         id: SourceId,
         source: SpannedSource<'fmt>,
         buffer: String,
