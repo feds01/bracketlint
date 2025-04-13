@@ -4,7 +4,14 @@
 
 use std::path::PathBuf;
 
-use bl_ast::{self as ast, SourceId, SpannedSource, TempSourceMap};
+use bl_ast::{self as ast, LineRanges, SourceId, SpannedSource, TempSourceMap};
+use derive_more::Constructor;
+
+/// A [Member] is a file that is part of a workspace. It contains the
+#[derive(Clone, Debug, Constructor)]
+pub struct MemberSourceMetadata {
+    line_map: LineRanges,
+}
 
 #[derive(Clone)]
 pub struct Member {
@@ -13,6 +20,9 @@ pub struct Member {
 
     /// The raw file contents of the member.
     pub contents: String,
+
+    /// Metadata about the source itself.
+    metadata: MemberSourceMetadata,
 
     /// The parsed document of the member.
     pub document: Option<ast::AstNode<ast::Document>>,
@@ -24,12 +34,13 @@ impl Member {
         path: PathBuf,
         contents: String,
         document: Option<ast::AstNode<ast::Document>>,
+        metadata: MemberSourceMetadata,
     ) -> Self {
-        Member { path, contents, document }
+        Member { path, contents, document, metadata }
     }
 
     pub fn spanned(&self) -> SpannedSource<'_> {
-        SpannedSource::new(&self.contents, &self.path)
+        SpannedSource::new(&self.contents, &self.path, &self.metadata.line_map)
     }
 
     pub fn document(&self) -> Option<&ast::AstNode<ast::Document>> {
