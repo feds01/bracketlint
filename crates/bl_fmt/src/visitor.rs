@@ -3,7 +3,10 @@ use bl_ast::{
 };
 
 use crate::{
-    adapters::{ExternalLanguagesEngineAdaptor, FormatterContext, HasHTMLParsing},
+    adapters::{
+        ExternalLanguagesEngineAdaptor, FormatterContext, HasHTMLParsing, LanguageType,
+        TerminalState,
+    },
     diagnostics::FmtError,
     options::FormatterOptions,
 };
@@ -19,9 +22,6 @@ pub(crate) struct Formatter<'fmt, EngineAdaptor: ExternalLanguagesEngineAdaptor>
 
     /// The buffer that is used to store the formatted document.
     buffer: String,
-
-    /// Any options that are used to format the document.
-    options: FmtOptions,
 
     /// The context of the formatter.
     ctx: FormatterContext,
@@ -59,7 +59,16 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         source: SpannedSource<'fmt>,
         buffer: String,
     ) -> Self {
-        Self { adaptor, buffer, source, options, ctx: FormatterContext { indent: 0, source: id } }
+        Self {
+            adaptor,
+            buffer,
+            source,
+            ctx: FormatterContext {
+                source: id,
+                options,
+                state: TerminalState { language: LanguageType::Html, indent: 0 },
+            },
+        }
     }
 
     /// Convert the formatter into the buffer.
@@ -70,7 +79,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
     /// Apply an indent to the buffer.
     #[inline(always)]
     pub fn add_indent(&mut self) {
-        let size = self.ctx.indent * self.options.indent_size;
+        let size = self.ctx.indent_level();
 
         self.buffer.push_str(" ".repeat(size as usize).as_str());
     }
@@ -98,10 +107,9 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
     where
         F: FnOnce(&mut Self) -> Result<(), FmtError>,
     {
-        // We increment the indent level before calling the function, and decrement it
-        self.ctx.indent += 1;
+        self.ctx.increment_indent();
         f(self)?;
-        self.ctx.indent -= 1;
+        self.ctx.decrement_indent();
 
         Ok(())
     }
@@ -227,13 +235,15 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         node: bl_ast::AstNodeRef<bl_ast::Text>,
     ) -> Result<Self::TextRet, Self::Error> {
         let text = self.source.hunk(node.span().range);
-        let result = self.adaptor.html_engine(&self.ctx).format(text)?;
+        let mut engine = self.adaptor.html_engine(&self.ctx);
+        let result = engine.format(text)?;
 
         // @@Temp: for now, lets just push the HTML into the buffer.
         for line in result.lines() {
             self.push_line(line);
         }
 
+        self.ctx.state = engine.into_state();
         Ok(())
     }
 
