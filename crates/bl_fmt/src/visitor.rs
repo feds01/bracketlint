@@ -127,18 +127,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
     type Error = FmtError;
 
     ast_visitor_mut_self_default_impl!(
-        hiding: Document, Text, For, If, IfClause, Comment, Inline, VarExpr
     );
-
-    type DocumentRet = ();
-
-    fn visit_document(
-        &mut self,
-        node: bl_ast::AstNodeRef<bl_ast::Document>,
-    ) -> Result<Self::DocumentRet, Self::Error> {
-        let _ = walk_mut_self::walk_document(self, node)?;
-        Ok(())
-    }
 
     type ForRet = ();
 
