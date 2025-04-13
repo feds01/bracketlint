@@ -44,8 +44,8 @@ impl AstVisitor for AstTreePrinter<'_> {
         &self,
         node: ast::AstNodeRef<ast::Document>,
     ) -> Result<Self::DocumentRet, Self::Error> {
-        let walk::Document { children } = walk::walk_document(self, node)?;
-        Ok(TreeNode::branch("document", children))
+        let walk::Document { document } = walk::walk_document(self, node)?;
+        Ok(document)
     }
 
     type ArgRet = TreeNode;

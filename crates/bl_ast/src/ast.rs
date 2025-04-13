@@ -1026,6 +1026,6 @@ define_tree! {
     #[derive(Debug, Clone, PartialEq)]
     #[node]
     pub struct Document {
-        pub children: Children!(Statement),
+        pub document: Child!(Body),
     }
 }

@@ -230,7 +230,7 @@ impl<'s> Parser<'s> {
     ///
     /// This function is used to report an error to the parser diagnostics.
     #[inline(always)]
-    pub fn _note_on_span(&self, span: ByteRange, note: impl Into<String>) {
+    pub(crate) fn _note_on_span(&self, span: ByteRange, note: impl Into<String>) {
         note_on_span(InlineSnippet::new(&self._source, self.make_span(span)), note.into());
     }
 
@@ -483,8 +483,9 @@ impl<'s> Parser<'s> {
             }
         }
 
-        let children = self.nodes_with_joined_span(children, start);
-        self.node_with_joined_span(ast::Document { children }, start)
+        let contents = self.nodes_with_joined_span(children, start);
+        let document = self.node_with_joined_span(ast::Body { contents }, start);
+        self.node_with_joined_span(ast::Document { document }, start)
     }
 
     fn parse_statement(&mut self) -> ParseResult<Option<AstNode<ast::Statement>>> {
