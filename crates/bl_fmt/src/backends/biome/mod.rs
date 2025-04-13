@@ -9,9 +9,10 @@ use std::{
 use biome_css_formatter::{self as css_formatter, context::CssFormatOptions};
 use biome_css_parser::{self as css_parser, CssParserOptions};
 use biome_diagnostics::DiagnosticExt;
+use biome_formatter::IndentStyle;
 use biome_html_formatter::{HtmlFormatOptions, format_node};
 use biome_html_parser::parse_html;
-use biome_html_syntax::HtmlElementList;
+use biome_html_syntax::{HtmlElementList, HtmlRoot};
 use biome_js_formatter::{self as js_formatter, context::JsFormatOptions};
 use biome_js_parser::{self as js_parser, JsFileSource, JsParserOptions};
 use biome_rowan::AstNodeList;
@@ -53,7 +54,10 @@ impl BiomeFormatter {
     pub fn new() -> Self {
         Self {
             options: BiomeFormatterOptions {
-                html: HtmlFormatOptions::default(),
+                // @@Todo: we need to have this be shared across our formatting configuration.
+                html: HtmlFormatOptions::default()
+                    .with_indent_width(4.try_into().unwrap())
+                    .with_indent_style(IndentStyle::Space),
                 css: CssFormatOptions::default(),
                 // @@Temp: we might need to change this based on the source of the module, however
                 // for now we can assume that is in-fact a script that we are formatting, since
@@ -70,7 +74,18 @@ struct HTMLBiomeFormatter {
     /// The options for the formatter, encapsulating backend specific options.
     options: BiomeFormatterOptions,
 
-    state: Option<TerminalState>,
+    /// The state of the formatter, which is used to determine the
+    /// terminal state of the formatter.
+    state: TerminalState,
+}
+
+impl HTMLBiomeFormatter {
+    /// A utility function to get the rightmost child of a node.
+    ///
+    /// This is used to determine the last child of a node, which is useful for
+    /// determining the terminal state of the parser.
+    fn apply_state_from_tree(&mut self, tree: &HtmlRoot) {
+    }
 }
 
 impl HasHTMLParsing for HTMLBiomeFormatter {
@@ -92,7 +107,7 @@ impl HasHTMLParsing for HTMLBiomeFormatter {
     /// that parsing this content failed for some reason.
     fn format(&mut self, contents: &str) -> FmtResult<String> {
         let parsed = parse_html(contents);
-        let html = parsed.tree().html();
+        let tree = parsed.tree();
 
         // In order to compute the terminal state, we're going to check
         // the top most node of the HTML document, and remember the value
@@ -102,7 +117,7 @@ impl HasHTMLParsing for HTMLBiomeFormatter {
         //    - If `style``, then we must be in a CSS block.
         //    - If `script`, then we must be in a JS block.
         //    - Otherwise, we are in a HTML block.
-        self.state = terminal_state_from_rightmost_child(&html);
+        self.apply_state_from_tree(&tree);
 
         let language = LanguageType::Html;
         let mut errors = Vec::new();
@@ -129,8 +144,8 @@ impl HasHTMLParsing for HTMLBiomeFormatter {
 
         match format_node(options, &parsed.syntax()) {
             Ok(formatted) => {
-                let indent = self.context.indent();
-                Ok(formatted.print_with_indent(indent).unwrap().into_code())
+                let printed = formatted.print().unwrap();
+                Ok(printed.into_code())
             }
             Err(_) => {
                 Err(FmtError::new(FmtErrorKind::ExternalLanguageFormatError { language }, None))
@@ -138,8 +153,9 @@ impl HasHTMLParsing for HTMLBiomeFormatter {
         }
     }
 
-    fn terminal_state(&self) -> Option<TerminalState> {
-        Some(TerminalState { language: LanguageType::Html })
+    /// Returns the terminal state of the HTML formatter.
+    fn into_state(self) -> TerminalState {
+        self.state
     }
 }
 
@@ -309,7 +325,7 @@ impl HasCSSParsing for CSSBiomeFormatter {
     /// there may not be any other embedded languages within the CSS block,
     /// we can safely assume that the terminal state is `Css`.
     fn terminal_state(&self) -> Option<TerminalState> {
-        Some(TerminalState { language: LanguageType::Css })
+        Some(TerminalState { language: LanguageType::Css, indent: 0 })
     }
 }
 
@@ -387,7 +403,7 @@ impl HasJSParsing for JSBiomeFormatter {
     /// there may not be any other embedded languages within the JS block,
     /// we can safely assume that the terminal state is `Js`.
     fn terminal_state(&self) -> Option<TerminalState> {
-        Some(TerminalState { language: LanguageType::Js })
+        Some(TerminalState { language: LanguageType::Js, indent: 0 })
     }
 }
 
@@ -400,7 +416,11 @@ impl ExternalLanguagesEngineAdaptor for BiomeFormatter {
     type JSEngine = impl HasJSParsing;
 
     fn html_engine(&self, context: &FormatterContext) -> Self::HTMLEngine {
-        HTMLBiomeFormatter { context: context.clone(), options: self.options.clone(), state: None }
+        HTMLBiomeFormatter {
+            context: context.clone(),
+            options: self.options.clone(),
+            state: context.state,
+        }
     }
 
     fn css_engine(&self, context: &FormatterContext) -> Self::CSSEngine {
