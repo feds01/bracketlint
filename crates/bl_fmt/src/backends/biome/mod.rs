@@ -85,6 +85,31 @@ impl HTMLBiomeFormatter {
     /// This is used to determine the last child of a node, which is useful for
     /// determining the terminal state of the parser.
     fn apply_state_from_tree(&mut self, tree: &HtmlRoot) {
+        let options = &self.options.html;
+        let html = tree.html();
+
+        // If we don't have any children, but we do have an EOF token, we can
+        // try and infer some context from the EOF token.
+        if html.iter().last().is_none()
+            && let Ok(_) = tree.eof_token()
+        {
+            self.state.indent = self.state.indent.saturating_sub(self.context.indent_step() as u16);
+            return;
+        }
+
+        let TerminalCalculationState::Some { language, indent } =
+            find_rightmost_child_and_extract_state(options, &html)
+        else {
+            return;
+        };
+
+        // If we've got an indent to apply, we need to apply it to the
+        // formatter state.
+        if let Some(indent) = indent {
+            self.state.indent = indent as u16;
+        }
+
+        self.state.language = language;
     }
 }
 
@@ -161,7 +186,12 @@ impl HasHTMLParsing for HTMLBiomeFormatter {
 
 enum TerminalCalculationState {
     None,
-    Some(TerminalState),
+    Some {
+        language: LanguageType,
+
+        /// Any indentation that was pending.
+        indent: Option<u8>,
+    },
     UseParent,
 }
 
@@ -179,7 +209,7 @@ impl Try for TerminalCalculationState {
             TerminalCalculationState::UseParent => std::ops::ControlFlow::Break(self),
 
             // Define which values represent "success" and should continue execution
-            val @ (TerminalCalculationState::None | TerminalCalculationState::Some(_)) => {
+            val @ (TerminalCalculationState::None | TerminalCalculationState::Some { .. }) => {
                 std::ops::ControlFlow::Continue(val)
             }
         }
@@ -199,26 +229,28 @@ impl<E> FromResidual<Result<Infallible, E>> for TerminalCalculationState {
     }
 }
 
-/// A utility function to get the rightmost child of a node.
-///
-/// This is used to determine the last child of a node, which is useful for
-/// determining the terminal state of the parser.
-fn terminal_state_from_rightmost_child(node: &HtmlElementList) -> Option<TerminalState> {
-    match find_rightmost_child_and_extract_state(node) {
-        TerminalCalculationState::Some(state) => Some(state),
-        _ => None,
-    }
-}
-
-fn find_rightmost_child_and_extract_state(node: &HtmlElementList) -> TerminalCalculationState {
+fn find_rightmost_child_and_extract_state(
+    options: &HtmlFormatOptions,
+    node: &HtmlElementList,
+) -> TerminalCalculationState {
     if let Some(child) = node.into_iter().last() {
-        // If the child is an HTML element, we need to check if it has any
-        // children.
-        let biome_html_syntax::AnyHtmlElement::HtmlElement(html_element) = child else {
+        let html_element = match child {
+            // If the child is an HTML element, we need to check if it has any
+            // children.
+            biome_html_syntax::AnyHtmlElement::HtmlElement(e) => e,
+
+            // biome_html_syntax::AnyHtmlElement::HtmlSelfClosingElement(e) => {
+            //     let indent = options.indent_width().value().wrapping_sub(2); // @@Temp: Hardcoded
+            //     return TerminalCalculationState::Some {
+            //         language: LanguageType::Html,
+            //         indent: Some(indent),
+            //     };
+            // }
+
             // If we get an element that is auxiliary, it means that we can
             // backtrack and in fact use the parent element which should be
             // the last "tag" child.
-            return TerminalCalculationState::UseParent;
+            _ => return TerminalCalculationState::UseParent,
         };
 
         let nodes = html_element.children();
@@ -226,7 +258,7 @@ fn find_rightmost_child_and_extract_state(node: &HtmlElementList) -> TerminalCal
         if !nodes.is_empty() {
             // Handle the case where the child is an HTML element, and it has
             // children.
-            match find_rightmost_child_and_extract_state(&nodes) {
+            match find_rightmost_child_and_extract_state(options, &nodes) {
                 TerminalCalculationState::UseParent => {}
                 state => return state,
             }
@@ -234,15 +266,14 @@ fn find_rightmost_child_and_extract_state(node: &HtmlElementList) -> TerminalCal
 
         let name_token = html_element.opening_element()?.name()?.value_token()?;
 
-        match name_token.text().trim() {
-            "style" => {
-                TerminalCalculationState::Some(TerminalState { language: LanguageType::Css })
-            }
-            "script" => {
-                TerminalCalculationState::Some(TerminalState { language: LanguageType::Js })
-            }
-            _ => TerminalCalculationState::Some(TerminalState { language: LanguageType::Html }),
-        }
+        let indent = html_element.closing_element().map(|_| options.indent_width().value());
+        let language = match name_token.text().trim() {
+            "style" => LanguageType::Css,
+            "script" => LanguageType::Js,
+            _ => LanguageType::Html,
+        };
+
+        TerminalCalculationState::Some { language, indent }
     } else {
         TerminalCalculationState::None
     }
