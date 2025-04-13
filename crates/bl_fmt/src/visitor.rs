@@ -1,6 +1,7 @@
 use bl_ast::{
     AstVisitorMutSelf, SourceId, SpannedSource, ast_visitor_mut_self_default_impl, walk_mut_self,
 };
+use bl_reporting::inline::{InlineSnippet, note_on_span};
 
 use crate::{
     adapters::{
@@ -25,6 +26,16 @@ pub(crate) struct Formatter<'fmt, EngineAdaptor: ExternalLanguagesEngineAdaptor>
 
     /// The context of the formatter.
     ctx: FormatterContext,
+}
+
+impl<EngineAdaptor: ExternalLanguagesEngineAdaptor> Formatter<'_, EngineAdaptor> {
+    /// Report an error to the parser diagnostics.
+    ///
+    /// This function is used to report an error to the parser diagnostics.
+    #[inline(always)]
+    pub(crate) fn _note_on_span(&self, span: bl_ast::Span, note: impl Into<String>) {
+        note_on_span(InlineSnippet::new(&self.source, span), note.into());
+    }
 }
 
 pub enum TagKind {
