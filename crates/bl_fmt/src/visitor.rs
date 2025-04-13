@@ -140,6 +140,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
     type Error = FmtError;
 
     ast_visitor_mut_self_default_impl!(
+        hiding: Text, For, If, IfClause, Comment, Inline, VarExpr, Body
     );
 
     type ForRet = ();
@@ -230,6 +231,35 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
 
         // Now visit the loop body.
         self.with_block(|formatter| formatter.visit_body(clause_body.ast_ref()))?;
+
+        Ok(())
+    }
+
+    type BodyRet = ();
+
+    fn visit_body(
+        &mut self,
+        node: bl_ast::AstNodeRef<bl_ast::Body>,
+    ) -> Result<Self::BodyRet, Self::Error> {
+        let bl_ast::Body { contents } = node.body();
+
+        // Visit the body of the document.
+        for item in contents.iter() {
+            walk_mut_self::walk_statement(self, item.ast_ref())?;
+
+            // We need to check for inline statements, whether we need to insert a newline
+            // or not, i.e. we need this to be a CST rather than an AST.
+            if let bl_ast::Statement::Inline(_) = item.ast_ref().body() {
+                let span = item.id.span().range;
+                let line_end = self.source.line_ranges.line_end(span.end());
+
+                // Check if the next line is the end of the line.
+                if span.end() + 1 == line_end {
+                    self.ctx.decrement_indent();
+                    self.push_hunk("\n");
+                }
+            }
+        }
 
         Ok(())
     }
