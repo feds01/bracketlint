@@ -9,10 +9,11 @@ pub mod settings;
 
 use std::{collections::HashMap, path::PathBuf};
 
-use bl_ast::{HasSource, SourceId};
+use bl_ast::{HasSource, LineRanges, SourceId};
 use bl_utils::stream::CompilerOutputStream;
 use index_vec::IndexVec;
 pub use member::Member;
+use member::MemberSourceMetadata;
 use settings::Settings;
 
 #[derive(Default)]
@@ -31,7 +32,13 @@ impl WorkspaceMembers {
     /// Reserve a member ready for setting its contents after it has completed
     /// the first stage, i.e. the parsing.
     pub fn reserve_member(&mut self, path: PathBuf, contents: String) -> SourceId {
-        let id = self.members.push(Member { path: path.clone(), contents, document: None });
+        // Calculate the "line_map" for the member.
+        //
+        // @@Future: we could make this a lazy-cell and just load it at time of use.
+        let line_map = LineRanges::new_from_str(&contents);
+        let metadata = MemberSourceMetadata::new(line_map);
+
+        let id = self.members.push(Member::new(path.clone(), contents, None, metadata));
         self.member_map.insert(path, id);
 
         id

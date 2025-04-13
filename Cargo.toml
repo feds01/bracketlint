@@ -26,6 +26,7 @@ annotate-snippets = { version = "0.11.4" }
 anyhow = { version = "1.0.80" }
 argfile = { version = "0.2.0" }
 bitflags = { version = "2.5.0" }
+bytecount = { version = "0.6.8" }
 clap = { version = "4.5.3", features = ["derive"] }
 colored = { version = "2.1.0" }
 convert_case ="0.4"

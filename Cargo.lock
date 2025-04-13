@@ -532,10 +532,12 @@ version = "0.1.0"
 dependencies = [
  "bl_macros",
  "bl_utils",
+ "bytecount",
  "derive_more",
  "index_vec",
  "itertools",
  "line-span",
+ "num-traits",
  "once_cell",
  "parking_lot",
  "replace_with",
