@@ -127,6 +127,11 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
 
         // Add the closing tag.
         self.push_hunk(kind.right());
+
+        // @@Todo: we need to determine whether we need to add a newline
+        // or not. For now, we just add a newline.
+        self.push_hunk("\n");
+
         Ok(())
     }
 }
@@ -192,7 +197,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
 
         // Walk the clauses, and format each one of them.
         for clause in clauses.iter() {
-            walk_mut_self::walk_if_clause(self, clause.ast_ref())?;
+            self.visit_if_clause(clause.ast_ref())?;
         }
 
         if let Some(otherwise) = otherwise {
@@ -206,6 +211,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
     }
 
     type IfClauseRet = ();
+
     fn visit_if_clause(
         &mut self,
         node: bl_ast::AstNodeRef<bl_ast::IfClause>,
