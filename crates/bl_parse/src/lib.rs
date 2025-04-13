@@ -1,10 +1,7 @@
 //! Contains all of the parsing logic for the `bl` project.
 #![feature(let_chains, if_let_guard)]
 
-use bl_ast::{
-    AstNode, AstVisitor, Document, LocalSpanMap, SourceId, Span, SpanMap, SpannedSource,
-    TempSourceMap,
-};
+use bl_ast::{AstNode, AstVisitor, Document, LocalSpanMap, SourceId, Span, SpanMap, TempSourceMap};
 use bl_ast_utils::{AstTreePrinter, TreeWriter, TreeWriterConfig};
 use bl_lexer::{Lexer, LexerMetadata, token::Token};
 use bl_reporting::{
@@ -88,7 +85,7 @@ pub fn parse_source(query: ParseQuery) -> ParseQueryResult {
     // let mut timings = StageMetrics::default();
     let ParseQuery { id, member, options } = query;
 
-    let spanned = SpannedSource::new(&member.contents, &member.path);
+    let spanned = member.spanned();
 
     // Lex the contents of the module or interactive block
     let LexerMetadata { tokens, mut diagnostics } = Lexer::new(spanned, id).tokenise();
@@ -127,15 +124,13 @@ pub fn parse_source(query: ParseQuery) -> ParseQueryResult {
 }
 
 pub fn emit_source_tree(member: &Member) {
-    let Member { path, document, .. } = member;
-
-    let spanned = SpannedSource::new(&member.contents, &member.path);
-    let tree =
-        AstTreePrinter::new(spanned).visit_document(document.as_ref().unwrap().ast_ref()).unwrap();
+    let document = member.document();
+    let spanned = member.spanned();
+    let tree = AstTreePrinter::new(spanned).visit_document(document.unwrap().ast_ref()).unwrap();
     let config = TreeWriterConfig::unicode();
     log::info!(
         "parsed module '{}':\n{}",
-        path.display(),
+        spanned.path.display(),
         TreeWriter::new_with_config(&tree, config)
     );
 }

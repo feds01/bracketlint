@@ -32,6 +32,10 @@ impl Member {
         SpannedSource::new(&self.contents, &self.path)
     }
 
+    pub fn document(&self) -> Option<&ast::AstNode<ast::Document>> {
+        self.document.as_ref()
+    }
+
     pub fn contents(&self) -> &str {
         &self.contents
     }
