@@ -147,6 +147,26 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
 
         Ok(())
     }
+
+    fn visit_list_of_formatters_with_separator<T, F>(
+        &mut self,
+        list: &'_ AstNodes<T>,
+        fmt: &mut F,
+        separator: &str,
+    ) -> Result<(), FmtError>
+    where
+        F: FnMut(&mut Self, bl_ast::AstNodeRef<T>) -> Result<(), FmtError>,
+    {
+        list.iter().map(|item| item.ast_ref()).try_fold(false, |need_separator, item| {
+            if need_separator {
+                self.push_hunk(separator);
+            }
+            fmt(self, item)?;
+            Ok(true)
+        })?;
+
+        Ok(())
+    }
 }
 
 impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
@@ -334,6 +354,26 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
     ) -> Result<Self::NameRet, Self::Error> {
         let name = self.source.hunk(node.span().range);
         self.push_hunk(name);
+        Ok(())
+    }
+
+    type ArgRet = ();
+
+    fn visit_arg(
+        &mut self,
+        node: bl_ast::AstNodeRef<bl_ast::Arg>,
+    ) -> Result<Self::ArgRet, Self::Error> {
+        let bl_ast::Arg { name, value } = node.body();
+
+        if let Some(name) = name {
+            self.visit_name(name.ast_ref())?;
+            self.push_hunk("=");
+        }
+
+        if let Some(value) = value {
+            self.visit_expr(value.ast_ref())?;
+        }
+
         Ok(())
     }
 }
