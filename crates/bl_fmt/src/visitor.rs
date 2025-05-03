@@ -132,11 +132,13 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
     ) -> Result<(), FmtError> {
         self.add_indent();
         self.push_hunk(kind.left());
+        self.push_hunk(" ");
 
         // Run F without an indent level.
         f(self)?;
 
         // Add the closing tag.
+        self.push_hunk(" ");
         self.push_hunk(kind.right());
 
         // @@Todo: we need to determine whether we need to add a newline
@@ -165,7 +167,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
 
         // @@ Proof of concept: for now, we will just push a for loop into the buffer.
         self.within_tag(TagKind::Block, |this| {
-            this.push_hunk(" for ");
+            this.push_hunk("for ");
             this.visit_for_target(target.ast_ref())?;
             this.push_hunk(" in ");
             this.visit_expr(iterator.ast_ref())?;
@@ -182,7 +184,6 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
                 this.visit_name(reverse_modifier.ast_ref())?;
             }
 
-            this.push_hunk(" ");
             Ok(())
         })?;
 
@@ -232,12 +233,10 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
 
         self.within_tag(TagKind::Block, |this| {
             match kind {
-                bl_ast::ClauseKind::If => this.push_hunk(" if "),
-                bl_ast::ClauseKind::Elif => this.push_hunk(" elif "),
+                bl_ast::ClauseKind::If => this.push_hunk("if "),
+                bl_ast::ClauseKind::Elif => this.push_hunk("elif "),
             }
-            this.visit_expr(condition.ast_ref())?;
-            this.push_hunk(" ");
-            Ok(())
+            this.visit_expr(condition.ast_ref())
         })?;
 
         // Now visit the loop body.
@@ -307,12 +306,8 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         // where the "anchor" points of the comment are, so we can treat the whole
         // area as verbatim.
         self.within_tag(TagKind::Comment, |this| {
-            this.push_hunk(" ");
-
             let text = this.source.hunk(node.span().range);
             this.push_hunk(text);
-
-            this.push_hunk(" ");
             Ok(())
         })
     }
