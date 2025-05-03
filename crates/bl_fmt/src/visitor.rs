@@ -1,5 +1,6 @@
 use bl_ast::{
-    AstVisitorMutSelf, SourceId, SpannedSource, ast_visitor_mut_self_default_impl, walk_mut_self,
+    AstNodes, AstVisitorMutSelf, SourceId, SpannedSource, ast_visitor_mut_self_default_impl,
+    walk_mut_self,
 };
 use bl_reporting::inline::{InlineSnippet, note_on_span};
 
@@ -173,7 +174,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
     type Error = FmtError;
 
     ast_visitor_mut_self_default_impl!(
-        hiding: Text, For, If, IfClause, Comment, Inline, VarExpr, Body
+        hiding: Text, For, If, IfClause, Comment, Inline, Body, GenericTag, Arg, Name
     );
 
     type ForRet = ();
@@ -355,6 +356,28 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         let name = self.source.hunk(node.span().range);
         self.push_hunk(name);
         Ok(())
+    }
+
+    type GenericTagRet = ();
+
+    fn visit_generic_tag(
+        &mut self,
+        node: bl_ast::AstNodeRef<bl_ast::GenericTag>,
+    ) -> Result<Self::GenericTagRet, Self::Error> {
+        self.within_tag(TagKind::Block, |this| {
+            let bl_ast::GenericTag { name, args } = node.body();
+
+            this.visit_name(name.ast_ref())?;
+            this.push_hunk(" ");
+            this.visit_list_of_formatters_with_separator(
+                args,
+                &mut |this: &mut Self, arg: bl_ast::AstNodeRef<'_, bl_ast::Arg>| {
+                    this.visit_arg(arg)
+                },
+                " ",
+            )?;
+            Ok(())
+        })
     }
 
     type ArgRet = ();
