@@ -982,6 +982,10 @@ define_tree! {
             }
         }
 
+        pub fn is_inline(&self) -> bool {
+            matches!(self, Tag::Unprocessable(_) | Tag::Assignment(_) | Tag::Continue(_) | Tag::Break(_) | Tag::Generic(_) )
+        }
+
     }
 
 
@@ -1011,6 +1015,22 @@ define_tree! {
     impl Statement {
         pub fn text() -> Self {
             Statement::Text(Text {})
+        }
+
+        pub fn is_inline(&self) -> bool {
+            matches!(self, Statement::Inline(_))
+        }
+
+        pub fn is_tag(&self) -> bool {
+            matches!(self, Statement::Tag(_))
+        }
+
+        pub fn is_comment(&self) -> bool {
+            matches!(self, Statement::Comment(_))
+        }
+
+        pub fn is_text(&self) -> bool {
+            matches!(self, Statement::Text(_))
         }
 
         pub fn kind(&self) -> &'static str {
