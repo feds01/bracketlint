@@ -417,6 +417,19 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         })
     }
 
+    type AccessExprRet = ();
+
+    fn visit_access_expr(
+        &mut self,
+        node: bl_ast::AstNodeRef<bl_ast::AccessExpr>,
+    ) -> Result<Self::AccessExprRet, Self::Error> {
+        let bl_ast::AccessExpr { subject, field } = node.body();
+
+        self.visit_expr(subject.ast_ref())?;
+        self.push_hunk(".");
+        self.visit_name(field.ast_ref())
+    }
+
     type NameRet = ();
 
     fn visit_name(
