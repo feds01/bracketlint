@@ -177,6 +177,30 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         hiding: Text, For, If, IfClause, Comment, Inline, Body, GenericTag, Arg, Name
     );
 
+    type BlockRet = ();
+
+    fn visit_block(
+        &mut self,
+        node: bl_ast::AstNodeRef<bl_ast::Block>,
+    ) -> Result<Self::BlockRet, Self::Error> {
+        let bl_ast::Block { label, block_body } = node.body();
+
+        self.within_tag(TagKind::Block, |this| {
+            if let Some(label) = label {
+                this.visit_name(label.ast_ref())?;
+                this.push_hunk(" ");
+            }
+
+            Ok(())
+        })?;
+        self.push_line("");
+
+        // Now visit the block body.
+        self.with_block(|formatter| formatter.visit_body(block_body.ast_ref()))?;
+
+        self.push_line("{% endblock %}");
+        Ok(())
+    }
     type ForRet = ();
 
     fn visit_for(
