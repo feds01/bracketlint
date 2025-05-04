@@ -13,7 +13,7 @@ pub struct MemberSourceMetadata {
     line_map: LineRanges,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Member {
     /// The fully canonicalised path of the member.
     pub path: PathBuf,
