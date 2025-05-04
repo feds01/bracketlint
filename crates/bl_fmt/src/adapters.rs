@@ -2,7 +2,7 @@
 
 use core::fmt;
 
-use bl_ast::SourceId;
+use bl_ast::{SourceId, SpannedSource};
 use derive_more::Constructor;
 
 use crate::{diagnostics::FmtResult, options::FormatterOptions};
@@ -43,10 +43,12 @@ pub struct TerminalState {
 }
 
 #[derive(Debug, Clone, Constructor)]
-pub struct FormatterContext {
+pub struct FormatterContext<'s> {
+    pub id: SourceId,
+
     /// The source of the module that is being formatted. This is mostly
     /// useful for diagnostics.
-    pub source: SourceId,
+    pub source: SpannedSource<'s>,
 
     pub options: FormatterOptions,
 
@@ -56,10 +58,14 @@ pub struct FormatterContext {
     pub state: TerminalState,
 }
 
-impl FormatterContext {
+impl<'s> FormatterContext<'s> {
     /// Get the ID of the source that is being formatted.
     #[inline(always)]
-    pub fn source(&self) -> SourceId {
+    pub fn id(&self) -> SourceId {
+        self.id
+    }
+
+    pub fn source(&self) -> SpannedSource<'_> {
         self.source
     }
 
@@ -91,7 +97,7 @@ impl FormatterContext {
 }
 
 /// A trait that represents a type that has the capability to parse HTML.
-pub trait HasHTMLParsing {
+pub trait HasHTMLParsing<'ctx> {
     fn format(&mut self, contents: &str) -> FmtResult<String>;
 
     /// Get the [TerminalState] of the parser.
@@ -99,7 +105,7 @@ pub trait HasHTMLParsing {
 }
 
 /// A trait that represents a type that has the capability to parse CSS.
-pub trait HasCSSParsing {
+pub trait HasCSSParsing<'ctx> {
     fn format(&self, contents: &str) -> FmtResult<String>;
 
     /// Attempt to compute the [TerminalState] of the parser.
@@ -107,7 +113,7 @@ pub trait HasCSSParsing {
 }
 
 /// A trait that represents a type that has the capability to parse JavaScript.
-pub trait HasJSParsing {
+pub trait HasJSParsing<'ctx> {
     fn format(&self, contents: &str) -> FmtResult<String>;
 
     /// Attempt to compute the [TerminalState] of the parser.
@@ -115,14 +121,14 @@ pub trait HasJSParsing {
 }
 
 pub(crate) trait ExternalLanguagesEngineAdaptor {
-    type HTMLEngine: HasHTMLParsing;
-    type CSSEngine: HasCSSParsing;
-    type JSEngine: HasJSParsing;
+    type HTMLEngine<'ctx>: HasHTMLParsing<'ctx>;
+    type CSSEngine<'ctx>: HasCSSParsing<'ctx>;
+    type JSEngine<'ctx>: HasJSParsing<'ctx>;
 
     /// A constructor for running the HTML formatting engine.
-    fn html_engine(&self, context: &FormatterContext) -> Self::HTMLEngine;
+    fn html_engine<'ctx>(&self, context: &'ctx FormatterContext<'_>) -> Self::HTMLEngine<'ctx>;
 
-    fn css_engine(&self, context: &FormatterContext) -> Self::CSSEngine;
+    fn css_engine<'ctx>(&self, context: &'ctx FormatterContext<'_>) -> Self::CSSEngine<'ctx>;
 
-    fn js_engine(&self, context: &FormatterContext) -> Self::JSEngine;
+    fn js_engine<'ctx>(&self, context: &'ctx FormatterContext<'_>) -> Self::JSEngine<'ctx>;
 }
