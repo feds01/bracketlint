@@ -26,7 +26,7 @@
 //! Nested trees are handled in the same way, here is an example which
 //! is annotated with token counts beginning from each token tree within
 //! the stream:
-//! ```
+//! ```ignore
 //! if x { if y { 2 } print( "bing") }
 //!      1  2 3 4 5   6    7 8  // `{`
 //!               1             // `{`
@@ -205,7 +205,7 @@ impl<'t> TokenCursor<'t> {
     /// > Use this function with caution as it doesn't perform any checks
     /// > on the tree ranges.
     ///
-    /// ```
+    /// ```ignore
     /// # use bl_lexer::token::{Token, TokenKind};
     ///
     /// let token = self.peek(1).unwrap_or_else(SomeErr(..))?;

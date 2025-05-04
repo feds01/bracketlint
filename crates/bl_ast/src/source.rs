@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use bl_utils::range_map::RangeMap;
+use bl_utils::range_map::{Range, RangeMap};
 use derive_more::Constructor;
 use line_span::LineSpanExt;
 
@@ -104,5 +104,10 @@ impl LineRanges {
     /// Get the line range for a given index.
     pub fn line_end(&self, index: usize) -> usize {
         self.map.key_wrapping(index).end()
+    }
+
+    /// Get the range responsible for the given line number.
+    pub fn range_for_line(&self, line: usize) -> Range<usize> {
+        *self.map.key(line).unwrap()
     }
 }

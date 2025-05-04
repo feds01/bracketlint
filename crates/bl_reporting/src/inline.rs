@@ -61,7 +61,7 @@ pub fn guarded_note_on_span<S: HasSource>(
 /// standard output, this does not panic, it is intended as a debugging utility
 /// for use when debugging the compiler.
 ///
-/// ```rust
+/// ```ignore
 /// // Don't print on `prelude` module.
 /// note_on_span(item.span(), "compiling `item`");
 ///
