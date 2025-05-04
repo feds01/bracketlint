@@ -19,14 +19,11 @@ pub(crate) struct Formatter<'fmt, EngineAdaptor: ExternalLanguagesEngineAdaptor>
     /// around about the formatter.
     adaptor: EngineAdaptor,
 
-    /// The source that is used to format the document.
-    source: SpannedSource<'fmt>,
-
     /// The buffer that is used to store the formatted document.
     buffer: String,
 
     /// The context of the formatter.
-    ctx: FormatterContext,
+    ctx: FormatterContext<'fmt>,
 }
 
 impl<EngineAdaptor: ExternalLanguagesEngineAdaptor> Formatter<'_, EngineAdaptor> {
@@ -35,7 +32,7 @@ impl<EngineAdaptor: ExternalLanguagesEngineAdaptor> Formatter<'_, EngineAdaptor>
     /// This function is used to report an error to the parser diagnostics.
     #[inline(always)]
     pub(crate) fn _note_on_span(&self, span: bl_ast::Span, note: impl Into<String>) {
-        note_on_span(InlineSnippet::new(&self.source, span), note.into());
+        note_on_span(InlineSnippet::new(&self.ctx.source, span), note.into());
     }
 }
 
@@ -74,11 +71,15 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         Self {
             adaptor,
             buffer,
-            source,
             ctx: FormatterContext {
-                source: id,
+                id,
+                source,
                 options,
-                state: TerminalState { language: LanguageType::Html, indent: 0 },
+                state: TerminalState {
+                    language: LanguageType::Html,
+                    indent: 0,
+                    continue_inline: false,
+                },
             },
         }
     }
@@ -400,7 +401,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         // where the "anchor" points of the comment are, so we can treat the whole
         // area as verbatim.
         self.within_tag(TagKind::Comment, |this| {
-            let text = this.source.hunk(node.span().range);
+            let text = this.ctx.source.hunk(node.span().range);
             this.push_hunk(text);
             Ok(())
         })?;
@@ -442,7 +443,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         &mut self,
         node: bl_ast::AstNodeRef<bl_ast::Name>,
     ) -> Result<Self::NameRet, Self::Error> {
-        let name = self.source.hunk(node.span().range);
+        let name = self.ctx.source.hunk(node.span().range);
         self.push_hunk(name);
         Ok(())
     }

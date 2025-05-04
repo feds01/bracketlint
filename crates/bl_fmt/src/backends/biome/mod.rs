@@ -68,8 +68,8 @@ impl BiomeFormatter {
     }
 }
 
-struct HTMLBiomeFormatter {
-    context: FormatterContext,
+struct HTMLBiomeFormatter<'ctx> {
+    context: &'ctx FormatterContext<'ctx>,
 
     /// The options for the formatter, encapsulating backend specific options.
     options: BiomeFormatterOptions,
@@ -79,7 +79,7 @@ struct HTMLBiomeFormatter {
     state: TerminalState,
 }
 
-impl HTMLBiomeFormatter {
+impl<'ctx> HTMLBiomeFormatter<'ctx> {
     /// A utility function to get the rightmost child of a node.
     ///
     /// This is used to determine the last child of a node, which is useful for
@@ -98,7 +98,7 @@ impl HTMLBiomeFormatter {
         }
 
         let TerminalCalculationState::Some { language, indent } =
-            find_rightmost_child_and_extract_state(options, &html)
+            find_rightmost_child_and_extract_state(options, &html, self.context.source())
         else {
             return;
         };
@@ -113,7 +113,7 @@ impl HTMLBiomeFormatter {
     }
 }
 
-impl HasHTMLParsing for HTMLBiomeFormatter {
+impl<'ctx> HasHTMLParsing<'ctx> for HTMLBiomeFormatter<'ctx> {
     /// Format the HTML contents using the Biome formatter.
     ///
     /// /// This will follow the algorithm:
@@ -158,7 +158,7 @@ impl HasHTMLParsing for HTMLBiomeFormatter {
                     err.location().span.map(|text_range| {
                         bl_ast::Span::new(
                             ByteRange::new(text_range.start().into(), text_range.end().into()),
-                            self.context.source(),
+                            self.context.id(),
                         )
                     }),
                 ));
@@ -279,14 +279,14 @@ fn find_rightmost_child_and_extract_state(
     }
 }
 
-struct CSSBiomeFormatter {
-    context: FormatterContext,
+struct CSSBiomeFormatter<'ctx> {
+    context: &'ctx FormatterContext<'ctx>,
 
     /// The options for the formatter, encapsulating backend specific options.
     options: BiomeFormatterOptions,
 }
 
-impl HasCSSParsing for CSSBiomeFormatter {
+impl<'ctx> HasCSSParsing<'ctx> for CSSBiomeFormatter<'ctx> {
     /// Format the CSS contents using the Biome formatter.
     ///
     /// This will follow the algorithm:
@@ -325,7 +325,7 @@ impl HasCSSParsing for CSSBiomeFormatter {
                 err.location().span.map(|text_range| {
                     bl_ast::Span::new(
                         ByteRange::new(text_range.start().into(), text_range.end().into()),
-                        self.context.source(),
+                        self.context.id(),
                     )
                 }),
             ));
@@ -360,14 +360,14 @@ impl HasCSSParsing for CSSBiomeFormatter {
     }
 }
 
-struct JSBiomeFormatter {
-    context: FormatterContext,
+struct JSBiomeFormatter<'ctx> {
+    context: &'ctx FormatterContext<'ctx>,
 
     /// The options for the formatter, encapsulating backend specific options.
     options: BiomeFormatterOptions,
 }
 
-impl HasJSParsing for JSBiomeFormatter {
+impl<'ctx> HasJSParsing<'ctx> for JSBiomeFormatter<'ctx> {
     /// Format the JS contents using the Biome formatter.
     ///
     /// This will follow the algorithm:
@@ -404,7 +404,7 @@ impl HasJSParsing for JSBiomeFormatter {
                 err.location().span.map(|text_range| {
                     bl_ast::Span::new(
                         ByteRange::new(text_range.start().into(), text_range.end().into()),
-                        self.context.source(),
+                        self.context.id(),
                     )
                 }),
             ));
@@ -442,23 +442,19 @@ impl HasJSParsing for JSBiomeFormatter {
 // `BiomeFormatter` by implementing the `HasHtmlParsing`, `HasCssParsing` and
 // `HasJsParsing` traits.
 impl ExternalLanguagesEngineAdaptor for BiomeFormatter {
-    type HTMLEngine = impl HasHTMLParsing;
-    type CSSEngine = impl HasCSSParsing;
-    type JSEngine = impl HasJSParsing;
+    type CSSEngine<'ctx> = impl HasCSSParsing<'ctx>;
+    type HTMLEngine<'ctx> = impl HasHTMLParsing<'ctx>;
+    type JSEngine<'ctx> = impl HasJSParsing<'ctx>;
 
-    fn html_engine(&self, context: &FormatterContext) -> Self::HTMLEngine {
-        HTMLBiomeFormatter {
-            context: context.clone(),
-            options: self.options.clone(),
-            state: context.state,
-        }
+    fn html_engine<'ctx>(&self, context: &'ctx FormatterContext<'ctx>) -> Self::HTMLEngine<'ctx> {
+        HTMLBiomeFormatter { context, options: self.options.clone(), state: context.state }
     }
 
-    fn css_engine(&self, context: &FormatterContext) -> Self::CSSEngine {
-        CSSBiomeFormatter { context: context.clone(), options: self.options.clone() }
+    fn css_engine<'ctx>(&self, context: &'ctx FormatterContext<'ctx>) -> Self::CSSEngine<'ctx> {
+        CSSBiomeFormatter { context, options: self.options.clone() }
     }
 
-    fn js_engine(&self, context: &FormatterContext) -> Self::JSEngine {
-        JSBiomeFormatter { context: context.clone(), options: self.options.clone() }
+    fn js_engine<'ctx>(&self, context: &'ctx FormatterContext<'ctx>) -> Self::JSEngine<'ctx> {
+        JSBiomeFormatter { context, options: self.options.clone() }
     }
 }
