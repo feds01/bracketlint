@@ -201,6 +201,52 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         self.push_line("{% endblock %}");
         Ok(())
     }
+
+    type WithRet = ();
+
+    fn visit_with(
+        &mut self,
+        node: bl_ast::AstNodeRef<bl_ast::With>,
+    ) -> Result<Self::WithRet, Self::Error> {
+        let bl_ast::With { assignments, block_body, .. } = node.body();
+
+        self.within_tag(TagKind::Block, |this| {
+            this.push_hunk("with ");
+
+            this.visit_list_of_formatters_with_separator(
+                assignments,
+                &mut |this: &mut Self, assignment: bl_ast::AstNodeRef<'_, bl_ast::Assignment>| {
+                    this.visit_assignment(assignment)
+                },
+                ", ",
+            )?;
+
+            Ok(())
+        })?;
+        self.end_line();
+
+        // Now visit the block body.
+        self.with_block(|formatter| formatter.visit_body(block_body.ast_ref()))?;
+
+        self.push_line("{% endwith %}");
+        Ok(())
+    }
+
+    type AssignmentRet = ();
+
+    fn visit_assignment(
+        &mut self,
+        node: bl_ast::AstNodeRef<bl_ast::Assignment>,
+    ) -> Result<Self::AssignmentRet, Self::Error> {
+        let bl_ast::Assignment { name, value } = node.body();
+
+        self.visit_name(name.ast_ref())?;
+        self.push_hunk(" as ");
+        self.visit_expr(value.ast_ref())?;
+
+        Ok(())
+    }
+
     type ForRet = ();
 
     fn visit_for(
