@@ -399,4 +399,24 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
 
         Ok(())
     }
+
+    type LitRet = ();
+
+    fn visit_lit(
+        &mut self,
+        node: bl_ast::AstNodeRef<bl_ast::Lit>,
+    ) -> Result<Self::LitRet, Self::Error> {
+        match node.body() {
+            bl_ast::Lit::Int(_) | bl_ast::Lit::Float(_) | bl_ast::Lit::Str(_) => {
+                let lit = self.ctx.source.hunk(node.span().range);
+                self.push_hunk(lit);
+            }
+            bl_ast::Lit::Bool(bool) => match bool.value {
+                true => self.push_hunk("true"),
+                false => self.push_hunk("false"),
+            },
+        }
+
+        Ok(())
+    }
 }
