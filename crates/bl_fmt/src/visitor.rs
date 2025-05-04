@@ -358,6 +358,26 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         Ok(())
     }
 
+    type FilterRet = ();
+
+    fn visit_filter(
+        &mut self,
+        node: bl_ast::AstNodeRef<bl_ast::Filter>,
+    ) -> Result<Self::FilterRet, Self::Error> {
+        let bl_ast::Filter { name, args } = node.body();
+
+        self.push_hunk("|");
+        self.visit_name(name.ast_ref())?;
+        self.push_hunk(":");
+        self.visit_list_of_formatters_with_separator(
+            args,
+            &mut |this: &mut Self, arg: bl_ast::AstNodeRef<'_, bl_ast::Arg>| this.visit_arg(arg),
+            " ",
+        )?;
+
+        Ok(())
+    }
+
     type GenericTagRet = ();
 
     fn visit_generic_tag(
