@@ -161,7 +161,7 @@ pub struct Parser<'s> {
 
     /// The current frame of the parser. A frame represents a particular
     /// token stream, like the file, or a subtree within the source, i.e.
-    /// ```
+    /// ```ignore
     /// {% some_tag ... %}
     /// ```
     ///
@@ -988,7 +988,7 @@ impl<'s> Parser<'s> {
 
     /// Parse the destructuring target of a for loop, i.e. the assigned variable
     /// or variables per iteration, e.g.
-    /// ```
+    /// ```ignore
     /// {% for x in y %}
     ///     ...
     /// {% endfor %}
