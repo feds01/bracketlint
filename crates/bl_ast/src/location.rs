@@ -173,7 +173,7 @@ impl Span {
 /// A [SpannedSource] is a wrapper around the contents of a source file that
 /// is stored in [SourceMap]. It features useful methods for extracting
 /// and reading sections of the source by using [Span] or [ByteRange]s.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct SpannedSource<'s> {
     pub source: &'s str,
     pub path: &'s PathBuf,
