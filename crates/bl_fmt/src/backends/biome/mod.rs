@@ -15,8 +15,8 @@ use biome_html_parser::parse_html;
 use biome_html_syntax::{HtmlElementList, HtmlRoot};
 use biome_js_formatter::{self as js_formatter, context::JsFormatOptions};
 use biome_js_parser::{self as js_parser, JsFileSource, JsParserOptions};
-use biome_rowan::AstNodeList;
-use bl_ast::ByteRange;
+use biome_rowan::{AstNode, AstNodeList};
+use bl_ast::{ByteRange, SpannedSource};
 
 use crate::{
     adapters::{
@@ -93,6 +93,12 @@ impl<'ctx> HTMLBiomeFormatter<'ctx> {
         if html.iter().last().is_none()
             && let Ok(_) = tree.eof_token()
         {
+            let end: usize = html.range().end().into();
+            let contents_line_end = self.context.source().line_ranges.line_end(end);
+            if end != contents_line_end {
+                return;
+            }
+
             self.state.indent = self.state.indent.saturating_sub(self.context.indent_step() as u16);
             return;
         }
@@ -106,6 +112,8 @@ impl<'ctx> HTMLBiomeFormatter<'ctx> {
         // If we've got an indent to apply, we need to apply it to the
         // formatter state.
         if let Some(indent) = indent {
+            let current_indent = self.state.indent as i8;
+            let indent = current_indent.saturating_add(indent);
             self.state.indent = indent as u16;
         }
 
@@ -190,7 +198,7 @@ enum TerminalCalculationState {
         language: LanguageType,
 
         /// Any indentation that was pending.
-        indent: Option<u8>,
+        indent: Option<i8>,
     },
     UseParent,
 }
@@ -232,6 +240,7 @@ impl<E> FromResidual<Result<Infallible, E>> for TerminalCalculationState {
 fn find_rightmost_child_and_extract_state(
     options: &HtmlFormatOptions,
     node: &HtmlElementList,
+    spanned: SpannedSource<'_>,
 ) -> TerminalCalculationState {
     if let Some(child) = node.into_iter().last() {
         let html_element = match child {
@@ -258,15 +267,31 @@ fn find_rightmost_child_and_extract_state(
         if !nodes.is_empty() {
             // Handle the case where the child is an HTML element, and it has
             // children.
-            match find_rightmost_child_and_extract_state(options, &nodes) {
+            match find_rightmost_child_and_extract_state(options, &nodes, spanned) {
                 TerminalCalculationState::UseParent => {}
                 state => return state,
             }
         }
 
-        let name_token = html_element.opening_element()?.name()?.value_token()?;
+        let opening_element = html_element.opening_element()?;
+        let name_token = opening_element.name()?.value_token()?;
 
-        let indent = html_element.closing_element().map(|_| options.indent_width().value());
+        let size = options.indent_width().value() as i8;
+
+        let indent = match html_element.closing_element() {
+            Some(_) => Some(-size),
+            None => {
+                // @@CrazyHueristic: if the name is not a self-closing element, and it uses all
+                // of the space on the current line, we can assume that we should
+                // increase the indent level by 1.
+                let range = opening_element.range();
+                let end: usize = range.end().into();
+                let contents_line_end = spanned.line_ranges.line_end(end);
+
+                if end == contents_line_end { Some(size) } else { None }
+            }
+        };
+
         let language = match name_token.text().trim() {
             "style" => LanguageType::Css,
             "script" => LanguageType::Js,
@@ -356,7 +381,7 @@ impl<'ctx> HasCSSParsing<'ctx> for CSSBiomeFormatter<'ctx> {
     /// there may not be any other embedded languages within the CSS block,
     /// we can safely assume that the terminal state is `Css`.
     fn terminal_state(&self) -> Option<TerminalState> {
-        Some(TerminalState { language: LanguageType::Css, indent: 0 })
+        Some(TerminalState { language: LanguageType::Css, indent: 0, continue_inline: false })
     }
 }
 
@@ -434,7 +459,7 @@ impl<'ctx> HasJSParsing<'ctx> for JSBiomeFormatter<'ctx> {
     /// there may not be any other embedded languages within the JS block,
     /// we can safely assume that the terminal state is `Js`.
     fn terminal_state(&self) -> Option<TerminalState> {
-        Some(TerminalState { language: LanguageType::Js, indent: 0 })
+        Some(TerminalState { language: LanguageType::Js, indent: 0, continue_inline: false })
     }
 }
 
