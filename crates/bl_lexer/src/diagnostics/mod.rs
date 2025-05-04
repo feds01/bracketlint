@@ -15,7 +15,7 @@ pub enum LexerErrorKind {
     MissingExponentDigits,
 
     /// When a float literal specifies an invalid exponent. i.e.
-    /// ```
+    /// ```ignore
     /// 1.0e-1.0
     /// ```
     InvalidFloatExponent,

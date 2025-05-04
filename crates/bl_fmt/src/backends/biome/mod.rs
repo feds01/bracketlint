@@ -15,8 +15,8 @@ use biome_html_parser::parse_html;
 use biome_html_syntax::{HtmlElementList, HtmlRoot};
 use biome_js_formatter::{self as js_formatter, context::JsFormatOptions};
 use biome_js_parser::{self as js_parser, JsFileSource, JsParserOptions};
-use biome_rowan::AstNodeList;
-use bl_ast::ByteRange;
+use biome_rowan::{AstNode, AstNodeList};
+use bl_ast::{ByteRange, SpannedSource};
 
 use crate::{
     adapters::{
@@ -68,8 +68,8 @@ impl BiomeFormatter {
     }
 }
 
-struct HTMLBiomeFormatter {
-    context: FormatterContext,
+struct HTMLBiomeFormatter<'ctx> {
+    context: &'ctx FormatterContext<'ctx>,
 
     /// The options for the formatter, encapsulating backend specific options.
     options: BiomeFormatterOptions,
@@ -79,7 +79,7 @@ struct HTMLBiomeFormatter {
     state: TerminalState,
 }
 
-impl HTMLBiomeFormatter {
+impl<'ctx> HTMLBiomeFormatter<'ctx> {
     /// A utility function to get the rightmost child of a node.
     ///
     /// This is used to determine the last child of a node, which is useful for
@@ -93,12 +93,18 @@ impl HTMLBiomeFormatter {
         if html.iter().last().is_none()
             && let Ok(_) = tree.eof_token()
         {
+            let end: usize = html.range().end().into();
+            let contents_line_end = self.context.source().line_ranges.line_end(end);
+            if end != contents_line_end {
+                return;
+            }
+
             self.state.indent = self.state.indent.saturating_sub(self.context.indent_step() as u16);
             return;
         }
 
         let TerminalCalculationState::Some { language, indent } =
-            find_rightmost_child_and_extract_state(options, &html)
+            find_rightmost_child_and_extract_state(options, &html, self.context.source())
         else {
             return;
         };
@@ -106,6 +112,8 @@ impl HTMLBiomeFormatter {
         // If we've got an indent to apply, we need to apply it to the
         // formatter state.
         if let Some(indent) = indent {
+            let current_indent = self.state.indent as i8;
+            let indent = current_indent.saturating_add(indent);
             self.state.indent = indent as u16;
         }
 
@@ -113,7 +121,7 @@ impl HTMLBiomeFormatter {
     }
 }
 
-impl HasHTMLParsing for HTMLBiomeFormatter {
+impl<'ctx> HasHTMLParsing<'ctx> for HTMLBiomeFormatter<'ctx> {
     /// Format the HTML contents using the Biome formatter.
     ///
     /// /// This will follow the algorithm:
@@ -158,7 +166,7 @@ impl HasHTMLParsing for HTMLBiomeFormatter {
                     err.location().span.map(|text_range| {
                         bl_ast::Span::new(
                             ByteRange::new(text_range.start().into(), text_range.end().into()),
-                            self.context.source(),
+                            self.context.id(),
                         )
                     }),
                 ));
@@ -190,7 +198,7 @@ enum TerminalCalculationState {
         language: LanguageType,
 
         /// Any indentation that was pending.
-        indent: Option<u8>,
+        indent: Option<i8>,
     },
     UseParent,
 }
@@ -232,6 +240,7 @@ impl<E> FromResidual<Result<Infallible, E>> for TerminalCalculationState {
 fn find_rightmost_child_and_extract_state(
     options: &HtmlFormatOptions,
     node: &HtmlElementList,
+    spanned: SpannedSource<'_>,
 ) -> TerminalCalculationState {
     if let Some(child) = node.into_iter().last() {
         let html_element = match child {
@@ -258,15 +267,31 @@ fn find_rightmost_child_and_extract_state(
         if !nodes.is_empty() {
             // Handle the case where the child is an HTML element, and it has
             // children.
-            match find_rightmost_child_and_extract_state(options, &nodes) {
+            match find_rightmost_child_and_extract_state(options, &nodes, spanned) {
                 TerminalCalculationState::UseParent => {}
                 state => return state,
             }
         }
 
-        let name_token = html_element.opening_element()?.name()?.value_token()?;
+        let opening_element = html_element.opening_element()?;
+        let name_token = opening_element.name()?.value_token()?;
 
-        let indent = html_element.closing_element().map(|_| options.indent_width().value());
+        let size = options.indent_width().value() as i8;
+
+        let indent = match html_element.closing_element() {
+            Some(_) => Some(-size),
+            None => {
+                // @@CrazyHueristic: if the name is not a self-closing element, and it uses all
+                // of the space on the current line, we can assume that we should
+                // increase the indent level by 1.
+                let range = opening_element.range();
+                let end: usize = range.end().into();
+                let contents_line_end = spanned.line_ranges.line_end(end);
+
+                if end == contents_line_end { Some(size) } else { None }
+            }
+        };
+
         let language = match name_token.text().trim() {
             "style" => LanguageType::Css,
             "script" => LanguageType::Js,
@@ -279,14 +304,14 @@ fn find_rightmost_child_and_extract_state(
     }
 }
 
-struct CSSBiomeFormatter {
-    context: FormatterContext,
+struct CSSBiomeFormatter<'ctx> {
+    context: &'ctx FormatterContext<'ctx>,
 
     /// The options for the formatter, encapsulating backend specific options.
     options: BiomeFormatterOptions,
 }
 
-impl HasCSSParsing for CSSBiomeFormatter {
+impl<'ctx> HasCSSParsing<'ctx> for CSSBiomeFormatter<'ctx> {
     /// Format the CSS contents using the Biome formatter.
     ///
     /// This will follow the algorithm:
@@ -325,7 +350,7 @@ impl HasCSSParsing for CSSBiomeFormatter {
                 err.location().span.map(|text_range| {
                     bl_ast::Span::new(
                         ByteRange::new(text_range.start().into(), text_range.end().into()),
-                        self.context.source(),
+                        self.context.id(),
                     )
                 }),
             ));
@@ -356,18 +381,18 @@ impl HasCSSParsing for CSSBiomeFormatter {
     /// there may not be any other embedded languages within the CSS block,
     /// we can safely assume that the terminal state is `Css`.
     fn terminal_state(&self) -> Option<TerminalState> {
-        Some(TerminalState { language: LanguageType::Css, indent: 0 })
+        Some(TerminalState { language: LanguageType::Css, indent: 0, continue_inline: false })
     }
 }
 
-struct JSBiomeFormatter {
-    context: FormatterContext,
+struct JSBiomeFormatter<'ctx> {
+    context: &'ctx FormatterContext<'ctx>,
 
     /// The options for the formatter, encapsulating backend specific options.
     options: BiomeFormatterOptions,
 }
 
-impl HasJSParsing for JSBiomeFormatter {
+impl<'ctx> HasJSParsing<'ctx> for JSBiomeFormatter<'ctx> {
     /// Format the JS contents using the Biome formatter.
     ///
     /// This will follow the algorithm:
@@ -404,7 +429,7 @@ impl HasJSParsing for JSBiomeFormatter {
                 err.location().span.map(|text_range| {
                     bl_ast::Span::new(
                         ByteRange::new(text_range.start().into(), text_range.end().into()),
-                        self.context.source(),
+                        self.context.id(),
                     )
                 }),
             ));
@@ -434,7 +459,7 @@ impl HasJSParsing for JSBiomeFormatter {
     /// there may not be any other embedded languages within the JS block,
     /// we can safely assume that the terminal state is `Js`.
     fn terminal_state(&self) -> Option<TerminalState> {
-        Some(TerminalState { language: LanguageType::Js, indent: 0 })
+        Some(TerminalState { language: LanguageType::Js, indent: 0, continue_inline: false })
     }
 }
 
@@ -442,23 +467,19 @@ impl HasJSParsing for JSBiomeFormatter {
 // `BiomeFormatter` by implementing the `HasHtmlParsing`, `HasCssParsing` and
 // `HasJsParsing` traits.
 impl ExternalLanguagesEngineAdaptor for BiomeFormatter {
-    type HTMLEngine = impl HasHTMLParsing;
-    type CSSEngine = impl HasCSSParsing;
-    type JSEngine = impl HasJSParsing;
+    type CSSEngine<'ctx> = impl HasCSSParsing<'ctx>;
+    type HTMLEngine<'ctx> = impl HasHTMLParsing<'ctx>;
+    type JSEngine<'ctx> = impl HasJSParsing<'ctx>;
 
-    fn html_engine(&self, context: &FormatterContext) -> Self::HTMLEngine {
-        HTMLBiomeFormatter {
-            context: context.clone(),
-            options: self.options.clone(),
-            state: context.state,
-        }
+    fn html_engine<'ctx>(&self, context: &'ctx FormatterContext<'ctx>) -> Self::HTMLEngine<'ctx> {
+        HTMLBiomeFormatter { context, options: self.options.clone(), state: context.state }
     }
 
-    fn css_engine(&self, context: &FormatterContext) -> Self::CSSEngine {
-        CSSBiomeFormatter { context: context.clone(), options: self.options.clone() }
+    fn css_engine<'ctx>(&self, context: &'ctx FormatterContext<'ctx>) -> Self::CSSEngine<'ctx> {
+        CSSBiomeFormatter { context, options: self.options.clone() }
     }
 
-    fn js_engine(&self, context: &FormatterContext) -> Self::JSEngine {
-        JSBiomeFormatter { context: context.clone(), options: self.options.clone() }
+    fn js_engine<'ctx>(&self, context: &'ctx FormatterContext<'ctx>) -> Self::JSEngine<'ctx> {
+        JSBiomeFormatter { context, options: self.options.clone() }
     }
 }

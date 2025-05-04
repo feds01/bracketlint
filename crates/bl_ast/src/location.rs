@@ -173,7 +173,7 @@ impl Span {
 /// A [SpannedSource] is a wrapper around the contents of a source file that
 /// is stored in [SourceMap]. It features useful methods for extracting
 /// and reading sections of the source by using [Span] or [ByteRange]s.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct SpannedSource<'s> {
     pub source: &'s str,
     pub path: &'s PathBuf,
@@ -201,6 +201,31 @@ impl<'s> SpannedSource<'s> {
     /// Check if the source is empty.
     pub fn is_empty(&self) -> bool {
         self.source.is_empty()
+    }
+
+    /// Get the line number of a particular byte position.
+    pub fn line_number(&self, byte: usize) -> usize {
+        self.line_ranges.line_number(byte)
+    }
+
+    /// Get the byte position of the given positions line number with
+    /// none-whitespace content. An example of this would be:
+    /// ```ignore
+    /// // 1:  let x = 1;     
+    ///            ^    ^- the byte position within the line that is not a whitespace, i.e. the trimmed line range.
+    ///            |
+    ///            \ The byte position of the query
+    /// ```
+    pub fn trimmed_range(&self, line: usize) -> ByteRange {
+        let range = self.line_ranges.range_for_line(line);
+        let start = range.start();
+        let end = range.end();
+
+        let line = self.source[start..end].trim();
+        let start = line.as_ptr() as usize - self.source.as_ptr() as usize;
+        let end = start + line.len();
+
+        ByteRange::new(start, end)
     }
 }
 

@@ -16,7 +16,7 @@ pub use member::Member;
 use member::MemberSourceMetadata;
 use settings::Settings;
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct WorkspaceMembers {
     member_map: HashMap<PathBuf, SourceId>,
 

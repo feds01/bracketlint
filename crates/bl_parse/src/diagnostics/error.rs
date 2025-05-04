@@ -44,7 +44,7 @@ pub enum ParseErrorKind {
 
     /// For tags that expect a termination, e.g. `{% endif %}`, this error
     /// represents the case where the termination is missing, e.g.
-    /// ```
+    /// ```ignore
     /// {% if user.is_active %}
     ///   ...
     ///

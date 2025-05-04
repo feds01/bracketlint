@@ -574,6 +574,7 @@ dependencies = [
  "biome_js_parser",
  "biome_rowan",
  "bl_ast",
+ "bl_lexer",
  "bl_macros",
  "bl_reporting",
  "bl_workspace",
