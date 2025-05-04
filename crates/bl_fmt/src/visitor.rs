@@ -169,13 +169,68 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
 
         Ok(())
     }
+
+    // Extract the inline check into a separate function
+    fn check_inline_statement_newline(
+        &mut self,
+        statement: bl_ast::AstNodeRef<bl_ast::Statement>,
+        next_statement: Option<bl_ast::AstNodeRef<bl_ast::Statement>>,
+    ) -> Result<(), FmtError> {
+        match (statement.body(), next_statement.as_ref().map(|s| s.body())) {
+            (bl_ast::Statement::Text(_), Some(bl_ast::Statement::Inline(_))) => Ok(()),
+            (bl_ast::Statement::Text(_), Some(bl_ast::Statement::Tag(tag))) if tag.is_inline() => {
+                Ok(())
+            }
+
+            (bl_ast::Statement::Tag(tag), _) => {
+                if let bl_ast::Tag::Generic(generic) = tag {
+                    let name = self.ctx.source.hunk(generic.name.ast_ref().span().range);
+
+                    if bl_lexer::token::Keyword::try_from(name).is_ok() {
+                        self.end_line();
+                    }
+                }
+
+                Ok(())
+            }
+            (bl_ast::Statement::Inline(_), _) => {
+                let span = statement.id().span().range;
+                let line_end = self.ctx.source.line_ranges.line_end(span.end());
+
+                // Check if the next line is the end of the line.
+                if span.end() + 1 == line_end {
+                    self.ctx.decrement_indent();
+                    self.push_hunk("\n");
+                } else {
+                    // We need to continue the "inline" statement.
+                    self.ctx.continue_inline();
+                }
+
+                Ok(())
+            }
+            (bl_ast::Statement::Comment(_), _) => {
+                // If the statement is a comment, we need to check if
+                // the next line is the end of the line.
+                self.ctx.increment_indent();
+                self.push_hunk("\n");
+
+                // Additional logic can be added here that uses next_statement if needed
+
+                Ok(())
+            }
+            _ => {
+                self.end_line();
+                Ok(())
+            }
+        }
+    }
 }
 
 impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
     type Error = FmtError;
 
     ast_visitor_mut_self_default_impl!(
-        hiding: Text, For, If, IfClause, Comment, Inline, Body, GenericTag, Arg, Name
+        hiding: Text, For, If, IfClause, Comment, Inline, Body, GenericTag, Arg, Name, AccessExpr, Lit, Filter, Block, With, Assignment,
     );
 
     type BlockRet = ();
@@ -347,25 +402,18 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         node: bl_ast::AstNodeRef<bl_ast::Body>,
     ) -> Result<Self::BodyRet, Self::Error> {
         let bl_ast::Body { contents } = node.body();
+        let statements: Vec<_> = contents.iter().collect();
 
-        // Visit the body of the document.
-        for item in contents.iter() {
+        // Visit the body of the document
+        for (i, item) in statements.iter().enumerate() {
             walk_mut_self::walk_statement(self, item.ast_ref())?;
 
-            // We need to check for inline statements, whether we need to insert a newline
-            // or not, i.e. we need this to be a CST rather than an AST.
-            if let bl_ast::Statement::Inline(_) = item.ast_ref().body() {
-                let span = item.id.span().range;
-                let line_end = self.source.line_ranges.line_end(span.end());
+            // Get optional next statement if it exists
+            let next_statement =
+                if i + 1 < statements.len() { Some(statements[i + 1].ast_ref()) } else { None };
 
-                // Check if the next line is the end of the line.
-                if span.end() + 1 == line_end {
-                    self.ctx.decrement_indent();
-                    self.push_hunk("\n");
-                }
-            }
+            self.check_inline_statement_newline(item.ast_ref(), next_statement)?;
         }
-
         Ok(())
     }
 
@@ -375,16 +423,38 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         &mut self,
         node: bl_ast::AstNodeRef<bl_ast::Text>,
     ) -> Result<Self::TextRet, Self::Error> {
-        let text = self.source.hunk(node.span().range);
+        let is_inline = self.ctx.state.continue_inline;
+        let text = self.ctx.source.hunk(node.span().range);
         let mut engine = self.adaptor.html_engine(&self.ctx);
         let result = engine.format(text)?;
+        let new_state = engine.into_state();
 
-        // @@Temp: for now, lets just push the HTML into the buffer.
-        for line in result.lines() {
-            self.push_line(line);
+        let mut lines: Vec<_> = result.lines().collect();
+
+        // Remove empty lines at the end
+        while let Some(last) = lines.last() {
+            if last.trim().is_empty() {
+                lines.pop();
+            } else {
+                break;
+            }
         }
 
-        self.ctx.state = engine.into_state();
+        if is_inline {
+            self.push_hunk(lines.join("\n").as_str());
+        } else {
+            for (index, line) in lines.iter().enumerate() {
+                let is_last = index == lines.len() - 1;
+
+                if is_last {
+                    self.push_hunk(line);
+                } else {
+                    self.push_line(line);
+                }
+            }
+        }
+
+        self.ctx.state = new_state;
         Ok(())
     }
 
