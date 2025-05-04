@@ -104,6 +104,11 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         self.buffer.push('\n');
     }
 
+    /// Push a newline into the buffer.
+    pub fn end_line(&mut self) {
+        self.buffer.push('\n');
+    }
+
     /// Push a hunk on the current line.
     #[inline(always)]
     pub fn push_hunk(&mut self, hunk: &str) {
@@ -131,7 +136,6 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         kind: TagKind,
         f: F,
     ) -> Result<(), FmtError> {
-        self.add_indent();
         self.push_hunk(kind.left());
         self.push_hunk(" ");
 
@@ -141,10 +145,6 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         // Add the closing tag.
         self.push_hunk(" ");
         self.push_hunk(kind.right());
-
-        // @@Todo: we need to determine whether we need to add a newline
-        // or not. For now, we just add a newline.
-        self.push_hunk("\n");
 
         Ok(())
     }
@@ -277,6 +277,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
 
             Ok(())
         })?;
+        self.end_line();
 
         // Now visit the loop body.
         self.with_block(|formatter| formatter.visit_body(loop_body.ast_ref()))?;
@@ -322,6 +323,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
     ) -> Result<Self::IfClauseRet, Self::Error> {
         let bl_ast::IfClause { kind, condition, clause_body } = node.body();
 
+        self.add_indent();
         self.within_tag(TagKind::Block, |this| {
             match kind {
                 bl_ast::ClauseKind::If => this.push_hunk("if "),
@@ -329,6 +331,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             }
             this.visit_expr(condition.ast_ref())
         })?;
+        self.end_line();
 
         // Now visit the loop body.
         self.with_block(|formatter| formatter.visit_body(clause_body.ast_ref()))?;
@@ -400,7 +403,10 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             let text = this.source.hunk(node.span().range);
             this.push_hunk(text);
             Ok(())
-        })
+        })?;
+        self.end_line();
+
+        Ok(())
     }
 
     type InlineRet = ();
