@@ -210,7 +210,7 @@ impl<'s> SpannedSource<'s> {
 
     /// Get the byte position of the given positions line number with
     /// none-whitespace content. An example of this would be:
-    /// ```
+    /// ```ignore
     /// // 1:  let x = 1;     
     ///            ^    ^- the byte position within the line that is not a whitespace, i.e. the trimmed line range.
     ///            |

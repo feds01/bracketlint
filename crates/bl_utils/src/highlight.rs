@@ -6,7 +6,7 @@
 //! specific colour and text effect, and then report it using the [Reporter]
 //! struct, e.g.:
 //!
-//! ```rust
+//! ```ignore
 //! use bl_reporting::{ReportBuilder, Reports};
 //! use bl_utils::highlight::{Colour, Modifier, highlight};
 //!
