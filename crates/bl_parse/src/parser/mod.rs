@@ -642,7 +642,7 @@ impl<'s> Parser<'s> {
         Ok(self.node_with_joined_span(ast::Statement::Inline(ast::Inline { expr }), token.span))
     }
 
-    fn parse_compound_expr(&mut self, min_prec: u8) -> ParseResult<AstNode<ast::Expr>> {
+    fn parse_compound_expr(&mut self, min_precedence: u8) -> ParseResult<AstNode<ast::Expr>> {
         // first of all, we want to get the lhs...
         let (mut lhs, lhs_span) = self.track_span(|this| this.parse_expr())?;
 
@@ -656,9 +656,9 @@ impl<'s> Parser<'s> {
             };
 
             // check if we have higher precedence than the lhs expression...
-            let (l_prec, r_prec) = op.infix_binding_power();
+            let (l_precedence, r_precedence) = op.infix_binding_power();
 
-            if l_prec < min_prec {
+            if l_precedence < min_precedence {
                 break;
             }
 
@@ -666,7 +666,7 @@ impl<'s> Parser<'s> {
             self.skip(consumed_tokens);
 
             let op_span = op_start.join(self.current_pos());
-            let rhs = self.parse_compound_expr(r_prec)?;
+            let rhs = self.parse_compound_expr(r_precedence)?;
 
             //v transform the operator into an `BinaryExpr`
             let op = self.node_with_span(op, op_span);

@@ -281,7 +281,7 @@ fn find_rightmost_child_and_extract_state(
         let indent = match html_element.closing_element() {
             Some(_) => Some(-size),
             None => {
-                // @@CrazyHueristic: if the name is not a self-closing element, and it uses all
+                // @@CrazyHeuristic: if the name is not a self-closing element, and it uses all
                 // of the space on the current line, we can assume that we should
                 // increase the indent level by 1.
                 let range = opening_element.range();
