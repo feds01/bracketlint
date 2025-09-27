@@ -639,6 +639,7 @@ version = "0.1.0"
 dependencies = [
  "annotate-snippets",
  "bl_ast",
+ "bl_utils",
  "derive_more",
  "index_vec",
  "parking_lot",
