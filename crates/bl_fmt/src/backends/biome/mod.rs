@@ -380,8 +380,8 @@ impl<'ctx> HasCSSParsing<'ctx> for CSSBiomeFormatter<'ctx> {
     /// Since a CSS block is a terminal "node" in the context of a template i.e.
     /// there may not be any other embedded languages within the CSS block,
     /// we can safely assume that the terminal state is `Css`.
-    fn terminal_state(&self) -> Option<TerminalState> {
-        Some(TerminalState { language: LanguageType::Css, indent: 0, continue_inline: false })
+    fn into_state(self) -> TerminalState {
+        TerminalState { language: LanguageType::Css, indent: 0, continue_inline: false }
     }
 }
 
@@ -458,8 +458,8 @@ impl<'ctx> HasJSParsing<'ctx> for JSBiomeFormatter<'ctx> {
     /// Since a JS block is a terminal "node" in the context of a template i.e.
     /// there may not be any other embedded languages within the JS block,
     /// we can safely assume that the terminal state is `Js`.
-    fn terminal_state(&self) -> Option<TerminalState> {
-        Some(TerminalState { language: LanguageType::Js, indent: 0, continue_inline: false })
+    fn into_state(self) -> TerminalState {
+        TerminalState { language: LanguageType::Js, indent: 0, continue_inline: false }
     }
 }
 

@@ -115,7 +115,7 @@ pub trait HasCSSParsing<'ctx> {
     fn format(&self, contents: &str) -> FmtResult<String>;
 
     /// Attempt to compute the [TerminalState] of the parser.
-    fn terminal_state(&self) -> Option<TerminalState>;
+    fn into_state(self) -> TerminalState;
 }
 
 /// A trait that represents a type that has the capability to parse JavaScript.
@@ -123,7 +123,7 @@ pub trait HasJSParsing<'ctx> {
     fn format(&self, contents: &str) -> FmtResult<String>;
 
     /// Attempt to compute the [TerminalState] of the parser.
-    fn terminal_state(&self) -> Option<TerminalState>;
+    fn into_state(self) -> TerminalState;
 }
 
 pub(crate) trait ExternalLanguagesEngineAdaptor {
