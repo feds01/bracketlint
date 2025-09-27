@@ -5,7 +5,7 @@
 
 use std::fmt;
 
-use annotate_snippets::{Level, Renderer, Snippet};
+use annotate_snippets::{AnnotationKind, Element, Level, Renderer, Snippet};
 use bl_ast::HasSource;
 
 use crate::{Report, ReportCodeBlock, ReportElement, Reports};
@@ -43,36 +43,41 @@ impl<S: HasSource> fmt::Display for Reporter<'_, S> {
 
         for report in self.reports.iter() {
             let level = Level::from(report.kind);
-            let mut message = level.title(&report.title);
+            let mut message = level.primary_title(&report.title);
 
             // If we have an associated code, we can add it to the message.
             if let Some(ref code) = report.error_code {
                 message = message.id(code);
             }
 
+            let mut elements: Vec<Element<'_>> = vec![];
+
             for element in &report.contents {
                 match element {
                     ReportElement::CodeBlock(ReportCodeBlock { notes }) => {
                         for (span, note) in notes {
-                            message = message.snippet(
+                            elements.push(
                                 Snippet::source(self.sources.contents(span.id))
-                                    .origin(self.sources.path(span.id))
+                                    .path(self.sources.path(span.id))
                                     .fold(true)
                                     .annotation(
-                                        level
+                                        AnnotationKind::Context
                                             .span(span.range.start()..(span.range.end() + 1))
                                             .label(note.as_str()),
-                                    ),
+                                    )
+                                    .into(),
                             );
                         }
                     }
                     ReportElement::Note(report_note) => {
-                        message = message.footer(Level::Note.title(&report_note.message));
+                        elements.push(Level::INFO.message(&report_note.message).into());
                     }
                 }
             }
 
-            writeln!(f, "{}", renderer.render(message))?;
+            let report = &[message.elements(elements)];
+
+            writeln!(f, "{}", renderer.render(report))?;
         }
 
         Ok(())

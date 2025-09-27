@@ -37,12 +37,12 @@ pub enum ReportKind {
     Internal,
 }
 
-impl From<ReportKind> for Level {
+impl From<ReportKind> for Level<'static> {
     fn from(kind: ReportKind) -> Self {
         match kind {
-            ReportKind::Info => Level::Info,
-            ReportKind::Warning => Level::Warning,
-            ReportKind::Error | ReportKind::Internal => Level::Error,
+            ReportKind::Info => Level::INFO,
+            ReportKind::Warning => Level::WARNING,
+            ReportKind::Error | ReportKind::Internal => Level::ERROR,
         }
     }
 }
