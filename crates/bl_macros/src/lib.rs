@@ -5,7 +5,7 @@ use define_tree::{
     definitions::TreeDef, difference::Difference, emit::emit_tree, validate::validate_tree_def,
 };
 use quote::quote;
-use syn::{Ident, parse_macro_input};
+use syn::parse_macro_input;
 
 mod define_tree;
 
@@ -90,9 +90,12 @@ pub fn define_tree(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 pub fn difference(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let Difference { symbols, symbols_to_remove, callback_macro, callback_macro_flag } =
         parse_macro_input!(input as Difference);
-    let difference = symbols
+
+    let difference_items: Vec<proc_macro2::TokenStream> = symbols
         .into_iter()
         .filter(|symbol| !symbols_to_remove.contains(symbol))
-        .collect::<Vec<Ident>>();
-    quote! { #( #callback_macro!(@#callback_macro_flag #difference); )* }.into()
+        .map(|symbol| quote! { #callback_macro!(@#callback_macro_flag #symbol); })
+        .collect();
+
+    quote! { #(#difference_items)* }.into()
 }
