@@ -1,4 +1,4 @@
-//! `version` command implemention for the CLI.
+//! `version` command implementation for the CLI.
 
 use anyhow::Result;
 
