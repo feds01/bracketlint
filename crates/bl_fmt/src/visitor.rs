@@ -6,8 +6,8 @@ use bl_reporting::inline::{InlineSnippet, note_on_span};
 
 use crate::{
     adapters::{
-        ExternalLanguagesEngineAdaptor, FormatterContext, HasHTMLParsing, LanguageType,
-        TerminalState,
+        ExternalLanguagesEngineAdaptor, FormatterContext, HasCSSParsing, HasHTMLParsing,
+        HasJSParsing, LanguageType, TerminalState,
     },
     diagnostics::FmtError,
     options::FormatterOptions,
@@ -426,9 +426,29 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
     ) -> Result<Self::TextRet, Self::Error> {
         let is_inline = self.ctx.state.continue_inline;
         let text = self.ctx.source.hunk(node.span().range);
-        let mut engine = self.adaptor.html_engine(&self.ctx);
-        let result = engine.format(text)?;
-        let new_state = engine.into_state();
+
+        // We need to check which language engine to use for the formatting.
+        let (result, state) = match self.ctx.state.language {
+            LanguageType::Html => {
+                let mut engine = self.adaptor.html_engine(&self.ctx);
+                let result = engine.format(text)?;
+                let new_state = engine.into_state();
+                (result, new_state)
+            }
+            LanguageType::Css => {
+                let engine = self.adaptor.css_engine(&self.ctx);
+                let result = engine.format(text)?;
+                let new_state = engine.into_state();
+                (result, new_state)
+            }
+            LanguageType::Js => {
+                let engine = self.adaptor.js_engine(&self.ctx);
+                let result = engine.format(text)?;
+                let new_state = engine.into_state();
+                (result, new_state)
+            }
+            LanguageType::Text => (text.to_string(), self.ctx.state),
+        };
 
         let mut lines: Vec<_> = result.lines().collect();
 
@@ -455,7 +475,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             }
         }
 
-        self.ctx.state = new_state;
+        self.ctx.state = state;
         Ok(())
     }
 
