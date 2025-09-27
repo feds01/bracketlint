@@ -9,14 +9,14 @@ use bl_parse::{ParseQuery, ParseQueryResult, parse_source};
 use bl_reporting::Reports;
 use bl_utils::{stream_writeln, timed};
 use bl_workspace::{Workspace, resolver::find_files_in_paths};
-use log::{Level, info};
+use log::{Level, debug};
 
 pub fn fmt(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
     // Firstly, we need to discover all of the files in the provided paths.
     let files = timed(
         || find_files_in_paths(files, &workspace.settings),
-        log::Level::Info,
-        |duration| info!("resolved files in {duration:?}"),
+        log::Level::Debug,
+        |duration| debug!("resolved files in {duration:?}"),
     )?;
 
     if files.is_empty() {
@@ -24,7 +24,7 @@ pub fn fmt(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
         return Ok(Reports::default());
     }
 
-    info!("found {} files", files.len());
+    debug!("found {} files", files.len());
 
     let mut pipeline_diagnostics = Reports::default();
 
@@ -64,9 +64,9 @@ pub fn fmt(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
                 }
             }
         },
-        Level::Info,
+        Level::Debug,
         |duration| {
-            info!("parsed files in {duration:?}");
+            debug!("parsed files in {duration:?}");
         },
     );
 
@@ -91,7 +91,10 @@ pub fn fmt(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
 
                 stream_writeln!(stderr, "{}", diff);
             }
-            settings::FixMode::Generate => {}
+            settings::FixMode::Generate => {
+                let mut stdout = workspace.output_stream();
+                stream_writeln!(stdout, "{}", &buffer);
+            }
             settings::FixMode::Apply => {
                 let mut file = fs::OpenOptions::new()
                     .write(true)
