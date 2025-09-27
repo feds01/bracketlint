@@ -1,0 +1,14 @@
+[package]
+name = "bl_testing_internal"
+version = "0.1.0"
+authors = { workspace = true }
+edition = { workspace = true }
+
+[lib]
+doctest = false
+
+[dependencies]
+itertools = { workspace = true }
+quote = { workspace = true }
+
+bracketlint = { path = "../../crates/bl" }

@@ -1,0 +1,21 @@
+[package]
+name = "bl_testing_macros"
+version = "0.1.0"
+authors = { workspace = true }
+edition = { workspace = true }
+
+[lib]
+proc-macro = true
+doctest = false
+
+[dependencies]
+syn = { workspace = true }
+proc-macro-error = { workspace = true}
+quote = { workspace = true }
+convert_case = { workspace = true }
+regex = { workspace = true }
+
+bl_testing_internal = { path = "../testing-internal" }
+
+bl_utils = { workspace = true }
+bl_reporting = { workspace = true }

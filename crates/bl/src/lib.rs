@@ -1,7 +1,7 @@
 //! Library definition of `bl` crate.
 
 pub mod cli;
-mod commands;
+pub mod commands;
 mod crash;
 pub(crate) mod version;
 
@@ -80,7 +80,7 @@ fn resolve_default_files(files: Vec<PathBuf>, is_stdin: bool) -> Vec<PathBuf> {
     }
 }
 
-fn check(args: LintCommand) -> Result<ExitStatus> {
+pub fn check(args: LintCommand) -> Result<ExitStatus> {
     let files = resolve_default_files(args.files, false); // @@Todo: add stdin support.
 
     // Fix rules are as follows:
