@@ -7,14 +7,14 @@ use bl_parse::{ParseQuery, ParseQueryResult, emit_source_tree, parse_source};
 use bl_reporting::Reports;
 use bl_utils::timed;
 use bl_workspace::{Workspace, resolver::find_files_in_paths};
-use log::{Level, info};
+use log::{Level, debug};
 
 pub fn check(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
     // Firstly, we need to discover all of the files in the provided paths.
     let files = timed(
         || find_files_in_paths(files, &workspace.settings),
-        log::Level::Info,
-        |duration| info!("resolved files in {duration:?}"),
+        log::Level::Debug,
+        |duration| debug!("resolved files in {duration:?}"),
     )?;
 
     if files.is_empty() {
@@ -22,7 +22,7 @@ pub fn check(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
         return Ok(Reports::default());
     }
 
-    info!("found {} files", files.len());
+    debug!("found {} files", files.len());
 
     let mut pipeline_diagnostics = Reports::default();
 
@@ -62,9 +62,9 @@ pub fn check(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
                 }
             }
         },
-        Level::Info,
+        Level::Debug,
         |duration| {
-            info!("parsed files in {duration:?}");
+            debug!("parsed files in {duration:?}");
         },
     );
 
