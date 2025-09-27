@@ -1,6 +1,6 @@
 //! Contains a helper macro to get the difference of two identifier lists.
 
-use syn::{Ident, parse::Parse};
+use syn::{Ident, Token, parse::Parse};
 
 /// Represents the difference of two lists of symbols.
 pub(crate) struct Difference {
@@ -16,39 +16,44 @@ pub(crate) struct Difference {
 /// $callback_macro_flag:ident`
 impl Parse for Difference {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let result = input.parse_terminated::<_, syn::Token![;]>(|parser| {
-            let mut symbols = vec![];
-            loop {
-                match parser.parse::<Ident>() {
-                    Ok(symbol) => symbols.push(symbol),
-                    Err(_) => return Ok(symbols),
-                }
-                let _ = parser.parse::<syn::Token![,]>();
+        // Parse first section: comma-separated identifiers until semicolon
+        let mut symbols = Vec::new();
+        loop {
+            symbols.push(input.parse::<Ident>()?);
+            if input.peek(Token![;]) {
+                break;
             }
-        })?;
-
-        if result.len() != 3 {
-            return Err(syn::Error::new(
-                input.span(),
-                "Expected three lists of symbols separated by a semicolon.",
-            ));
+            input.parse::<Token![,]>()?;
         }
 
-        let symbols = result[0].clone();
-        let symbols_to_remove = result[1].clone();
-        let callback_macro = result[2].clone();
-        if callback_macro.len() != 2 {
-            return Err(syn::Error::new(
-                input.span(),
-                "Expected two symbols for the callback macro.",
-            ));
+        // Parse semicolon
+        input.parse::<Token![;]>()?;
+
+        // Parse second section: comma-separated identifiers until semicolon
+        let mut symbols_to_remove = Vec::new();
+        loop {
+            if input.peek(Token![;]) {
+                break; // Empty list case
+            }
+            symbols_to_remove.push(input.parse::<Ident>()?);
+            if input.peek(Token![;]) {
+                break;
+            }
+            input.parse::<Token![,]>()?;
         }
 
-        Ok(Self {
-            symbols: symbols.into_iter().collect(),
-            symbols_to_remove: symbols_to_remove.into_iter().collect(),
-            callback_macro: callback_macro[0].clone(),
-            callback_macro_flag: callback_macro[1].clone(),
-        })
+        // Parse semicolon
+        input.parse::<Token![;]>()?;
+
+        // Parse third section: single callback macro identifier
+        let callback_macro: Ident = input.parse()?;
+
+        // Parse semicolon
+        input.parse::<Token![;]>()?;
+
+        // Parse fourth section: single callback macro flag identifier
+        let callback_macro_flag: Ident = input.parse()?;
+
+        Ok(Self { symbols, symbols_to_remove, callback_macro, callback_macro_flag })
     }
 }

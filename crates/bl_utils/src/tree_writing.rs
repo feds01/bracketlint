@@ -10,9 +10,10 @@ use serde::{Deserialize, Serialize};
 
 /// What kind of character set to use when printing compiler
 /// messages.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, JsonSchema, Default)]
 pub enum CharacterSet {
     /// Use unicode character set, this is used by default.
+    #[default]
     Unicode,
 
     /// Use the ASCII character set.
@@ -36,12 +37,6 @@ impl fmt::Display for CharacterSet {
             Self::Unicode => write!(f, "unicode"),
             Self::Ascii => write!(f, "ascii"),
         }
-    }
-}
-
-impl Default for CharacterSet {
-    fn default() -> Self {
-        Self::Unicode
     }
 }
 
@@ -159,7 +154,7 @@ impl<'t> TreeWriter<'t, '_> {
         child_index == self.tree.children.len() - 1
     }
 
-    fn next_depth(&self, child: &'t TreeNode, child_index: usize) -> TreeWriter {
+    fn next_depth(&self, child: &'t TreeNode, child_index: usize) -> TreeWriter<'_, '_> {
         let vertical_line_or_pad = iter::once(if self.is_last(child_index) {
             self.config.pad
         } else {

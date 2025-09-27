@@ -1,7 +1,5 @@
 //! Library definition of `bl` crate.
 
-#![feature(panic_payload_as_str)]
-
 pub mod cli;
 mod commands;
 mod crash;

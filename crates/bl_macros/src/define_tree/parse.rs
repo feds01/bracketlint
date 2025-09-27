@@ -154,7 +154,7 @@ impl TryFrom<&Item> for MaybeTreeNodeDef {
     fn try_from(value: &Item) -> Result<Self, Self::Error> {
         // Something is a node if it is annotated with #[node]
         let has_tree_node =
-            |attrs: &[Attribute]| attrs.iter().any(|attr| attr.path.is_ident(NODE_DEF_ATTR_NAME));
+            |attrs: &[Attribute]| attrs.iter().any(|attr| attr.path().is_ident(NODE_DEF_ATTR_NAME));
 
         match value {
             Item::Enum(enum_item) if has_tree_node(&enum_item.attrs) => Ok(MaybeTreeNodeDef(Some(
@@ -174,13 +174,13 @@ fn parse_path_field(fields: &FieldsNamed, field_name: &str) -> Result<Path, syn:
         .named
         .iter()
         .find_map(|field| {
-            if let Some(ident) = &field.ident {
-                if ident == field_name {
-                    if let Type::Path(path) = &field.ty {
-                        return Some(Ok(path.path.clone()));
-                    }
-                    return Some(Err(syn::Error::new(field.ty.span(), "Expected a path")));
+            if let Some(ident) = &field.ident
+                && ident == field_name
+            {
+                if let Type::Path(path) = &field.ty {
+                    return Some(Ok(path.path.clone()));
                 }
+                return Some(Err(syn::Error::new(field.ty.span(), "Expected a path")));
             }
             None
         })
@@ -199,18 +199,15 @@ fn parse_ident_field(fields: &FieldsNamed, field_name: &str) -> Result<Ident, sy
         .named
         .iter()
         .find_map(|field| {
-            if let Some(ident) = &field.ident {
-                if ident == field_name {
-                    if let Type::Path(path) = &field.ty {
-                        if let Some(name) = path.path.get_ident() {
-                            return Some(Ok(name.clone()));
-                        }
-                    }
-                    return Some(Err(syn::Error::new(
-                        field.ty.span(),
-                        "Expected a type identifier",
-                    )));
+            if let Some(ident) = &field.ident
+                && ident == field_name
+            {
+                if let Type::Path(path) = &field.ty
+                    && let Some(name) = path.path.get_ident()
+                {
+                    return Some(Ok(name.clone()));
                 }
+                return Some(Err(syn::Error::new(field.ty.span(), "Expected a type identifier")));
             }
             None
         })
