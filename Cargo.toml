@@ -22,7 +22,6 @@ bl_reporting = { path = "crates/bl_reporting" }
 bl_utils = { path = "crates/bl_utils" }
 bl_workspace = { path = "crates/bl_workspace" }
 
-annotate-snippets = { version = "0.11.4" }
 anyhow = { version = "1.0.80" }
 argfile = { version = "0.2.0" }
 bitflags = { version = "2.5.0" }
@@ -32,6 +31,7 @@ colored = { version = "2.1.0" }
 convert_case ="0.4"
 crossbeam-channel = "0.5.1"
 dashmap = "5.1"
+annotate-snippets = { version = "0.12.4" }
 derive_more = { version = "2", features = ["constructor", "deref"] }
 globset = "0.4.14"
 ignore = "0.4.22"
