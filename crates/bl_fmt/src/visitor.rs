@@ -242,6 +242,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         let bl_ast::Block { label, block_body } = node.body();
 
         self.within_tag(TagKind::Block, |this| {
+            this.push_hunk("block ");
             if let Some(label) = label {
                 this.visit_name(label.ast_ref())?;
                 this.push_hunk(" ");
