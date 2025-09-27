@@ -1,5 +1,4 @@
 //! BL lexer implementation for the parser.
-#![feature(cell_update)]
 
 pub mod diagnostics;
 pub mod token;

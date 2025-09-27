@@ -1,6 +1,6 @@
 //! The bracketlint formatter.
 
-#![feature(impl_trait_in_assoc_type, try_trait_v2, let_chains)]
+#![feature(impl_trait_in_assoc_type, try_trait_v2)]
 
 use adapters::ExternalLanguagesEngineAdaptor;
 use bl_ast::{AstVisitorMutSelf, SourceId};
