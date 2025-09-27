@@ -91,7 +91,10 @@ pub fn fmt(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
 
                 stream_writeln!(stderr, "{}", diff);
             }
-            settings::FixMode::Generate => {}
+            settings::FixMode::Generate => {
+                let mut stdout = workspace.output_stream();
+                stream_writeln!(stdout, "{}", &buffer);
+            }
             settings::FixMode::Apply => {
                 let mut file = fs::OpenOptions::new()
                     .write(true)
