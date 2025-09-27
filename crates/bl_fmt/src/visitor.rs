@@ -230,7 +230,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
     type Error = FmtError;
 
     ast_visitor_mut_self_default_impl!(
-        hiding: Text, For, If, IfClause, Comment, Inline, Body, GenericTag, Arg, Name, AccessExpr, Lit, Filter, Block, With, Assignment,
+        hiding: Text, For, If, IfClause, Comment, Inline, Body, GenericTag, Arg, Name, AccessExpr, Lit, Filter, Block, With, Assignment, Extends
     );
 
     type BlockRet = ();
@@ -513,6 +513,23 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             this.visit_expr(expr.ast_ref())?;
             Ok(())
         })
+    }
+
+    type ExtendsRet = ();
+
+    fn visit_extends(
+        &mut self,
+        node: bl_ast::AstNodeRef<bl_ast::Extends>,
+    ) -> Result<Self::ExtendsRet, Self::Error> {
+        let bl_ast::Extends { template } = node.body();
+
+        self.within_tag(TagKind::Block, |this| {
+            this.push_hunk("extends ");
+            this.visit_expr(template.ast_ref())
+        })?;
+        self.end_line();
+
+        Ok(())
     }
 
     type AccessExprRet = ();
