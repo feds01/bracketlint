@@ -1,4 +1,5 @@
 use bl_ast::{HasSource, SourceId, Span};
+use bl_utils::stream_less_writeln;
 
 use crate::{ReportBuilder, Reporter};
 
@@ -54,7 +55,7 @@ pub fn guarded_note_on_span<S: HasSource>(
         .add_labelled_span(span, "here")
         .add_note(format!("invoked at {}", ::core::panic::Location::caller()));
 
-    println!("{}", Reporter::new(sources, builder.into_reports()));
+    stream_less_writeln!("{}", Reporter::new(sources, builder.into_reports()));
 }
 
 /// This macro will produce a [crate::report::Report] and then print it to the
