@@ -102,6 +102,10 @@ pub struct Workspace {
 }
 
 impl Workspace {
+    pub fn output_stream(&self) -> CompilerOutputStream {
+        self.stdout.clone()
+    }
+
     pub fn error_stream(&self) -> CompilerOutputStream {
         self.stderr.clone()
     }
