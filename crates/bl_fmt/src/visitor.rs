@@ -6,8 +6,8 @@ use bl_reporting::inline::{InlineSnippet, note_on_span};
 
 use crate::{
     adapters::{
-        ExternalLanguagesEngineAdaptor, FormatterContext, HasHTMLParsing, LanguageType,
-        TerminalState,
+        ExternalLanguagesEngineAdaptor, FormatterContext, HasCSSParsing, HasHTMLParsing,
+        HasJSParsing, LanguageType, TerminalState,
     },
     diagnostics::FmtError,
     options::FormatterOptions,
@@ -230,7 +230,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
     type Error = FmtError;
 
     ast_visitor_mut_self_default_impl!(
-        hiding: Text, For, If, IfClause, Comment, Inline, Body, GenericTag, Arg, Name, AccessExpr, Lit, Filter, Block, With, Assignment,
+        hiding: Text, For, If, IfClause, Comment, Inline, Body, GenericTag, Arg, Name, AccessExpr, Lit, Filter, Block, With, Assignment, Extends
     );
 
     type BlockRet = ();
@@ -242,6 +242,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         let bl_ast::Block { label, block_body } = node.body();
 
         self.within_tag(TagKind::Block, |this| {
+            this.push_hunk("block ");
             if let Some(label) = label {
                 this.visit_name(label.ast_ref())?;
                 this.push_hunk(" ");
@@ -425,9 +426,29 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
     ) -> Result<Self::TextRet, Self::Error> {
         let is_inline = self.ctx.state.continue_inline;
         let text = self.ctx.source.hunk(node.span().range);
-        let mut engine = self.adaptor.html_engine(&self.ctx);
-        let result = engine.format(text)?;
-        let new_state = engine.into_state();
+
+        // We need to check which language engine to use for the formatting.
+        let (result, state) = match self.ctx.state.language {
+            LanguageType::Html => {
+                let mut engine = self.adaptor.html_engine(&self.ctx);
+                let result = engine.format(text)?;
+                let new_state = engine.into_state();
+                (result, new_state)
+            }
+            LanguageType::Css => {
+                let engine = self.adaptor.css_engine(&self.ctx);
+                let result = engine.format(text)?;
+                let new_state = engine.into_state();
+                (result, new_state)
+            }
+            LanguageType::Js => {
+                let engine = self.adaptor.js_engine(&self.ctx);
+                let result = engine.format(text)?;
+                let new_state = engine.into_state();
+                (result, new_state)
+            }
+            LanguageType::Text => (text.to_string(), self.ctx.state),
+        };
 
         let mut lines: Vec<_> = result.lines().collect();
 
@@ -454,7 +475,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             }
         }
 
-        self.ctx.state = new_state;
+        self.ctx.state = state;
         Ok(())
     }
 
@@ -492,6 +513,23 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             this.visit_expr(expr.ast_ref())?;
             Ok(())
         })
+    }
+
+    type ExtendsRet = ();
+
+    fn visit_extends(
+        &mut self,
+        node: bl_ast::AstNodeRef<bl_ast::Extends>,
+    ) -> Result<Self::ExtendsRet, Self::Error> {
+        let bl_ast::Extends { template } = node.body();
+
+        self.within_tag(TagKind::Block, |this| {
+            this.push_hunk("extends ");
+            this.visit_expr(template.ast_ref())
+        })?;
+        self.end_line();
+
+        Ok(())
     }
 
     type AccessExprRet = ();
