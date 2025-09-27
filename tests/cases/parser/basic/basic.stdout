@@ -1,0 +1,8 @@
+info: parsed module '$DIR/basic.html':
+body
+├─text
+└─block
+  ├─name "title"
+  └─body
+    └─text
+
