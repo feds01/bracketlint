@@ -134,25 +134,25 @@ pub struct FilesVisitor<'s, 'config> {
 impl ignore::ParallelVisitor for FilesVisitor<'_, '_> {
     fn visit(&mut self, result: std::result::Result<DirEntry, Error>) -> WalkState {
         // Respect our own exclusion behaviour.
-        if let Ok(entry) = &result {
-            if entry.depth() > 0 {
-                let path = entry.path();
-                let resolver = self.global.resolver.read().unwrap();
-                let settings = resolver.resolve(path);
+        if let Ok(entry) = &result
+            && entry.depth() > 0
+        {
+            let path = entry.path();
+            let resolver = self.global.resolver.read().unwrap();
+            let settings = resolver.resolve(path);
 
-                if let Some(file_name) = path.file_name() {
-                    let file_path = Candidate::new(path);
-                    let file_basename = Candidate::new(file_name);
-                    if match_candidate_exclusion(
-                        &file_path,
-                        &file_basename,
-                        &settings.file_resolver.exclude,
-                    ) {
-                        return WalkState::Skip;
-                    }
-                } else {
+            if let Some(file_name) = path.file_name() {
+                let file_path = Candidate::new(path);
+                let file_basename = Candidate::new(file_name);
+                if match_candidate_exclusion(
+                    &file_path,
+                    &file_basename,
+                    &settings.file_resolver.exclude,
+                ) {
                     return WalkState::Skip;
                 }
+            } else {
+                return WalkState::Skip;
             }
         }
 

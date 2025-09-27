@@ -1,5 +1,5 @@
 //! Contains all of the parsing logic for the `bl` project.
-#![feature(let_chains, if_let_guard)]
+#![feature(if_let_guard)]
 
 use bl_ast::{AstNode, AstVisitor, Document, LocalSpanMap, SourceId, Span, SpanMap, TempSourceMap};
 use bl_ast_utils::{AstTreePrinter, TreeWriter, TreeWriterConfig};
