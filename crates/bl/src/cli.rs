@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use clap::{Parser, command};
+use clap::Parser;
 
 #[derive(Debug, Parser)]
 #[command(
