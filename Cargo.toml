@@ -11,6 +11,8 @@ resolver = "2"
 [workspace.package]
 authors = ["Alexander Fedotov <alexander.fedotov.uk@gmail.com>"]
 edition = "2024"
+license = "MIT"
+repository = "https://github.com/feds01/bracketlint"
 
 
 [workspace.dependencies]
@@ -73,3 +75,7 @@ strip = false
 
 # set debug to true when profiling
 debug = false
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
