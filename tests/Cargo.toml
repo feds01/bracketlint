@@ -14,7 +14,7 @@ doctest = false
 [dependencies]
 pretty_assertions = "1.4.1"
 regex = { workspace = true }
-lazy_static = "1.5.0"
+lazy_static = "1.5.1"
 log = { workspace = true }
 
 bl_lints = { workspace = true }

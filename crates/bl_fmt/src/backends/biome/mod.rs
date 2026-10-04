@@ -3,7 +3,7 @@
 
 use std::{
     convert::Infallible,
-    ops::{FromResidual, Try},
+    ops::{FromResidual, Residual, Try},
 };
 
 use biome_css_formatter::{self as css_formatter, context::CssFormatOptions};
@@ -228,6 +228,10 @@ impl FromResidual for TerminalCalculationState {
     fn from_residual(residual: <Self as Try>::Residual) -> Self {
         residual
     }
+}
+
+impl Residual<TerminalCalculationState> for TerminalCalculationState {
+    type TryType = TerminalCalculationState;
 }
 
 impl<E> FromResidual<Result<Infallible, E>> for TerminalCalculationState {
