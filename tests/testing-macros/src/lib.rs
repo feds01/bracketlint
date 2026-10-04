@@ -71,10 +71,10 @@ impl Parse for GenerateTestsInput {
         }
 
         Ok(GenerateTestsInput {
-            path: parse_str_lit(path.value())?,
-            test_pattern: parse_str_lit(test_pattern.value())?,
-            test_prefix: parse_str_lit(test_prefix.value())?,
-            func: func.into_value(),
+            path: parse_str_lit(&path)?,
+            test_pattern: parse_str_lit(&test_pattern)?,
+            test_prefix: parse_str_lit(&test_prefix)?,
+            func,
         })
     }
 }
