@@ -15,14 +15,14 @@ bl_reporting = { workspace = true }
 bl_macros = { workspace = true }
 bl_lexer = { workspace = true }
 
-biome_console = { git = "https://github.com/feds01/biome.git", branch = "html-unclosed-2", package = "biome_console" }
-biome_css_formatter = { git = "https://github.com/feds01/biome.git", branch = "html-unclosed-2", package = "biome_css_formatter" }
-biome_css_parser = { git = "https://github.com/feds01/biome.git", branch = "html-unclosed-2", package = "biome_css_parser" }
-biome_diagnostics = { git = "https://github.com/feds01/biome.git", branch = "html-unclosed-2", package = "biome_diagnostics" }
-biome_html_formatter = { git = "https://github.com/feds01/biome.git", branch = "html-unclosed-2", package = "biome_html_formatter" }
-biome_html_parser = { git = "https://github.com/feds01/biome.git", branch = "html-unclosed-2", package = "biome_html_parser" }
-biome_html_syntax = { git = "https://github.com/feds01/biome.git", branch = "html-unclosed-2", package = "biome_html_syntax" }
-biome_js_formatter = { git = "https://github.com/feds01/biome.git", branch = "html-unclosed-2", package = "biome_js_formatter" }
-biome_js_parser = { git = "https://github.com/feds01/biome.git", branch = "html-unclosed-2", package = "biome_js_parser" }
-biome_formatter = { git = "https://github.com/feds01/biome.git", branch = "html-unclosed-2", package = "biome_formatter" }
-biome_rowan = { git = "https://github.com/feds01/biome.git", branch = "html-unclosed-2", package = "biome_rowan" }
+biome_console = { git = "https://github.com/feds01/biome.git", rev = "8436c26b72ffe6ec1c3ee6241e70ed8cd93b37e8", package = "biome_console" }
+biome_css_formatter = { git = "https://github.com/feds01/biome.git", rev = "8436c26b72ffe6ec1c3ee6241e70ed8cd93b37e8", package = "biome_css_formatter" }
+biome_css_parser = { git = "https://github.com/feds01/biome.git", rev = "8436c26b72ffe6ec1c3ee6241e70ed8cd93b37e8", package = "biome_css_parser" }
+biome_diagnostics = { git = "https://github.com/feds01/biome.git", rev = "8436c26b72ffe6ec1c3ee6241e70ed8cd93b37e8", package = "biome_diagnostics" }
+biome_html_formatter = { git = "https://github.com/feds01/biome.git", rev = "8436c26b72ffe6ec1c3ee6241e70ed8cd93b37e8", package = "biome_html_formatter" }
+biome_html_parser = { git = "https://github.com/feds01/biome.git", rev = "8436c26b72ffe6ec1c3ee6241e70ed8cd93b37e8", package = "biome_html_parser" }
+biome_html_syntax = { git = "https://github.com/feds01/biome.git", rev = "8436c26b72ffe6ec1c3ee6241e70ed8cd93b37e8", package = "biome_html_syntax" }
+biome_js_formatter = { git = "https://github.com/feds01/biome.git", rev = "8436c26b72ffe6ec1c3ee6241e70ed8cd93b37e8", package = "biome_js_formatter" }
+biome_js_parser = { git = "https://github.com/feds01/biome.git", rev = "8436c26b72ffe6ec1c3ee6241e70ed8cd93b37e8", package = "biome_js_parser" }
+biome_formatter = { git = "https://github.com/feds01/biome.git", rev = "8436c26b72ffe6ec1c3ee6241e70ed8cd93b37e8", package = "biome_formatter" }
+biome_rowan = { git = "https://github.com/feds01/biome.git", rev = "8436c26b72ffe6ec1c3ee6241e70ed8cd93b37e8", package = "biome_rowan" }
