@@ -23,7 +23,7 @@ pub struct Diff<'a> {
 
     /// The computed differences between the original and modified
     /// source code.
-    diff: TextDiff<'a, 'a, 'a, str>,
+    diff: TextDiff<'a, 'a, str>,
 
     /// A flag indicating whether to show a hint for a missing newline
     /// at the end of the file. This is useful for indicating that
