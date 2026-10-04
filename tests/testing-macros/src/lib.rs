@@ -6,9 +6,6 @@
 
 extern crate proc_macro;
 
-#[macro_use]
-extern crate proc_macro_error;
-
 use std::{
     fs, io, iter,
     path::{Path, PathBuf},
@@ -19,7 +16,7 @@ use bl_testing_internal::metadata::{
 };
 use convert_case::{Case, Casing};
 use proc_macro::{Span, TokenStream};
-use proc_macro_error::{Diagnostic, Level};
+use proc_macro_error2::{Diagnostic, Level, proc_macro_error};
 use quote::{format_ident, quote};
 use regex::Regex;
 use syn::{

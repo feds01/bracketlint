@@ -10,7 +10,7 @@ doctest = false
 
 [dependencies]
 syn = { workspace = true }
-proc-macro-error = { workspace = true}
+proc-macro-error2 = { workspace = true }
 quote = { workspace = true }
 convert_case = { workspace = true }
 regex = { workspace = true }
