@@ -1,8 +1,11 @@
 [package]
 name = "bracketlint"
 version = "0.1.0"
+description = "HTML template linter for Jinja, Nunjucks, Django templates, Twig and Liquid"
 authors = { workspace = true }
 edition = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
 
 [dependencies]
 bl_ast = { workspace = true }
