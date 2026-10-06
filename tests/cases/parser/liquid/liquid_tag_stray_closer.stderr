@@ -1,0 +1,5 @@
+error: unexpected `)`, which doesn't close anything
+ --> $DIR/liquid_tag_stray_closer.html:2:13
+  |
+2 |   echo total) junk
+  |             -

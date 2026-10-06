@@ -1,0 +1,2 @@
+<p>Total: {% liquid echo cart.total_price %}</p>
+

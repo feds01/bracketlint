@@ -72,6 +72,10 @@ impl From<ParseError> for Reports {
             },
             ParseErrorKind::Statement => "expected a statement".to_string(),
             ParseErrorKind::Tag => "expected a tag".to_string(),
+            // A `liquid` tag ends at its own `%}`, rather than at a closing tag.
+            ParseErrorKind::UnclosedTag(Keyword::EndLiquid) => {
+                "expected the `%}` that closes the `liquid` tag".to_string()
+            }
             ParseErrorKind::UnclosedTag(end) => format!("expected a closing `{{% {end} %}}` tag"),
         };
 

@@ -1,0 +1,8 @@
+<div>{%- liquid
+  # Shipping is free over 100.
+  assign total = cart.total_price
+  if total > 100
+    echo "Free shipping"
+  endif
+-%}</div>
+

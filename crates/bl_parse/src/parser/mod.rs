@@ -619,6 +619,7 @@ impl<'s> Parser<'s> {
                     self.with_tag_context(TagContext::Capture, |g| g.parse_capture_block())
                 }
                 token::Keyword::Render => self.parse_render_statement(),
+                token::Keyword::Liquid => self.parse_liquid_tag(),
 
                 // Control flow tags, that are effectively standalone.
                 token::Keyword::Break => self.parse_break_statement(),
@@ -1706,6 +1707,31 @@ impl<'s> Parser<'s> {
                 g.range(),
             ))
         })
+    }
+
+    /// Parse a Liquid `{% liquid %}` tag. The lexer gives each of its lines a
+    /// `{% %}` tree, so the lines are parsed like any other tags, up to the
+    /// tree for its `%}`.
+    fn parse_liquid_tag(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+        let start = self.current_pos();
+
+        self.in_tree(Delimiter::Percent, None, |g| {
+            g.parse_token(TokenKind::Keyword(Keyword::Liquid))
+        })?;
+
+        let (block_body, _, _) = self.parse_body_until_block_footer(
+            Keyword::EndLiquid,
+            |kind| kind == TokenKind::Keyword(Keyword::EndLiquid),
+            |g| {
+                g.skip_fast(TokenKind::Keyword(Keyword::EndLiquid)); // `%}` Skip the end token.
+                Ok(())
+            },
+        )?;
+
+        Ok(self.node_with_joined_span(
+            ast::Statement::Tag(ast::Tag::Liquid(ast::LiquidTag { block_body })),
+            start,
+        ))
     }
 
     /// Parse a Liquid `capture` block, i.e.

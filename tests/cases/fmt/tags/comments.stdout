@@ -1,8 +1,8 @@
 {# a comment on its own line #}
 
-    <div>
-        {# inside an element #}
-        <p>text</p>
-        {# trailing #}
-    </div>
+<div>
+    {# inside an element #}
+    <p>text</p>
+    {# trailing #}
+</div>
 

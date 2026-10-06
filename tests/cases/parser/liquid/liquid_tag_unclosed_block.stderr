@@ -1,0 +1,7 @@
+error: expected a tag, however received the keyword `endliquid`
+ --> $DIR/liquid_tag_unclosed_block.html:4:1
+  |
+4 | %}
+  | --
+  |
+  = info: expected a `identifier`

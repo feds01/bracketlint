@@ -1,5 +1,6 @@
 info: parsed module '$DIR/inline_comment.html' as liquid:
 body
+├─comment
 ├─text
 ├─inline
 │ └─access_expr

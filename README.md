@@ -30,6 +30,19 @@ From source (with Rust & Cargo installed):
 $ cargo install --git https://github.com/feds01/bracketlint bracketlint
 ```
 
+### Usage
+
+```bash
+$ bracketlint check templates/   # report problems in the templates
+$ bracketlint fmt templates/     # print the formatted templates
+```
+
+Each file is read in the dialect that its extension names: `.jinja` is Jinja, `.liquid` is Liquid and `.twig` is Twig. Any other file, such as `.html`, is read as Django. To read every file in one dialect instead, pass `--dialect`:
+
+```bash
+$ bracketlint check --dialect liquid theme/
+```
+
 ### Development
 
 Common tasks are recipes in the [`justfile`](./justfile) (install [just](https://github.com/casey/just) with `brew install just` or `cargo install just`). Run `just` to list them all:

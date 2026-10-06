@@ -22,6 +22,10 @@ pub enum LexerErrorKind {
 
     /// When a token tree is left un-closed without a matching delimiter.
     Unclosed(Delimiter),
+
+    /// When a closing delimiter has no tree to close, e.g. a stray `)` on a
+    /// line of a Liquid `{% liquid %}` tag.
+    UnexpectedClose(Delimiter),
 }
 
 /// The error type for the lexer.
@@ -52,6 +56,9 @@ impl From<LexerError> for Reports {
             ),
             LexerErrorKind::InvalidFloatExponent => {
                 "float literal has an invalid exponent".to_string()
+            }
+            LexerErrorKind::UnexpectedClose(delim) => {
+                format!("unexpected `{}`, which doesn't close anything", delim.right())
             }
         };
 
