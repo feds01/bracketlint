@@ -1,4 +1,4 @@
-info: parsed module '$DIR/if.html':
+info: parsed module '$DIR/if.html' as liquid:
 body
 ├─if
 │ ├─clauses

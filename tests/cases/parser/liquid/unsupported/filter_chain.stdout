@@ -1,4 +1,4 @@
-info: parsed module '$DIR/filter_chain.html':
+info: parsed module '$DIR/filter_chain.html' as liquid:
 body
 ├─text
 ├─inline

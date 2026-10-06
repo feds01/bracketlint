@@ -1,4 +1,4 @@
-info: parsed module '$DIR/tablerow.html':
+info: parsed module '$DIR/tablerow.html' as liquid:
 body
 ├─text
 ├─unprocessable_tag

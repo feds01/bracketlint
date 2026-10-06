@@ -1,4 +1,4 @@
-info: parsed module '$DIR/and_or.html':
+info: parsed module '$DIR/and_or.html' as liquid:
 body
 └─if
   └─clauses

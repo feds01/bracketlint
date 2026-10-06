@@ -1,4 +1,4 @@
-info: parsed module '$DIR/include_args.html':
+info: parsed module '$DIR/include_args.html' as liquid:
 body
 └─include
   ├─lit_expr

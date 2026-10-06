@@ -1,10 +1,16 @@
 //! Defines all of the settings that a [super::Workspace] can hold.
 
-use std::{ops::Deref, path::PathBuf, str::FromStr};
+use std::{
+    ops::Deref,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 use anyhow::Result;
 use bl_lints::settings::FixMode;
 use globset::{Glob, GlobSet, GlobSetBuilder};
+
+use crate::Dialect;
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
 pub enum FilePattern {
@@ -135,6 +141,17 @@ pub struct LinterSettings {
 
 pub struct ParserSettings {
     pub dump_ast: bool,
+
+    /// The dialect to parse every file in, instead of picking one from each
+    /// file's extension.
+    pub dialect: Option<Dialect>,
+}
+
+impl ParserSettings {
+    /// The dialect to parse the file at `path` in.
+    pub fn dialect_for(&self, path: &Path) -> Dialect {
+        self.dialect.or_else(|| Dialect::from_path(path)).unwrap_or_default()
+    }
 }
 
 pub struct Settings {
@@ -151,10 +168,15 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn new(respect_gitignore: bool, fix_mode: FixMode, dump_ast: bool) -> Self {
+    pub fn new(
+        respect_gitignore: bool,
+        fix_mode: FixMode,
+        dump_ast: bool,
+        dialect: Option<Dialect>,
+    ) -> Self {
         Settings {
             respect_gitignore,
-            parser_settings: ParserSettings { dump_ast },
+            parser_settings: ParserSettings { dump_ast, dialect },
             file_resolver: FileResolverSettings::new(),
             linter_settings: LinterSettings { fix_mode },
         }
@@ -167,6 +189,23 @@ impl Settings {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings::new(true, FixMode::default(), false)
+        Settings::new(true, FixMode::default(), false, None)
+    }
+}
+
+#[cfg(test)]
+mod test_super {
+    use super::*;
+
+    #[test]
+    fn test_dialect_for() {
+        let by_extension = ParserSettings { dump_ast: false, dialect: None };
+        assert_eq!(by_extension.dialect_for(Path::new("cart.liquid")), Dialect::Liquid);
+        assert_eq!(by_extension.dialect_for(Path::new("index.html")), Dialect::Django);
+
+        // `--dialect` wins over the extension.
+        let overridden = ParserSettings { dump_ast: false, dialect: Some(Dialect::Twig) };
+        assert_eq!(overridden.dialect_for(Path::new("cart.liquid")), Dialect::Twig);
+        assert_eq!(overridden.dialect_for(Path::new("index.html")), Dialect::Twig);
     }
 }

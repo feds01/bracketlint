@@ -1,4 +1,4 @@
-info: parsed module '$DIR/for.html':
+info: parsed module '$DIR/for.html' as liquid:
 body
 ├─text
 ├─for

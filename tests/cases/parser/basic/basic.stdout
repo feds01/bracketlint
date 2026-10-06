@@ -1,4 +1,4 @@
-info: parsed module '$DIR/basic.html':
+info: parsed module '$DIR/basic.html' as django:
 body
 └─block
   ├─name "title"

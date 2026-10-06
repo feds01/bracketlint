@@ -1,4 +1,4 @@
-info: parsed module '$DIR/tags.html':
+info: parsed module '$DIR/tags.html' as liquid:
 body
 ├─generic_tag
 │ ├─name "increment"

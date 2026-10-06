@@ -1,0 +1,11 @@
+info: parsed module '$DIR/with_as_twig.html' as twig:
+body
+└─set
+  ├─assignments
+  └─body
+    ├─text
+    ├─inline
+    │ └─var_expr
+    │   └─name "name"
+    └─text
+

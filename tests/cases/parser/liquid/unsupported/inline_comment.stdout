@@ -1,4 +1,4 @@
-info: parsed module '$DIR/inline_comment.html':
+info: parsed module '$DIR/inline_comment.html' as liquid:
 body
 ├─text
 ├─inline

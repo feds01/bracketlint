@@ -8,6 +8,7 @@ use std::{
     path::PathBuf,
 };
 
+use bl_workspace::Dialect;
 use itertools::{Itertools, peek_nth};
 use quote::{ToTokens, quote};
 
@@ -147,21 +148,34 @@ pub struct TestMetadata {
     /// A flag that specifies if the test should be skipped, if so the
     /// test will be generated, but will be "ignored" when running.
     pub skip: bool,
+
+    /// The dialect to parse the test case in, instead of picking one from its
+    /// extension.
+    pub dialect: Option<Dialect>,
 }
 
 impl ToTokens for TestMetadata {
     fn to_tokens(&self, tokens: &mut quote::__private::TokenStream) {
-        let TestMetadata { stage, completion, warnings, args, skip } = &self;
+        let TestMetadata { stage, completion, warnings, args, skip, dialect } = &self;
         let args = args.clone();
 
         let stage: quote::__private::TokenStream = format!("StageKind::{stage:?}").parse().unwrap();
+        let dialect = match dialect {
+            Some(dialect) => {
+                let dialect: quote::__private::TokenStream =
+                    format!("::bl_workspace::Dialect::{dialect:?}").parse().unwrap();
+                quote!(Some(#dialect))
+            }
+            None => quote!(None),
+        };
 
         tokens.extend(quote! ( TestMetadata {
             completion: #completion,
             stage: #stage,
             warnings: #warnings,
             args: #args,
-            skip: #skip
+            skip: #skip,
+            dialect: #dialect
         }))
     }
 }
@@ -183,12 +197,22 @@ pub struct TestMetadataBuilder {
 
     /// Whether the test should be skipped.
     skip: bool,
+
+    /// The dialect to parse the test case in.
+    dialect: Option<Dialect>,
 }
 
 impl TestMetadataBuilder {
     /// Create a new [TestMetadataBuilder]
     pub fn new() -> Self {
-        Self { stage: None, completion: None, warnings: None, skip: false, args: TestArgs::new() }
+        Self {
+            stage: None,
+            completion: None,
+            warnings: None,
+            skip: false,
+            args: TestArgs::new(),
+            dialect: None,
+        }
     }
 
     /// Add a stage value to the test.
@@ -221,6 +245,12 @@ impl TestMetadataBuilder {
         self
     }
 
+    /// Specify the dialect to parse the test case in.
+    pub fn with_dialect(&mut self, dialect: Dialect) -> &mut Self {
+        self.dialect = Some(dialect);
+        self
+    }
+
     /// Build the [TestMetadata], defaulting to the specified defaults
     /// for any missing property.
     pub fn build(self) -> TestMetadata {
@@ -232,6 +262,7 @@ impl TestMetadataBuilder {
             warnings: self.warnings.unwrap_or(warnings),
             args: self.args,
             skip: self.skip,
+            dialect: self.dialect,
         }
     }
 }
@@ -373,6 +404,12 @@ pub fn parse_test_case_metadata(path: &PathBuf) -> Result<ParsedMetadata, io::Er
 
                     builder.with_skip(skip);
                 }
+                "dialect" => match value.parse::<Dialect>() {
+                    Ok(dialect) => {
+                        builder.with_dialect(dialect);
+                    }
+                    Err(_) => warnings.push(ParseWarning::unrecognised_value(key, value)),
+                },
                 _ => {
                     warnings.push(ParseWarning::unrecognised_key(key));
                     break;

@@ -98,7 +98,7 @@ pub fn check(args: LintCommand) -> Result<ExitStatus> {
         FixMode::Generate
     };
 
-    let settings = Settings::new(args.respect_gitignore, fix_mode, args.dump_ast);
+    let settings = Settings::new(args.respect_gitignore, fix_mode, args.dump_ast, args.dialect);
     let builder = WorkspaceBuilder::new()
         .with_settings(settings)
         .with_stdout(CompilerOutputStream::stdout())
@@ -127,7 +127,7 @@ fn fmt(args: LintCommand) -> Result<ExitStatus> {
         FixMode::Generate
     };
 
-    let settings = Settings::new(args.respect_gitignore, fix_mode, args.dump_ast);
+    let settings = Settings::new(args.respect_gitignore, fix_mode, args.dump_ast, args.dialect);
     let builder = WorkspaceBuilder::new()
         .with_settings(settings)
         .with_stdout(CompilerOutputStream::stdout())

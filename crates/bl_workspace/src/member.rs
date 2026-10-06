@@ -7,6 +7,8 @@ use std::path::PathBuf;
 use bl_ast::{self as ast, LineRanges, SourceId, SpannedSource, TempSourceMap};
 use derive_more::Constructor;
 
+use crate::Dialect;
+
 /// A [Member] is a file that is part of a workspace. It contains the
 #[derive(Clone, Debug, Constructor)]
 pub struct MemberSourceMetadata {
@@ -21,6 +23,9 @@ pub struct Member {
     /// The raw file contents of the member.
     pub contents: String,
 
+    /// The template dialect that the member is written in.
+    pub dialect: Dialect,
+
     /// Metadata about the source itself.
     metadata: MemberSourceMetadata,
 
@@ -33,10 +38,11 @@ impl Member {
     pub fn new(
         path: PathBuf,
         contents: String,
+        dialect: Dialect,
         document: Option<ast::AstNode<ast::Document>>,
         metadata: MemberSourceMetadata,
     ) -> Self {
-        Member { path, contents, document, metadata }
+        Member { path, contents, dialect, document, metadata }
     }
 
     pub fn spanned(&self) -> SpannedSource<'_> {

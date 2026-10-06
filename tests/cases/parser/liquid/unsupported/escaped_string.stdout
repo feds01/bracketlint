@@ -1,4 +1,4 @@
-info: parsed module '$DIR/escaped_string.html':
+info: parsed module '$DIR/escaped_string.html' as liquid:
 body
 ├─text
 ├─inline

@@ -7,13 +7,11 @@ use bl_reporting::{
     DiagnosticsMut, Report, Reports,
     inline::{InlineSnippet, note_on_span},
 };
-use bl_workspace::Member;
+use bl_workspace::{Dialect, Member};
 use diagnostics::ParserDiagnostics;
-use dialect::Dialect;
 use parser::Parser;
 
 mod diagnostics;
-mod dialect;
 mod parser;
 
 /// The options for the parsing operation.
@@ -53,9 +51,10 @@ pub struct ParseQuery<'a> {
 }
 
 impl<'a> ParseQuery<'a> {
-    /// Create a new parse query with the given source ID and source.
+    /// Create a new parse query with the given source ID and source, parsed in
+    /// the member's dialect.
     pub fn new(id: SourceId, member: &'a Member) -> Self {
-        Self { id, member, options: ParseOptions::default() }
+        Self { id, member, options: ParseOptions::new(true, member.dialect) }
     }
 
     /// Create a new parse query with the given source ID, source, and options.
@@ -128,8 +127,9 @@ pub fn emit_source_tree(member: &Member) {
     let tree = AstTreePrinter::new(spanned).visit_document(document.unwrap().ast_ref()).unwrap();
     let config = TreeWriterConfig::unicode();
     log::info!(
-        "parsed module '{}':\n{}",
+        "parsed module '{}' as {}:\n{}",
         spanned.path.display(),
+        member.dialect,
         TreeWriter::new_with_config(&tree, config)
     );
 }

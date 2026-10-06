@@ -1,4 +1,4 @@
-info: parsed module '$DIR/elsif.html':
+info: parsed module '$DIR/elsif.html' as liquid:
 body
 └─if
   ├─clauses

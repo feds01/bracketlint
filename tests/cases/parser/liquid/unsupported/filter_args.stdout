@@ -1,4 +1,4 @@
-info: parsed module '$DIR/filter_args.html':
+info: parsed module '$DIR/filter_args.html' as liquid:
 body
 ├─text
 ├─inline

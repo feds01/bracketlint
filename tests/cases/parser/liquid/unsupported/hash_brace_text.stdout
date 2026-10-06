@@ -1,4 +1,4 @@
-info: parsed module '$DIR/hash_brace_text.html':
+info: parsed module '$DIR/hash_brace_text.html' as liquid:
 body
 ├─text
 ├─inline

@@ -2,7 +2,11 @@
 
 use std::path::PathBuf;
 
-use clap::Parser;
+use bl_workspace::Dialect;
+use clap::{
+    Parser,
+    builder::{PossibleValuesParser, TypedValueParser},
+};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -75,4 +79,14 @@ pub struct LintCommand {
     /// Dump the generated AST for the given files.
     #[arg(long)]
     pub dump_ast: bool,
+
+    /// The template dialect to parse files in. By default it is picked from
+    /// each file's extension (`.jinja`, `.liquid` or `.twig`), and is
+    /// `django` for any other file.
+    #[arg(
+        long,
+        value_parser = PossibleValuesParser::new(Dialect::ALL.iter().map(|dialect| dialect.name()))
+            .map(|name| name.parse::<Dialect>().unwrap())
+    )]
+    pub dialect: Option<Dialect>,
 }

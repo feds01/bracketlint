@@ -1,4 +1,4 @@
-info: parsed module '$DIR/case.html':
+info: parsed module '$DIR/case.html' as liquid:
 body
 ├─generic_tag
 │ ├─name "case"
