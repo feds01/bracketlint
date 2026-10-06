@@ -11,10 +11,11 @@ use biome_css_parser::{self as css_parser, CssParserOptions};
 use biome_diagnostics::DiagnosticExt;
 use biome_formatter::IndentStyle;
 use biome_html_formatter::{HtmlFormatOptions, format_node};
-use biome_html_parser::parse_html;
+use biome_html_parser::{HtmlParserOptions, parse_html};
 use biome_html_syntax::{HtmlElementList, HtmlRoot};
 use biome_js_formatter::{self as js_formatter, context::JsFormatOptions};
-use biome_js_parser::{self as js_parser, JsFileSource, JsParserOptions};
+use biome_js_parser::{self as js_parser, JsParserOptions};
+use biome_languages::{CssFileSource, HtmlFileSource, JsFileSource};
 use biome_rowan::{AstNode, AstNodeList};
 use bl_ast::{ByteRange, SpannedSource};
 
@@ -139,7 +140,7 @@ impl<'ctx> HasHTMLParsing<'ctx> for HTMLBiomeFormatter<'ctx> {
     /// contents as verbatim. We could emit an event for debugging purposes
     /// that parsing this content failed for some reason.
     fn format(&mut self, contents: &str) -> FmtResult<String> {
-        let parsed = parse_html(contents);
+        let parsed = parse_html(contents, HtmlParserOptions::from(&HtmlFileSource::html()));
         let tree = parsed.tree();
 
         // In order to compute the terminal state, we're going to check
@@ -175,7 +176,7 @@ impl<'ctx> HasHTMLParsing<'ctx> for HTMLBiomeFormatter<'ctx> {
 
         let options = self.options.html.clone();
 
-        match format_node(options, &parsed.syntax()) {
+        match format_node(options, &parsed.syntax(), vec![]) {
             Ok(formatted) => {
                 let printed = formatted.print().unwrap();
                 Ok(printed.into_code())
@@ -278,7 +279,9 @@ fn find_rightmost_child_and_extract_state(
         }
 
         let opening_element = html_element.opening_element()?;
-        let name_token = opening_element.name()?.value_token()?;
+        let Some(name) = opening_element.tag_name() else {
+            return TerminalCalculationState::None;
+        };
 
         let size = options.indent_width().value() as i8;
 
@@ -296,7 +299,7 @@ fn find_rightmost_child_and_extract_state(
             }
         };
 
-        let language = match name_token.text().trim() {
+        let language = match name.text() {
             "style" => LanguageType::Css,
             "script" => LanguageType::Js,
             _ => LanguageType::Html,
@@ -336,6 +339,7 @@ impl<'ctx> HasCSSParsing<'ctx> for CSSBiomeFormatter<'ctx> {
         // within our caching system.
         let parsed = css_parser::parse_css(
             contents,
+            CssFileSource::css(),
             CssParserOptions::default().allow_wrong_line_comments().allow_metavariables(),
         );
         let language = LanguageType::Css;
@@ -446,7 +450,7 @@ impl<'ctx> HasJSParsing<'ctx> for JSBiomeFormatter<'ctx> {
 
         // Now, format the JS.
         let options = self.options.js.clone();
-        let formatted = js_formatter::format_node(options, &parsed.syntax());
+        let formatted = js_formatter::format_node(options, &parsed.syntax(), vec![]);
 
         // @@Temp: for now, just return the original contents.
         match formatted {
