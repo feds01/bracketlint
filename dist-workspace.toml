@@ -17,5 +17,5 @@ install-path = ["$XDG_BIN_HOME/", "$XDG_DATA_HOME/../bin", "~/.local/bin"]
 hosting = "github"
 # Whether to install an updater program
 install-updater = false
-# Build every artifact on PRs (temporary)
-pr-run-mode = "upload"
+# Only run the release workflow for release tags, never on PRs
+pr-run-mode = "skip"
