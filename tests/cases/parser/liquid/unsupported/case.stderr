@@ -1,7 +1,0 @@
-error: expected a tag, however received the keyword `else`
- --> $DIR/case.html:8:4
-  |
-8 | {% else %}
-  |    ----
-  |
-  = info: expected a `identifier`

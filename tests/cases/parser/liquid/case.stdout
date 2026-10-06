@@ -1,0 +1,42 @@
+info: parsed module '$DIR/case.html' as liquid:
+body
+└─case
+  ├─subject
+  │ └─access_expr
+  │   ├─subject
+  │   │ └─var_expr
+  │   │   └─name "product"
+  │   └─field
+  │     └─name "type"
+  ├─leading
+  │ └─body
+  ├─branches
+  │ ├─when
+  │ │ ├─values
+  │ │ │ └─lit_expr
+  │ │ │   └─str_lit "shirt"
+  │ │ └─clause_body
+  │ │   └─body
+  │ │     └─text
+  │ ├─when
+  │ │ ├─values
+  │ │ │ ├─lit_expr
+  │ │ │ │ └─str_lit "mug"
+  │ │ │ └─lit_expr
+  │ │ │   └─str_lit "glass"
+  │ │ └─clause_body
+  │ │   └─body
+  │ │     └─text
+  │ └─when
+  │   ├─values
+  │   │ ├─lit_expr
+  │   │ │ └─str_lit "book"
+  │   │ └─lit_expr
+  │   │   └─str_lit "magazine"
+  │   └─clause_body
+  │     └─body
+  │       └─text
+  └─otherwise
+    └─body
+      └─text
+

@@ -1,0 +1,18 @@
+info: parsed module '$DIR/liquid_tags_in_jinja.html' as jinja:
+body
+├─generic_tag
+│ ├─name "unless"
+│ └─args
+│   └─arg
+│     └─var_expr
+│       └─name "user"
+├─text
+├─inline
+│ └─access_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "case"
+│   └─field
+│     └─name "when"
+└─text
+

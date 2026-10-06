@@ -3,6 +3,7 @@
 use core::fmt;
 
 use bl_ast::{SourceId, SpannedSource};
+use bl_workspace::Dialect;
 use derive_more::Constructor;
 
 use crate::{diagnostics::FmtResult, options::FormatterOptions};
@@ -51,6 +52,10 @@ pub struct FormatterContext<'s> {
     pub source: SpannedSource<'s>,
 
     pub options: FormatterOptions,
+
+    /// The template dialect of the module, which decides how some tags are
+    /// spelled, e.g. `elsif` in Liquid and `elif` elsewhere.
+    pub dialect: Dialect,
 
     /// We should be storing the last [`TerminalState`] that was
     /// encountered. This is used to determine the language that

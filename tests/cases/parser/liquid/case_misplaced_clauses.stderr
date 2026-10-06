@@ -1,0 +1,24 @@
+error: unexpectedly encountered the keyword `else`
+ --> $DIR/case_misplaced_clauses.html:1:53
+  |
+1 | {% case size %}{% when "s" %}Small{% else %}Other{% else %}Again{% endcase %}
+  |                                                     ----
+error: expected a tag, however received the keyword `end_case`
+ --> $DIR/case_misplaced_clauses.html:1:68
+  |
+1 | {% case size %}{% when "s" %}Small{% else %}Other{% else %}Again{% endcase %}
+  |                                                                    -------
+  |
+  = info: expected a `identifier`
+error: unexpectedly encountered the keyword `when`
+ --> $DIR/case_misplaced_clauses.html:2:53
+  |
+2 | {% case size %}{% when "s" %}Small{% else %}Other{% when "m" %}Medium{% endcase %}
+  |                                                     ----
+error: expected a tag, however received the keyword `end_case`
+ --> $DIR/case_misplaced_clauses.html:2:73
+  |
+2 | {% case size %}{% when "s" %}Small{% else %}Other{% when "m" %}Medium{% endcase %}
+  |                                                                         -------
+  |
+  = info: expected a `identifier`

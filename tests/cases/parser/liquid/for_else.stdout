@@ -1,0 +1,27 @@
+info: parsed module '$DIR/for_else.html' as liquid:
+body
+└─for
+  ├─target
+  │ └─name "product"
+  ├─iterator
+  │ └─access_expr
+  │   ├─subject
+  │   │ └─var_expr
+  │   │   └─name "collection"
+  │   └─field
+  │     └─name "products"
+  ├─loop_body
+  │ └─body
+  │   ├─text
+  │   ├─inline
+  │   │ └─access_expr
+  │   │   ├─subject
+  │   │   │ └─var_expr
+  │   │   │   └─name "product"
+  │   │   └─field
+  │   │     └─name "title"
+  │   └─text
+  └─loop_empty
+    └─body
+      └─text
+

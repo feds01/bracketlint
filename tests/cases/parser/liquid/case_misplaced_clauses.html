@@ -1,0 +1,4 @@
+// run=fail, stage=check, dialect=liquid
+
+{% case size %}{% when "s" %}Small{% else %}Other{% else %}Again{% endcase %}
+{% case size %}{% when "s" %}Small{% else %}Other{% when "m" %}Medium{% endcase %}

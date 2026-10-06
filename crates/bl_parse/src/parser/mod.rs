@@ -51,6 +51,9 @@ pub(crate) enum TagContext {
 
     /// When the parser has encountered a `for` loop.
     For,
+
+    /// When the parser has encountered a Liquid `case` block.
+    Case,
 }
 impl TagContext {
     fn applies_to(&self, kwd: token::Keyword) -> bool {
@@ -60,7 +63,10 @@ impl TagContext {
             TagContext::With => matches!(kwd, token::Keyword::EndWith),
             TagContext::Comment => matches!(kwd, token::Keyword::EndComment),
             TagContext::Raw => matches!(kwd, token::Keyword::EndRaw),
-            TagContext::For => matches!(kwd, token::Keyword::EndFor | token::Keyword::Empty),
+            TagContext::For => {
+                matches!(kwd, token::Keyword::EndFor | token::Keyword::EndTableRow)
+            }
+            TagContext::Case => matches!(kwd, token::Keyword::When | token::Keyword::Else),
         }
     }
 }
@@ -593,10 +599,18 @@ impl<'s> Parser<'s> {
                 // Key control flow components, once that imply a more complex structure
                 // of subsequent tags.
                 token::Keyword::For => {
-                    self.with_tag_context(TagContext::For, |g| g.parse_for_loop())
+                    self.with_tag_context(TagContext::For, |g| g.parse_for_loop(ast::LoopKind::For))
                 }
+                token::Keyword::TableRow => self.with_tag_context(TagContext::For, |g| {
+                    g.parse_for_loop(ast::LoopKind::TableRow)
+                }),
 
-                token::Keyword::If => self.with_tag_context(TagContext::If, |g| g.parse_if_block()),
+                token::Keyword::If | token::Keyword::Unless => {
+                    self.with_tag_context(TagContext::If, |g| g.parse_if_block())
+                }
+                token::Keyword::Case => {
+                    self.with_tag_context(TagContext::Case, |g| g.parse_case_block())
+                }
 
                 // Control flow tags, that are effectively standalone.
                 token::Keyword::Break => self.parse_break_statement(),
@@ -1036,80 +1050,144 @@ impl<'s> Parser<'s> {
         }
     }
 
-    fn parse_for_loop(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+    /// Parse a `for` loop, or a Liquid `tablerow` loop, which is written the
+    /// same way apart from its tags, and has no body for an empty loop.
+    fn parse_for_loop(&mut self, kind: ast::LoopKind) -> ParseResult<AstNode<ast::Statement>> {
         let start = self.current_pos();
+        let (opening, end) = match kind {
+            ast::LoopKind::For => (Keyword::For, Keyword::EndFor),
+            ast::LoopKind::TableRow => (Keyword::TableRow, Keyword::EndTableRow),
+        };
+
+        // The body for an empty loop comes after `{% empty %}` in Django, and
+        // after `{% else %}` in the other dialects.
+        let dialect = self.options.dialect;
+        let empty = match kind {
+            ast::LoopKind::For => Keyword::lookup(dialect.empty_loop_tag(), dialect),
+            ast::LoopKind::TableRow => None,
+        };
 
         // Parse the header first, which is within the current token.
-        let ((target, iterator, reverse_modifier, guard), trim) =
+        let ((target, iterator, reverse_modifier, params, guard), trim) =
             self.in_tag(Delimiter::Percent, |g| {
-                g.parse_token(TokenKind::Keyword(token::Keyword::For))?;
+                g.parse_token(TokenKind::Keyword(opening))?;
                 let target = g.parse_for_target()?;
 
                 g.parse_token(TokenKind::Keyword(token::Keyword::In))?;
                 let iterator = g.parse_expr()?;
+                let (reverse_modifier, params) = g.parse_loop_modifiers()?;
 
-                let reverse_modifier =
-                    if g.parse_token_fast(TokenKind::Keyword(token::Keyword::Reversed)).is_some() {
-                        Some(g.node_with_span(
-                            ast::Name::new(ast::Identifier::from(0u32)),
-                            g.previous_pos(),
-                        ))
-                    } else {
-                        None
-                    };
-
-                if g.parse_token_fast(TokenKind::Keyword(token::Keyword::If)).is_some() {
-                    let guard = g.parse_expr()?;
-                    Ok((target, iterator, reverse_modifier, Some(guard)))
+                let guard = if g.parse_token_fast(TokenKind::Keyword(token::Keyword::If)).is_some()
+                {
+                    Some(g.parse_expr()?)
                 } else {
-                    Ok((target, iterator, reverse_modifier, None))
-                }
+                    None
+                };
+
+                Ok((target, iterator, reverse_modifier, params, guard))
             })?;
 
-        // Next, parse either until we reach an `endfor` or `empty` token.
-        //
-        // If it's an empty token, then we reach the end of the loop.
+        // Next, parse until we reach the end of the loop, or the body for an
+        // empty loop.
         let (loop_body, ending_token, ending_trim) = self.parse_body_until_block_footer(
             ExpectedItem::empty(),
-            |kind| {
-                matches!(kind, TokenKind::Keyword(token::Keyword::EndFor | token::Keyword::Empty))
-            },
+            |kind| matches!(kind, TokenKind::Keyword(kwd) if kwd == end || Some(kwd) == empty),
             |g| {
-                g.skip_token(); // `<empty>` | `<end_for>` Skip the empty token.
+                g.skip_token(); // `<empty>` | `<end>` Skip the empty or end token.
                 Ok(g.trim())
             },
         )?;
 
-        // If we ended with an `{% empty %}` token, then we parse the empty block.
-        let (loop_empty, empty_trim, end_trim) =
-            if ending_token == TokenKind::Keyword(token::Keyword::Empty) {
-                let (body, _, end_trim) = self.parse_body_until_block_footer(
-                    ExpectedItem::empty(),
-                    |kind| matches!(kind, TokenKind::Keyword(token::Keyword::EndFor)),
-                    |g| {
-                        g.skip_token(); // `<end_for>` Skip the empty token.
-                        Ok(g.trim())
-                    },
-                )?;
+        let (loop_empty, empty_trim, end_trim) = if ending_token != TokenKind::Keyword(end) {
+            let (body, _, end_trim) = self.parse_body_until_block_footer(
+                ExpectedItem::empty(),
+                |kind| kind == TokenKind::Keyword(end),
+                |g| {
+                    g.skip_token(); // `<end>` Skip the end token.
+                    Ok(g.trim())
+                },
+            )?;
 
-                (Some(body), ending_trim, end_trim)
-            } else {
-                (None, ast::TrimMarker::default(), ending_trim)
-            };
+            (Some(body), ending_trim, end_trim)
+        } else {
+            (None, ast::TrimMarker::default(), ending_trim)
+        };
 
         Ok(self.node_with_joined_span(
             ast::Statement::Tag(ast::Tag::For(ast::For {
+                kind,
                 target,
                 iterator,
                 guard,
                 loop_body,
                 loop_empty,
                 reverse_modifier,
+                params,
                 trim: ast::TrimTag { start: trim, end: end_trim },
                 empty_trim,
             })),
             start,
         ))
+    }
+
+    /// Parse the modifiers after the iterator of a loop, in any order: the
+    /// `reversed` modifier, and in Liquid, parameters such as `limit: 2`.
+    fn parse_loop_modifiers(
+        &mut self,
+    ) -> ParseResult<(Option<AstNode<ast::Name>>, AstNodes<ast::Arg>)> {
+        let mut reverse_modifier = None;
+        let mut params = thin_vec![];
+        let start = self.current_pos();
+
+        loop {
+            // Liquid can also separate the parameters with commas.
+            if self.options.dialect.is_liquid() && !params.is_empty() {
+                self.parse_token_fast(TokenKind::Comma);
+            }
+
+            match (self.peek().copied(), self.peek_second().copied()) {
+                (Some(Token { kind: TokenKind::Keyword(Keyword::Reversed), span }), _)
+                    if reverse_modifier.is_none() =>
+                {
+                    self.skip_fast(TokenKind::Keyword(Keyword::Reversed)); // `reversed` Skip the modifier.
+                    reverse_modifier = Some(
+                        self.node_with_span(ast::Name::new(ast::Identifier::from(0u32)), span),
+                    );
+                }
+                (Some(Token { kind, span }), Some(Token { kind: TokenKind::Colon, .. }))
+                    if self.options.dialect.is_liquid() && kind.is_ident_like() =>
+                {
+                    let name = self.parse_name()?;
+                    self.skip_fast(TokenKind::Colon); // `:` Skip the colon token.
+                    let value = self.parse_loop_param_value()?;
+
+                    params.push(self.node_with_joined_span(
+                        ast::Arg { name: Some(name), value: Some(value) },
+                        span,
+                    ));
+                }
+                _ => break,
+            }
+        }
+
+        Ok((reverse_modifier, self.nodes_with_joined_span(params, start)))
+    }
+
+    /// Parse the value of a Liquid loop parameter, e.g. `2` in `limit: 2`.
+    fn parse_loop_param_value(&mut self) -> ParseResult<AstNode<ast::Expr>> {
+        let token = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
+
+        // `offset: continue` starts where the last loop over the same items
+        // stopped.
+        if token.kind == TokenKind::Keyword(Keyword::Continue) {
+            self.skip_fast(token.kind); // `continue` Skip the keyword.
+            return Ok(self.node_with_span(
+                ast::Expr::Var(ast::VarExpr { name: ast::Name::new(ast::Identifier::from(0u32)) }),
+                token.span,
+            ));
+        }
+
+        self.parse_value()
     }
 
     /// Parse the destructuring target of a for loop, i.e. the assigned variable
@@ -1141,6 +1219,35 @@ impl<'s> Parser<'s> {
         Ok(self.node_with_joined_span(ast::ForTarget { items }, start))
     }
 
+    /// Parse statements up to a `{% %}` tag whose keyword `stop` accepts, or
+    /// the end of the input, without parsing that tag.
+    fn parse_body_until(
+        &mut self,
+        stop: impl Fn(Keyword) -> bool,
+    ) -> ParseResult<AstNode<ast::Body>> {
+        let start = self.current_pos();
+        let mut contents = thin_vec![];
+
+        while let Some(token) = self.peek() {
+            if token.kind.is_percent_tree()
+                && let Some(TokenKind::Keyword(kwd)) = self.peek_raw(1).map(|t| t.kind)
+                && stop(kwd)
+            {
+                break;
+            }
+
+            match self.parse_statement()? {
+                Some(statement) => contents.push(statement),
+                None => break,
+            }
+        }
+
+        let contents = self.nodes_with_joined_span(contents, start);
+        Ok(self.node_with_joined_span(ast::Body { contents }, start))
+    }
+
+    /// Parse an `if` block, or a Liquid `unless` block, which is written the
+    /// same way apart from its opening and closing tags.
     fn parse_if_block(&mut self) -> ParseResult<AstNode<ast::Statement>> {
         let mut clauses = thin_vec![];
         let mut otherwise = None;
@@ -1148,78 +1255,62 @@ impl<'s> Parser<'s> {
         let mut end_trim = None;
         let start = self.current_pos();
 
-        let parse_body = |this: &mut Self, preceding_token: TokenKind| {
-            let start = this.current_pos();
-            let mut contents = thin_vec![];
-
-            while let Some(token) = this.peek() {
-                if token.kind.is_percent_tree() {
-                    let maybe_token = this.peek_raw(1).map(|t| t.kind);
-                    if let Some(kind) = maybe_token
-                        && kind.is_control_flow_for(preceding_token)
-                    {
-                        break;
-                    }
-                }
-
-                if let (Some(statement), _) = this.track_span(|g| g.parse_statement())? {
-                    contents.push(statement);
-                } else {
-                    break;
-                }
-            }
-
-            let contents = this.nodes_with_joined_span(contents, start);
-            Ok(this.node_with_joined_span(ast::Body { contents }, start))
+        let end = match self.peek_raw(1).map(|token| token.kind) {
+            Some(TokenKind::Keyword(Keyword::Unless)) => Keyword::EndUnless,
+            _ => Keyword::EndIf,
         };
 
         while let Some(token) = self.peek() {
-            // If it's a percent tree (and of length 1), then we can check if it's the end
-            // of the block.
-            if let TokenKind::Tree(Delimiter::Percent, len) = token.kind
-                && len > 0
-            {
-                let token = self.peek_raw(1).copied().unwrap();
+            // Every clause body ends at the next `{% %}` tag of this block.
+            if !matches!(token.kind, TokenKind::Tree(Delimiter::Percent, len) if len > 0) {
+                break;
+            }
 
-                match token {
-                    Token { kind: TokenKind::Keyword(Keyword::If | Keyword::Elif), .. } => {
-                        let (condition, trim) = self.in_tag(Delimiter::Percent, |g| {
-                            g.skip_token();
-                            g.parse_compound_expr(0)
-                        })?;
+            let token = self.peek_raw(1).copied().unwrap();
 
-                        let clause_kind = match token.kind {
-                            TokenKind::Keyword(Keyword::If) => bl_ast::ClauseKind::If,
-                            TokenKind::Keyword(Keyword::Elif) => bl_ast::ClauseKind::Elif,
-                            _ => unreachable!(),
-                        };
-                        let clause_body = parse_body(self, token.kind)?;
-                        clauses.push(self.node_with_joined_span(
-                            ast::IfClause { kind: clause_kind, condition, clause_body, trim },
-                            start,
-                        ));
-                    }
-                    Token { kind: TokenKind::Keyword(Keyword::Else), .. } => {
-                        ((), else_trim) = self.in_tag(Delimiter::Percent, |g| {
-                            g.parse_token(TokenKind::Keyword(Keyword::Else))
-                        })?;
+            // A clause can't come after `{% else %}`, and neither can a second
+            // `{% else %}`, since the formatter would move or drop them.
+            match token.kind {
+                TokenKind::Keyword(kwd @ (Keyword::If | Keyword::Unless | Keyword::Elif))
+                    if otherwise.is_none() =>
+                {
+                    let (condition, trim) = self.in_tag(Delimiter::Percent, |g| {
+                        g.skip_token();
+                        g.parse_compound_expr(0)
+                    })?;
 
-                        otherwise = Some(parse_body(self, token.kind)?);
-                    }
-                    Token { kind: TokenKind::Keyword(Keyword::EndIf), .. } => {
-                        let ((), trim) = self.in_tag(Delimiter::Percent, |g| {
-                            g.parse_token(TokenKind::Keyword(Keyword::EndIf))
-                        })?;
-                        end_trim = Some(trim);
-                        break;
-                    }
-                    _ => self.err_with_location(
-                        ParseErrorKind::UnExpected,
-                        ExpectedItem::empty(),
-                        Some(token.kind),
-                        token.span,
-                    )?,
+                    let clause_kind = match kwd {
+                        Keyword::If => bl_ast::ClauseKind::If,
+                        Keyword::Unless => bl_ast::ClauseKind::Unless,
+                        _ => bl_ast::ClauseKind::Elif,
+                    };
+                    let clause_body = self.parse_body_until(|kwd| {
+                        kwd == end || matches!(kwd, Keyword::Elif | Keyword::Else)
+                    })?;
+                    clauses.push(self.node_with_joined_span(
+                        ast::IfClause { kind: clause_kind, condition, clause_body, trim },
+                        start,
+                    ));
                 }
+                TokenKind::Keyword(Keyword::Else) if otherwise.is_none() => {
+                    ((), else_trim) = self.in_tag(Delimiter::Percent, |g| {
+                        g.parse_token(TokenKind::Keyword(Keyword::Else))
+                    })?;
+
+                    otherwise = Some(self.parse_body_until(|kwd| kwd == end)?);
+                }
+                TokenKind::Keyword(kwd) if kwd == end => {
+                    let ((), trim) = self
+                        .in_tag(Delimiter::Percent, |g| g.parse_token(TokenKind::Keyword(end)))?;
+                    end_trim = Some(trim);
+                    break;
+                }
+                _ => self.err_with_location(
+                    ParseErrorKind::UnExpected,
+                    ExpectedItem::empty(),
+                    Some(token.kind),
+                    token.span,
+                )?,
             }
         }
 
@@ -1237,6 +1328,118 @@ impl<'s> Parser<'s> {
             ast::Statement::Tag(ast::Tag::If(ast::If { clauses, otherwise, else_trim, end_trim })),
             start,
         ))
+    }
+
+    /// Parse a Liquid `case` block, i.e.
+    ///
+    /// ```liquid
+    /// {% case product.type %}
+    ///     {% when "shirt", "hat" %} Apparel
+    ///     {% else %} Other
+    /// {% endcase %}
+    /// ```
+    fn parse_case_block(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+        let start = self.current_pos();
+        let is_clause = |kwd| matches!(kwd, Keyword::When | Keyword::Else | Keyword::EndCase);
+
+        let (subject, trim) = self.in_tag(Delimiter::Percent, |g| {
+            g.parse_token(TokenKind::Keyword(Keyword::Case))?;
+            g.parse_expr()
+        })?;
+
+        let leading = self.parse_body_until(is_clause)?;
+
+        let mut branches = thin_vec![];
+        let mut otherwise = None;
+        let mut else_trim = ast::TrimMarker::default();
+        let mut end_trim = None;
+        let branches_start = self.current_pos();
+
+        while let Some(token) = self.peek() {
+            // Every clause body ends at the next `{% %}` tag of this block.
+            if !matches!(token.kind, TokenKind::Tree(Delimiter::Percent, len) if len > 0) {
+                break;
+            }
+
+            let token = self.peek_raw(1).copied().unwrap();
+
+            // A clause can't come after `{% else %}`, and neither can a second
+            // `{% else %}`, since the formatter would move or drop them.
+            match token.kind {
+                TokenKind::Keyword(Keyword::When) if otherwise.is_none() => {
+                    let clause_start = self.current_pos();
+                    let (values, trim) = self.in_tag(Delimiter::Percent, |g| {
+                        g.skip_token(); // `when` Skip the keyword.
+                        g.parse_when_values()
+                    })?;
+
+                    let clause_body = self.parse_body_until(is_clause)?;
+                    branches.push(self.node_with_joined_span(
+                        ast::When { values, clause_body, trim },
+                        clause_start,
+                    ));
+                }
+                TokenKind::Keyword(Keyword::Else) if otherwise.is_none() => {
+                    ((), else_trim) = self.in_tag(Delimiter::Percent, |g| {
+                        g.parse_token(TokenKind::Keyword(Keyword::Else))
+                    })?;
+
+                    otherwise = Some(self.parse_body_until(|kwd| kwd == Keyword::EndCase)?);
+                }
+                TokenKind::Keyword(Keyword::EndCase) => {
+                    let ((), trim) = self.in_tag(Delimiter::Percent, |g| {
+                        g.parse_token(TokenKind::Keyword(Keyword::EndCase))
+                    })?;
+                    end_trim = Some(trim);
+                    break;
+                }
+                _ => self.err_with_location(
+                    ParseErrorKind::UnExpected,
+                    ExpectedItem::empty(),
+                    Some(token.kind),
+                    token.span,
+                )?,
+            }
+        }
+
+        let Some(end_trim) = end_trim else {
+            return self.err_with_location(
+                ParseErrorKind::UnclosedTag,
+                ExpectedItem::empty(),
+                None,
+                self.eof_pos(),
+            );
+        };
+
+        let branches = self.nodes_with_joined_span(branches, branches_start);
+        Ok(self.node_with_joined_span(
+            ast::Statement::Tag(ast::Tag::Case(ast::Case {
+                subject,
+                leading,
+                branches,
+                otherwise,
+                trim: ast::TrimTag { start: trim, end: end_trim },
+                else_trim,
+            })),
+            start,
+        ))
+    }
+
+    /// Parse the values of a `{% when %}` clause, which are separated by `,`
+    /// or `or`.
+    fn parse_when_values(&mut self) -> ParseResult<AstNodes<ast::Expr>> {
+        let start = self.current_pos();
+        let mut values = thin_vec![self.parse_expr()?];
+
+        while self
+            .parse_token_fast(TokenKind::Comma)
+            .or_else(|| self.parse_token_fast(TokenKind::Keyword(Keyword::Or)))
+            .is_some()
+        {
+            values.push(self.parse_expr()?);
+        }
+
+        Ok(self.nodes_with_joined_span(values, start))
     }
 
     fn parse_break_statement(&mut self) -> ParseResult<AstNode<ast::Statement>> {

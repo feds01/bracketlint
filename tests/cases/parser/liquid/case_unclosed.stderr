@@ -1,0 +1,5 @@
+error: expected a closing tag
+ --> $DIR/case_unclosed.html:1:36
+  |
+1 | {% case size %}{% when "s" %}Small
+  |                                   -

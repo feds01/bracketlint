@@ -79,6 +79,17 @@ impl Dialect {
         matches!(self, Dialect::Liquid)
     }
 
+    /// How the dialect spells `elif`, which is `elsif` in Liquid.
+    pub fn elif_tag(self) -> &'static str {
+        if self.is_liquid() { "elsif" } else { "elif" }
+    }
+
+    /// The tag that starts the body of a loop for when there is nothing to
+    /// loop over, which is `empty` in Django and `else` in the other dialects.
+    pub fn empty_loop_tag(self) -> &'static str {
+        if self.is_django() { "empty" } else { "else" }
+    }
+
     /// Check if its currently Django dialect.
     #[inline]
     pub fn is_django(self) -> bool {

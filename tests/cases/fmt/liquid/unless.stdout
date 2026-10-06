@@ -1,0 +1,6 @@
+<div>
+    {% unless customer %}
+        <a href="/account/login">Log in</a>
+{% endunless %}
+</div>
+

@@ -1,5 +1,0 @@
-error: unexpectedly encountered an identifier
- --> $DIR/for_params.html:1:39
-  |
-1 | {% for product in collection.products limit:4 offset:2 %}
-  |                                       -----

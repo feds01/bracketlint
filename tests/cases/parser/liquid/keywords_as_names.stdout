@@ -1,0 +1,29 @@
+info: parsed module '$DIR/keywords_as_names.html' as liquid:
+body
+├─text
+├─inline
+│ └─var_expr
+│   └─name "case"
+├─inline
+│ └─access_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "product"
+│   └─field
+│     └─name "when"
+├─inline
+│ └─var_expr
+│   └─name "unless"
+├─text
+└─for
+  ├─target
+  │ └─name "when"
+  ├─iterator
+  │ └─var_expr
+  │   └─name "case"
+  └─loop_body
+    └─body
+      └─inline
+        └─var_expr
+          └─name "when"
+

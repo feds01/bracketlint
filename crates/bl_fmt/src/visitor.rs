@@ -1,7 +1,9 @@
 use bl_ast::{
-    AstVisitorMutSelf, SourceId, SpannedSource, ast_visitor_mut_self_default_impl, walk_mut_self,
+    AstVisitorMutSelf, ByteRange, SourceId, Span, SpannedSource, ast_visitor_mut_self_default_impl,
+    walk_mut_self,
 };
 use bl_reporting::inline::{InlineSnippet, note_on_span};
+use bl_workspace::Dialect;
 
 use crate::{
     adapters::{
@@ -67,6 +69,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         options: FormatterOptions,
         id: SourceId,
         source: SpannedSource<'fmt>,
+        dialect: Dialect,
         buffer: String,
     ) -> Self {
         Self {
@@ -76,6 +79,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
                 id,
                 source,
                 options,
+                dialect,
                 state: TerminalState { language: LanguageType::Html, indent: 0 },
             },
         }
@@ -218,7 +222,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
                 if let bl_ast::Tag::Generic(generic) = tag {
                     let name = self.ctx.source.hunk(generic.name.ast_ref().span().range);
 
-                    if bl_lexer::token::Keyword::try_from(name).is_ok() {
+                    if bl_lexer::token::Keyword::lookup(name, self.ctx.dialect).is_some() {
                         self.end_line();
                     }
                 }
@@ -260,7 +264,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
     type Error = FmtError;
 
     ast_visitor_mut_self_default_impl!(
-        hiding: Text, Tag, For, If, IfClause, Comment, Inline, Body, Name, Expr, Block, With, Extends
+        hiding: Text, Tag, For, If, IfClause, Case, When, Comment, Inline, Body, Name, Expr, Block, With, Extends
     );
 
     type TagRet = ();
@@ -277,6 +281,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             bl_ast::Tag::Extends(extends) => self.visit_extends(node.with_body(extends)),
             bl_ast::Tag::If(if_block) => self.visit_if(node.with_body(if_block)),
             bl_ast::Tag::For(for_loop) => self.visit_for(node.with_body(for_loop)),
+            bl_ast::Tag::Case(case) => self.visit_case(node.with_body(case)),
             bl_ast::Tag::Generic(_)
             | bl_ast::Tag::Unprocessable(_)
             | bl_ast::Tag::Assignment(_)
@@ -358,28 +363,46 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         node: bl_ast::AstNodeRef<bl_ast::For>,
     ) -> Result<Self::ForRet, Self::Error> {
         let bl_ast::For {
+            kind,
             target,
             iterator,
             guard,
             reverse_modifier,
+            params,
             loop_body,
             loop_empty,
             trim,
             empty_trim,
         } = node.body();
 
+        let (opening, end) = match kind {
+            bl_ast::LoopKind::For => ("for", "endfor"),
+            bl_ast::LoopKind::TableRow => ("tablerow", "endtablerow"),
+        };
+
         // @@ Proof of concept: for now, we will just push a for loop into the buffer.
         self.within_tag(TagKind::Block, trim.start, |this| {
-            this.push_hunk("for ");
+            this.push_hunk(opening);
+            this.push_hunk(" ");
             this.push_source(target.ast_ref().span());
             this.push_hunk(" in ");
             this.visit_expr(iterator.ast_ref())?;
 
-            // Check if there's a reverse modifier on the loop, which comes
-            // before the guard.
-            if let Some(reverse_modifier) = reverse_modifier {
+            // Keep the modifiers in the order they are written, e.g. `reversed`
+            // and `limit: 2` in Liquid, which come before the guard.
+            let modifiers = reverse_modifier
+                .iter()
+                .map(|name| name.ast_ref().span())
+                .chain((!params.is_empty()).then(|| params.span()))
+                .reduce(|span, other| {
+                    let start = span.range.start().min(other.range.start());
+                    let end = span.range.end().max(other.range.end());
+                    Span::new(ByteRange::new(start, end), span.id)
+                });
+
+            if let Some(modifiers) = modifiers {
                 this.push_hunk(" ");
-                this.visit_name(reverse_modifier.ast_ref())?;
+                this.push_source(modifiers);
             }
 
             // Check if we have an if guard on the loop itself.
@@ -395,14 +418,14 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         // Now visit the loop body.
         self.with_block(|formatter| formatter.visit_body(loop_body.ast_ref()))?;
 
-        // Check if we have an empty loop body.
+        // Check if we have an empty loop body, which comes after `{% empty %}`
+        // in Django and `{% else %}` in the other dialects.
         if let Some(loop_empty) = loop_empty {
-            self.push_tag_line("empty", *empty_trim)?;
+            self.push_tag_line(self.ctx.dialect.empty_loop_tag(), *empty_trim)?;
             self.with_block(|formatter| formatter.visit_body(loop_empty.ast_ref()))?;
         }
 
-        self.push_tag_line("endfor", trim.end)?;
-        Ok(())
+        self.push_tag_line(end, trim.end)
     }
 
     type IfRet = ();
@@ -423,9 +446,12 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             self.with_block(|formatter| formatter.visit_body(otherwise.ast_ref()))?;
         }
 
-        self.push_tag_line("endif", *end_trim)?;
-
-        Ok(())
+        // A Liquid `unless` block ends with `{% endunless %}`.
+        let end = match clauses.first().map(|clause| clause.body.kind) {
+            Some(bl_ast::ClauseKind::Unless) => "endunless",
+            _ => "endif",
+        };
+        self.push_tag_line(end, *end_trim)
     }
 
     type IfClauseRet = ();
@@ -440,7 +466,11 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         self.within_tag(TagKind::Block, *trim, |this| {
             match kind {
                 bl_ast::ClauseKind::If => this.push_hunk("if "),
-                bl_ast::ClauseKind::Elif => this.push_hunk("elif "),
+                bl_ast::ClauseKind::Elif => {
+                    this.push_hunk(this.ctx.dialect.elif_tag());
+                    this.push_hunk(" ");
+                }
+                bl_ast::ClauseKind::Unless => this.push_hunk("unless "),
             }
             this.visit_expr(condition.ast_ref())
         })?;
@@ -450,6 +480,58 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         self.with_block(|formatter| formatter.visit_body(clause_body.ast_ref()))?;
 
         Ok(())
+    }
+
+    type CaseRet = ();
+
+    fn visit_case(
+        &mut self,
+        node: bl_ast::AstNodeRef<bl_ast::Case>,
+    ) -> Result<Self::CaseRet, Self::Error> {
+        let bl_ast::Case { subject, leading, branches, otherwise, trim, else_trim } = node.body();
+
+        self.add_indent();
+        self.within_tag(TagKind::Block, trim.start, |this| {
+            this.push_hunk("case ");
+            this.visit_expr(subject.ast_ref())
+        })?;
+        self.end_line();
+
+        // Liquid doesn't render what comes before the first `{% when %}`, but
+        // it is kept all the same.
+        self.with_block(|formatter| formatter.visit_body(leading.ast_ref()))?;
+
+        for branch in branches.iter() {
+            self.visit_when(branch.ast_ref())?;
+        }
+
+        if let Some(otherwise) = otherwise {
+            self.push_tag_line("else", *else_trim)?;
+            self.with_block(|formatter| formatter.visit_body(otherwise.ast_ref()))?;
+        }
+
+        self.push_tag_line("endcase", trim.end)
+    }
+
+    type WhenRet = ();
+
+    fn visit_when(
+        &mut self,
+        node: bl_ast::AstNodeRef<bl_ast::When>,
+    ) -> Result<Self::WhenRet, Self::Error> {
+        let bl_ast::When { values, clause_body, trim } = node.body();
+
+        // The values are separated by either `,` or `or`, so keep them as they
+        // are written.
+        self.add_indent();
+        self.within_tag(TagKind::Block, *trim, |this| {
+            this.push_hunk("when ");
+            this.push_source(values.span());
+            Ok(())
+        })?;
+        self.end_line();
+
+        self.with_block(|formatter| formatter.visit_body(clause_body.ast_ref()))
     }
 
     type BodyRet = ();

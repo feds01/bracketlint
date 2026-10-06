@@ -6,8 +6,8 @@ use num_derive::FromPrimitive;
 use phf::phf_map;
 use strum_macros::AsRefStr;
 
-/// Django template language keywords.
-/// Each variant represents a keyword that can appear in a Django template.
+/// Template language keywords. Most of them are shared by every dialect, and
+/// [Keyword::lookup] finds the ones that a dialect has.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, AsRefStr, FromPrimitive)]
 #[strum(serialize_all = "snake_case")]
 pub enum Keyword {
@@ -198,6 +198,40 @@ pub enum Keyword {
     /// {% if product.title contains "Pack" %}
     /// ```
     Contains,
+    /// `unless` - Begins a Liquid block that renders when its condition is
+    /// false, and can have `elsif` and `else` clauses like an `if` block
+    /// ```liquid
+    /// {% unless user %}
+    ///     Guest
+    /// {% endunless %}
+    /// ```
+    Unless,
+    /// `endunless` - Ends an `unless` block
+    EndUnless,
+    /// `case` - Begins a Liquid block that renders the `when` clause that
+    /// matches its subject
+    /// ```liquid
+    /// {% case product.type %}
+    ///     {% when "shirt", "hat" %} Apparel
+    ///     {% else %} Other
+    /// {% endcase %}
+    /// ```
+    Case,
+    /// `when` - A clause of a `case` block
+    When,
+    /// `endcase` - Ends a `case` block
+    EndCase,
+    /// `tablerow` - Begins a Liquid loop that renders a table row per item
+    /// ```liquid
+    /// {% tablerow product in products cols: 2 %}
+    ///     {{ product.title }}
+    /// {% endtablerow %}
+    /// ```
+    #[strum(serialize = "tablerow")]
+    TableRow,
+    /// `endtablerow` - Ends a `tablerow` loop
+    #[strum(serialize = "endtablerow")]
+    EndTableRow,
 }
 impl Keyword {
     pub fn identifier_like(&self) -> bool {
@@ -209,13 +243,22 @@ impl Keyword {
                 | Keyword::Import
                 | Keyword::Comment
                 | Keyword::Contains
+                | Keyword::Unless
+                | Keyword::Case
+                | Keyword::When
+                | Keyword::TableRow
         )
     }
 
     /// The keyword that `name` is in `dialect`, if any. Liquid has keywords of
-    /// its own.
+    /// its own, and spells `elif` as `elsif`.
     pub fn lookup(name: &str, dialect: Dialect) -> Option<Keyword> {
+        if name == dialect.elif_tag() {
+            return Some(Keyword::Elif);
+        }
+
         match dialect {
+            Dialect::Liquid if name == "elif" => None,
             Dialect::Liquid => LIQUID_KEYWORDS.get(name).or_else(|| KEYWORDS.get(name)).copied(),
             _ => KEYWORDS.get(name).copied(),
         }
@@ -281,6 +324,13 @@ static KEYWORDS: phf::Map<&'static str, Keyword> = phf_map! {
 /// The keywords that only Liquid has.
 static LIQUID_KEYWORDS: phf::Map<&'static str, Keyword> = phf_map! {
     "contains" => Keyword::Contains,
+    "unless" => Keyword::Unless,
+    "endunless" => Keyword::EndUnless,
+    "case" => Keyword::Case,
+    "when" => Keyword::When,
+    "endcase" => Keyword::EndCase,
+    "tablerow" => Keyword::TableRow,
+    "endtablerow" => Keyword::EndTableRow,
 };
 
 impl TryFrom<&str> for Keyword {
