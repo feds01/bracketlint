@@ -1,0 +1,4 @@
+// run=pass, stage=check, dialect=liquid
+
+{% assign pages = (1..collection.pages) %}
+<p>{{ (1..3) | join: ", " }}</p>

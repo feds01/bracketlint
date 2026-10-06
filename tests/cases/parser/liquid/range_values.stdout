@@ -1,0 +1,37 @@
+info: parsed module '$DIR/range_values.html' as liquid:
+body
+├─generic_tag
+│ ├─name "assign"
+│ └─args
+│   └─arg
+│     ├─name "pages"
+│     └─range_expr
+│       ├─start
+│       │ └─lit_expr
+│       │   └─int_lit 1
+│       └─end
+│         └─access_expr
+│           ├─subject
+│           │ └─var_expr
+│           │   └─name "collection"
+│           └─field
+│             └─name "pages"
+├─text
+├─inline
+│ └─filtered_expr
+│   ├─subject
+│   │ └─range_expr
+│   │   ├─start
+│   │   │ └─lit_expr
+│   │   │   └─int_lit 1
+│   │   └─end
+│   │     └─lit_expr
+│   │       └─int_lit 3
+│   └─filter
+│     ├─name "join"
+│     └─args
+│       └─arg
+│         └─lit_expr
+│           └─str_lit ", "
+└─text
+

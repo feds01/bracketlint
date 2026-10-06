@@ -462,7 +462,9 @@ define_tree! {
         /// `is`
         Is,
         /// `is not`
-        IsNot
+        IsNot,
+        /// `contains`, in Liquid
+        Contains,
     }
 
     impl BinOp {
@@ -473,7 +475,7 @@ define_tree! {
                 BinOp::And => (4, 5),
                 BinOp::In | BinOp::NotIn => (6, 7),
                 BinOp::Eq | BinOp::NotEq | BinOp::Is | BinOp::IsNot => (6, 5),
-                BinOp::Gt | BinOp::GtEq | BinOp::Lt | BinOp::LtEq => (7, 8),
+                BinOp::Gt | BinOp::GtEq | BinOp::Lt | BinOp::LtEq | BinOp::Contains => (7, 8),
             }
         }
     }
@@ -493,6 +495,7 @@ define_tree! {
                 BinOp::In => write!(f, "in"),
                 BinOp::Is => write!(f, "is"),
                 BinOp::IsNot => write!(f, "is not"),
+                BinOp::Contains => write!(f, "contains"),
             }
         }
     }
@@ -539,6 +542,25 @@ define_tree! {
     pub struct StrLit {
     }
 
+    /// Liquid's `nil`, which can also be written `null`.
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct NilLit {
+    }
+
+    /// Liquid's `empty`, which an empty string, array or hash is equal to.
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct EmptyLit {
+    }
+
+    /// Liquid's `blank`, which `empty` values and strings of only whitespace
+    /// are equal to.
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct BlankLit {
+    }
+
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub enum Lit {
@@ -546,6 +568,9 @@ define_tree! {
         Float(FloatLit),
         Int(IntLit),
         Str(StrLit),
+        Nil(NilLit),
+        Empty(EmptyLit),
+        Blank(BlankLit),
     }
 
     #[derive(Clone, Debug, PartialEq)]
@@ -660,10 +685,19 @@ define_tree! {
         pub index: Child!(Expr),
     }
 
+    /// A range of integers, i.e. `(1..n)` in Liquid.
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct RangeExpr {
+        pub start: Child!(Expr),
+        pub end: Child!(Expr),
+    }
+
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub enum Expr {
         Unary(UnaryExpr),
+        Range(RangeExpr),
         Lit(LitExpr),
         Array(ArrayExpr),
         Bin(BinExpr),

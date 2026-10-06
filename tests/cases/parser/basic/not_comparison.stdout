@@ -1,0 +1,34 @@
+info: parsed module '$DIR/not_comparison.html' as django:
+body
+└─if
+  └─clauses
+    └─if_clause
+      ├─condition
+      │ └─bin_expr
+      │   ├─lhs
+      │   │ └─unary_expr
+      │   │   ├─unary operator `not`
+      │   │   └─bin_expr
+      │   │     ├─lhs
+      │   │     │ └─access_expr
+      │   │     │   ├─subject
+      │   │     │   │ └─var_expr
+      │   │     │   │   └─name "user"
+      │   │     │   └─field
+      │   │     │     └─name "age"
+      │   │     ├─operator `>=`
+      │   │     └─rhs
+      │   │       └─lit_expr
+      │   │         └─int_lit 18
+      │   ├─operator `and`
+      │   └─rhs
+      │     └─access_expr
+      │       ├─subject
+      │       │ └─var_expr
+      │       │   └─name "user"
+      │       └─field
+      │         └─name "active"
+      └─clause_body
+        └─body
+          └─text
+

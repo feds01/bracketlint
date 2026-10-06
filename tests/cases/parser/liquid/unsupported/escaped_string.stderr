@@ -1,5 +1,0 @@
-error: unexpectedly encountered an identifier
- --> $DIR/escaped_string.html:1:14
-  |
-1 | <p>{{ "Say \"hello\"" | append: "!" }}</p>
-  |              -----

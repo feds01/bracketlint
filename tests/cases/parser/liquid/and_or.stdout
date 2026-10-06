@@ -1,0 +1,42 @@
+info: parsed module '$DIR/and_or.html' as liquid:
+body
+└─if
+  └─clauses
+    └─if_clause
+      ├─condition
+      │ └─bin_expr
+      │   ├─lhs
+      │   │ └─access_expr
+      │   │   ├─subject
+      │   │   │ └─var_expr
+      │   │   │   └─name "product"
+      │   │   └─field
+      │   │     └─name "available"
+      │   ├─operator `and`
+      │   └─rhs
+      │     └─bin_expr
+      │       ├─lhs
+      │       │ └─bin_expr
+      │       │   ├─lhs
+      │       │   │ └─access_expr
+      │       │   │   ├─subject
+      │       │   │   │ └─var_expr
+      │       │   │   │   └─name "product"
+      │       │   │   └─field
+      │       │   │     └─name "price"
+      │       │   ├─operator `>`
+      │       │   └─rhs
+      │       │     └─lit_expr
+      │       │       └─int_lit 0
+      │       ├─operator `or`
+      │       └─rhs
+      │         └─access_expr
+      │           ├─subject
+      │           │ └─var_expr
+      │           │   └─name "product"
+      │           └─field
+      │             └─name "preorder"
+      └─clause_body
+        └─body
+          └─text
+

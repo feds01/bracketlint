@@ -1,8 +1,0 @@
-info: parsed module '$DIR/escaped_string.html' as liquid:
-body
-├─text
-├─inline
-│ └─lit_expr
-│   └─str_lit "Say \"
-└─text
-

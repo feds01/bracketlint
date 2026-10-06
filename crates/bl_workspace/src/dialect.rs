@@ -77,6 +77,12 @@ impl Dialect {
     pub fn is_django(self) -> bool {
         self == Dialect::Django
     }
+
+    /// Check if its currently Liquid dialect.
+    #[inline]
+    pub fn is_liquid(self) -> bool {
+        self == Dialect::Liquid
+    }
 }
 
 #[cfg(test)]

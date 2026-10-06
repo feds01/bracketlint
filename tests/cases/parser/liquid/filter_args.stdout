@@ -13,9 +13,12 @@ body
 │   └─filter
 │     ├─name "slice"
 │     └─args
+│       ├─arg
+│       │ └─lit_expr
+│       │   └─int_lit 0
 │       └─arg
 │         └─lit_expr
-│           └─int_lit 0
+│           └─int_lit 10
 ├─text
 ├─inline
 │ └─filtered_expr
@@ -29,8 +32,12 @@ body
 │   └─filter
 │     ├─name "default"
 │     └─args
+│       ├─arg
+│       │ └─lit_expr
+│       │   └─str_lit "None"
 │       └─arg
+│         ├─name "allow_false"
 │         └─lit_expr
-│           └─str_lit "None"
+│           └─bool_lit true
 └─text
 

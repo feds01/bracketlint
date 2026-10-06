@@ -1,0 +1,16 @@
+info: parsed module '$DIR/escaped_string.html' as django:
+body
+├─text
+├─inline
+│ └─filtered_expr
+│   ├─subject
+│   │ └─lit_expr
+│   │   └─str_lit "say \"hi\""
+│   └─filter
+│     ├─name "upper"
+│     └─args
+├─inline
+│ └─lit_expr
+│   └─str_lit "C:\\"
+└─text
+

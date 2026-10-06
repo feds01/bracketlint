@@ -498,6 +498,46 @@ impl AstVisitor for AstTreePrinter<'_> {
         ))
     }
 
+    type RangeExprRet = TreeNode;
+
+    fn visit_range_expr(
+        &self,
+        node: ast::AstNodeRef<ast::RangeExpr>,
+    ) -> Result<Self::RangeExprRet, Self::Error> {
+        let walk::RangeExpr { start, end } = walk::walk_range_expr(self, node)?;
+        Ok(TreeNode::branch(
+            "range_expr",
+            vec![TreeNode::branch("start", vec![start]), TreeNode::branch("end", vec![end])],
+        ))
+    }
+
+    type NilLitRet = TreeNode;
+
+    fn visit_nil_lit(
+        &self,
+        node: ast::AstNodeRef<ast::NilLit>,
+    ) -> Result<Self::NilLitRet, Self::Error> {
+        Ok(TreeNode::leaf(labelled("nil_lit", self.source.hunk(node.span().range), "")))
+    }
+
+    type EmptyLitRet = TreeNode;
+
+    fn visit_empty_lit(
+        &self,
+        node: ast::AstNodeRef<ast::EmptyLit>,
+    ) -> Result<Self::EmptyLitRet, Self::Error> {
+        Ok(TreeNode::leaf(labelled("empty_lit", self.source.hunk(node.span().range), "")))
+    }
+
+    type BlankLitRet = TreeNode;
+
+    fn visit_blank_lit(
+        &self,
+        node: ast::AstNodeRef<ast::BlankLit>,
+    ) -> Result<Self::BlankLitRet, Self::Error> {
+        Ok(TreeNode::leaf(labelled("blank_lit", self.source.hunk(node.span().range), "")))
+    }
+
     type FilterRet = TreeNode;
 
     fn visit_filter(

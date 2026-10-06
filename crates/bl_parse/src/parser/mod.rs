@@ -683,7 +683,7 @@ impl<'s> Parser<'s> {
             };
 
             // check if we have higher precedence than the lhs expression...
-            let (l_precedence, r_precedence) = op.infix_binding_power();
+            let (l_precedence, r_precedence) = self.binding_power(op);
 
             if l_precedence < min_precedence {
                 break;
@@ -702,6 +702,16 @@ impl<'s> Parser<'s> {
         }
 
         Ok(lhs)
+    }
+
+    /// The binding power of `op`. Liquid has no precedence between `and` and
+    /// `or`, and evaluates them from right to left, so `a and b or c` is
+    /// `a and (b or c)`.
+    fn binding_power(&self, op: ast::BinOp) -> (u8, u8) {
+        match op {
+            ast::BinOp::And | ast::BinOp::Or if self.options.dialect.is_liquid() => (2, 2),
+            op => op.infix_binding_power(),
+        }
     }
 
     fn parse_expr(&mut self) -> ParseResult<AstNode<ast::Expr>> {
@@ -728,6 +738,14 @@ impl<'s> Parser<'s> {
         // ##Note: Each child path is responsible for skipping the current `token`.
         Ok(match token.kind {
             kind if kind.is_unary_op() => return self.parse_unary_expr(token),
+
+            _ if let Some(lit) = self.liquid_literal(token) => {
+                self.skip_fast(token.kind); // `<lit>` Skip the literal token.
+                self.node_with_span(ast::Expr::Lit(ast::LitExpr { lit }), token.span)
+            }
+            TokenKind::Tree(Delimiter::Paren, _) if self.options.dialect.is_liquid() => {
+                return self.parse_range(token);
+            }
 
             kw @ TokenKind::Keyword(keyword) if keyword.identifier_like() => {
                 self.skip_fast(kw); // `<kw>` Skip the identifier token.
@@ -760,6 +778,35 @@ impl<'s> Parser<'s> {
                 );
             }
         })
+    }
+
+    /// The Liquid literal that `token` is, if any, e.g. `nil`. In the other
+    /// dialects, these are names like any other.
+    fn liquid_literal(&self, token: Token) -> Option<ast::Lit> {
+        if !self.options.dialect.is_liquid() {
+            return None;
+        }
+
+        match (token.kind, self._source.hunk(token.span)) {
+            (TokenKind::Ident, "true") => Some(ast::Lit::Bool(ast::BoolLit { value: true })),
+            (TokenKind::Ident, "false") => Some(ast::Lit::Bool(ast::BoolLit { value: false })),
+            (TokenKind::Ident, "nil" | "null") => Some(ast::Lit::Nil(ast::NilLit {})),
+            (TokenKind::Ident, "blank") => Some(ast::Lit::Blank(ast::BlankLit {})),
+            (TokenKind::Keyword(Keyword::Empty), _) => Some(ast::Lit::Empty(ast::EmptyLit {})),
+            _ => None,
+        }
+    }
+
+    /// Parse a Liquid range of integers, i.e. `(1..n)`. Its bounds are values,
+    /// which have no filters.
+    fn parse_range(&mut self, token: Token) -> ParseResult<AstNode<ast::Expr>> {
+        let (start, end) = self.in_tree(Delimiter::Paren, None, |g| {
+            let start = g.parse_value()?;
+            g.parse_token(TokenKind::DotDot)?;
+            Ok((start, g.parse_value()?))
+        })?;
+
+        Ok(self.node_with_span(ast::Expr::Range(ast::RangeExpr { start, end }), token.span))
     }
 
     /// Parse a value, i.e. an expression without any filters applied to it.
@@ -833,7 +880,16 @@ impl<'s> Parser<'s> {
         );
 
         self.skip_fast(token.kind); // `<op>` Skip the operator token.
-        let expr = self.parse_expr()?;
+
+        // `not` applies to a whole comparison, so `not a == b` is `not (a == b)`,
+        // but not to `and` and `or`, which bind looser.
+        let expr = match *op.body {
+            ast::UnaryOp::Not => {
+                let (precedence, _) = ast::BinOp::Eq.infix_binding_power();
+                self.parse_compound_expr(precedence)?
+            }
+            ast::UnaryOp::Neg => self.parse_expr()?,
+        };
         Ok(self.node_with_joined_span(ast::Expr::Unary(ast::UnaryExpr { op, expr }), token.span))
     }
 
@@ -877,8 +933,16 @@ impl<'s> Parser<'s> {
         let name = self.parse_name()?;
         let args = if self.parse_token_fast(TokenKind::Colon).is_some() {
             let start = self.current_pos();
-            let arg = self.parse_filter_arg()?;
-            self.nodes_with_joined_span(thin_vec![arg], start)
+            let mut args = thin_vec![self.parse_filter_arg()?];
+
+            // Liquid filters take any number of arguments, separated by commas.
+            if self.options.dialect.is_liquid() {
+                while self.parse_token_fast(TokenKind::Comma).is_some() {
+                    args.push(self.parse_filter_arg()?);
+                }
+            }
+
+            self.nodes_with_joined_span(args, start)
         } else {
             AstNodes::empty(self.make_span(subject_span))
         };
@@ -886,14 +950,26 @@ impl<'s> Parser<'s> {
         Ok(self.node_with_joined_span(ast::Filter { name, args }, subject_span))
     }
 
-    /// Parse the argument of a filter, i.e. `a` in `x|f:a`. A filter takes a
-    /// single argument, which has no filters of its own, so in `x|f:a|g` the
-    /// filter `g` applies to `x|f:a` rather than to `a`.
+    /// Parse an argument of a filter, i.e. `a` in `x|f:a`. The argument has no
+    /// filters of its own, so in `x|f:a|g` the filter `g` applies to `x|f:a`
+    /// rather than to `a`. Liquid filters also take keyword arguments, e.g.
+    /// `allow_false: true`.
     fn parse_filter_arg(&mut self) -> ParseResult<AstNode<ast::Arg>> {
-        let start = self.current_pos();
-        let value = self.parse_value()?;
+        let start = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
 
-        Ok(self.node_with_joined_span(ast::Arg { name: None, value: Some(value) }, start))
+        let name = match self.peek_second() {
+            Some(Token { kind: TokenKind::Colon, .. })
+                if self.options.dialect.is_liquid() && start.kind.is_ident_like() =>
+            {
+                let name = self.parse_name()?;
+                self.skip_fast(TokenKind::Colon); // `:` Skip the colon token.
+                Some(name)
+            }
+            _ => None,
+        };
+
+        let value = self.parse_value()?;
+        Ok(self.node_with_joined_span(ast::Arg { name, value: Some(value) }, start.span))
     }
 
     fn parse_bin_op(&mut self) -> (Option<ast::BinOp>, u8) {
@@ -905,6 +981,12 @@ impl<'s> Parser<'s> {
         }
 
         match &(token.unwrap()).kind {
+            TokenKind::Ident
+                if self.options.dialect.is_liquid()
+                    && self._source.hunk(token.unwrap().span) == "contains" =>
+            {
+                (Some(ast::BinOp::Contains), 1)
+            }
             TokenKind::EqEq => (Some(ast::BinOp::Eq), 1),
             TokenKind::NotEq => (Some(ast::BinOp::NotEq), 1),
             TokenKind::Lt => (Some(ast::BinOp::Lt), 1),

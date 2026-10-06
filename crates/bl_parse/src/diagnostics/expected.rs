@@ -73,6 +73,9 @@ bitflags! {
         /// Right bracket
         const RightBracket = 1 << 23;
 
+        /// Two dots, as in a Liquid range like `(1..5)`
+        const DotDot = 1 << 24;
+
         /// Convenient grouping of `operator`.
         const Op = Self::Minus.bits()
                  | Self::Lt.bits()
@@ -108,6 +111,7 @@ impl fmt::Display for ExpectedItem {
                 ExpectedItem::Colon => toks.push(":"),
                 ExpectedItem::Minus => toks.push("-"),
                 ExpectedItem::Dot => toks.push("."),
+                ExpectedItem::DotDot => toks.push(".."),
                 ExpectedItem::Eq => toks.push("="),
                 ExpectedItem::EqEq => toks.push("=="),
                 ExpectedItem::Lt => toks.push("<"),
@@ -139,6 +143,7 @@ impl From<TokenKind> for ExpectedItem {
             TokenKind::EqEq => ExpectedItem::EqEq,
             TokenKind::Minus => ExpectedItem::Minus,
             TokenKind::Dot => ExpectedItem::Dot,
+            TokenKind::DotDot => ExpectedItem::DotDot,
             TokenKind::Colon => ExpectedItem::Colon,
             TokenKind::Comma => ExpectedItem::Comma,
             TokenKind::Ident => ExpectedItem::Ident,
