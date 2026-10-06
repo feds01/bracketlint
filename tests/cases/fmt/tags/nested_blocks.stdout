@@ -1,0 +1,9 @@
+// run=pass, stage=fmt
+{% block outer  %}
+<div>
+{% block inner  %}    
+<p>inner</p>
+{% endblock %}
+</div>
+{% endblock %}
+

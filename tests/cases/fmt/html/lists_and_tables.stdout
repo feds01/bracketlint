@@ -1,0 +1,25 @@
+// run=pass, stage=fmt
+
+<ul>
+    <li>One</li>
+    <li>Two</li>
+</ul>
+<table>
+    <thead>
+        <tr>
+            <th>A</th>
+            <th>B</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>1</td>
+            <td>2</td>
+        </tr>
+    </tbody>
+</table>
+<select>
+    <option value="1">One</option>
+    <option value="2" selected>Two</option>
+</select>
+

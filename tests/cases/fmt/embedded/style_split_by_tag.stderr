@@ -1,0 +1,10 @@
+error: An error occurred when parsing the `CSS`.
+ --> $DIR/style_split_by_tag.html:1:1
+  |
+1 | // run=fail, stage=fmt
+  | --- Expected a qualified rule, or an at rule but instead found '</'.
+error: An error occurred when parsing the `CSS`.
+ --> $DIR/style_split_by_tag.html:1:10
+  |
+1 | // run=fail, stage=fmt
+  |          - Expected a compound selector but instead found the end of the file.

@@ -1,0 +1,7 @@
+// run=pass, stage=fmt
+
+<style>
+body{margin:0;padding:0}
+.card>.title{font-weight:bold;color:#333}
+</style>
+

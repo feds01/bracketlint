@@ -1,0 +1,22 @@
+// run=pass, stage=fmt
+
+<html>
+    <head>
+        <style>
+body { color: red; margin:0 }
+</style>
+    </head>
+    <body>
+    {% if user %}
+        <div class="a">
+    <span>Hello{{ user.name }}</span>
+    {% else %}
+<div class="b">
+    {% endif %}
+<p>some text</p></div>
+<script>
+const x = {a:1,b:2}; function f(){return x}
+</script>
+</body>
+</html>
+

@@ -1,0 +1,4 @@
+// run=fail, stage=fmt
+
+<script>
+const data = {{ data }}

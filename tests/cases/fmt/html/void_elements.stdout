@@ -1,0 +1,10 @@
+// run=pass, stage=fmt
+
+<form action="/search" method="get">
+    <label for="q">Search</label>
+    <input type="text" id="q" name="q" />
+    <br />
+    <img src="/logo.png" alt="Logo" />
+    <input type="submit" value="Go" />
+</form>
+

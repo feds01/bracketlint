@@ -1,0 +1,11 @@
+// run=pass, stage=fmt
+
+<div class="card">
+    <div class="card-body">
+        <h1>Title</h1>
+        <p>
+            Some <strong>bold</strong>and <em>emphasised</em>text.
+        </p>
+    </div>
+</div>
+
