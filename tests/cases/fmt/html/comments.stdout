@@ -2,7 +2,7 @@
 
 <!-- A top level comment -->
 <div>
-<!-- inside -->
-<p>text</p>
+    <!-- inside -->
+    <p>text</p>
 </div>
 

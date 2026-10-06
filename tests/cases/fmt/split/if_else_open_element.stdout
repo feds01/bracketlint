@@ -6,6 +6,7 @@
         {% else %}
 <div class="anonymous">
             {% endif %}
-            <p>Welcome</p></div>
+            <p>Welcome</p>
+            </div>
 </section>
 
