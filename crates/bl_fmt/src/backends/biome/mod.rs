@@ -113,9 +113,7 @@ impl<'ctx> HTMLBiomeFormatter<'ctx> {
         // If we've got an indent to apply, we need to apply it to the
         // formatter state.
         if let Some(indent) = indent {
-            let current_indent = self.state.indent as i8;
-            let indent = current_indent.saturating_add(indent);
-            self.state.indent = indent as u16;
+            self.state.indent = self.state.indent.saturating_add_signed(indent.into());
         }
 
         self.state.language = language;
@@ -389,7 +387,7 @@ impl<'ctx> HasCSSParsing<'ctx> for CSSBiomeFormatter<'ctx> {
     /// there may not be any other embedded languages within the CSS block,
     /// we can safely assume that the terminal state is `Css`.
     fn into_state(self) -> TerminalState {
-        TerminalState { language: LanguageType::Css, indent: 0, continue_inline: false }
+        TerminalState { language: LanguageType::Css, indent: 0 }
     }
 }
 
@@ -467,7 +465,7 @@ impl<'ctx> HasJSParsing<'ctx> for JSBiomeFormatter<'ctx> {
     /// there may not be any other embedded languages within the JS block,
     /// we can safely assume that the terminal state is `Js`.
     fn into_state(self) -> TerminalState {
-        TerminalState { language: LanguageType::Js, indent: 0, continue_inline: false }
+        TerminalState { language: LanguageType::Js, indent: 0 }
     }
 }
 

@@ -40,7 +40,6 @@ impl fmt::Display for LanguageType {
 pub struct TerminalState {
     pub language: LanguageType,
     pub indent: u16,
-    pub continue_inline: bool,
 }
 
 #[derive(Debug, Clone, Constructor)]
@@ -84,11 +83,6 @@ impl<'s> FormatterContext<'s> {
 
     pub fn indent_step(&self) -> u8 {
         self.options.indent_size
-    }
-
-    /// Enable "Continue Inline" mode.
-    pub fn continue_inline(&mut self) {
-        self.state.continue_inline = true;
     }
 
     /// Decrease the indent level by the indent step.

@@ -2,11 +2,11 @@
 
 <section>
     {% if user %}
-<div class="logged-in">
+        <div class="logged-in">
         {% else %}
-<div class="anonymous">
+            <div class="anonymous">
             {% endif %}
             <p>Welcome</p>
             </div>
-</section>
+            </section>
 

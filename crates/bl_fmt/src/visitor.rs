@@ -75,11 +75,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
                 id,
                 source,
                 options,
-                state: TerminalState {
-                    language: LanguageType::Html,
-                    indent: 0,
-                    continue_inline: false,
-                },
+                state: TerminalState { language: LanguageType::Html, indent: 0 },
             },
         }
     }
@@ -103,6 +99,12 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         self.add_indent();
         self.buffer.push_str(line);
         self.buffer.push('\n');
+    }
+
+    /// Whether the next hunk would start a new line in the buffer.
+    #[inline(always)]
+    fn at_line_start(&self) -> bool {
+        self.buffer.is_empty() || self.buffer.ends_with('\n')
     }
 
     /// Push a newline into the buffer.
@@ -197,13 +199,11 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
                 let span = statement.id().span().range;
                 let line_end = self.ctx.source.line_ranges.line_end(span.end());
 
-                // Check if the next line is the end of the line.
+                // Check if the next line is the end of the line, otherwise the
+                // following text continues the line.
                 if span.end() + 1 == line_end {
                     self.ctx.decrement_indent();
                     self.push_hunk("\n");
-                } else {
-                    // We need to continue the "inline" statement.
-                    self.ctx.continue_inline();
                 }
 
                 Ok(())
@@ -424,7 +424,6 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         &mut self,
         node: bl_ast::AstNodeRef<bl_ast::Text>,
     ) -> Result<Self::TextRet, Self::Error> {
-        let is_inline = self.ctx.state.continue_inline;
         let text = self.ctx.source.hunk(node.span().range);
 
         // We need to check which language engine to use for the formatting.
@@ -461,18 +460,20 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             }
         }
 
-        if is_inline {
-            self.push_hunk(lines.join("\n").as_str());
-        } else {
-            for (index, line) in lines.iter().enumerate() {
-                let is_last = index == lines.len() - 1;
-
-                if is_last {
-                    self.push_hunk(line);
-                } else {
-                    self.push_line(line);
-                }
+        // The last line is left open so that a following inline tag can
+        // continue it. Any line that starts a new line in the buffer gets the
+        // current indent, the first one may instead continue a line that an
+        // inline tag left open.
+        for (index, line) in lines.iter().enumerate() {
+            if index > 0 {
+                self.end_line();
             }
+
+            if self.at_line_start() && !line.is_empty() {
+                self.add_indent();
+            }
+
+            self.push_hunk(line);
         }
 
         self.ctx.state = state;

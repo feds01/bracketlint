@@ -3,7 +3,7 @@
 <div class="outer">
     <div class="inner">
     {% if show %}
-<p>shown</p>
+        <p>shown</p>
 {% endif %}
 </div>
 </div>
