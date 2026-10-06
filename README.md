@@ -30,10 +30,23 @@ From source (with Rust & Cargo installed):
 $ cargo install --git https://github.com/feds01/bracketlint bracketlint
 ```
 
-### Releasing
+### Development
 
-Releases are built by [dist](https://github.com/axodotdev/cargo-dist) (`.github/workflows/release.yml`, config in `dist-workspace.toml`). Bump `version` in `crates/bl/Cargo.toml`, merge, then push a matching tag:
+Common tasks are recipes in the [`justfile`](./justfile) (install [just](https://github.com/casey/just) with `brew install just` or `cargo install just`). Run `just` to list them all:
 
 ```bash
-$ git tag v0.2.1 && git push origin v0.2.1
+$ just setup             # install the pinned nightly toolchain and pre-commit hooks
+$ just install           # install `bracketlint` from this checkout into ~/.cargo/bin
+$ just run check foo/    # run the CLI from source
+$ just test              # run all tests
+$ just update-snapshots  # re-generate the UI test snapshots in tests/cases
+$ just ci                # run tests, clippy and the formatting check, like CI does
+```
+
+### Releasing
+
+Releases are built by [dist](https://github.com/axodotdev/cargo-dist) (`.github/workflows/release.yml`, config in `dist-workspace.toml`). Bump `version` in `crates/bl/Cargo.toml`, merge, then from an up-to-date `main` push a matching tag:
+
+```bash
+$ just release   # tags v<version> from crates/bl/Cargo.toml and pushes it
 ```
