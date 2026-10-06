@@ -1,4 +1,3 @@
-// run=pass, stage=fmt
 {% block body  %}
     <div class="wrapper">
         <main>

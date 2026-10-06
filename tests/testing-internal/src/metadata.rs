@@ -287,13 +287,6 @@ pub fn parse_test_case_metadata(path: &PathBuf) -> Result<ParsedMetadata, io::Er
     let mut buffer = BufReader::new(file);
     let _ = buffer.read_line(&mut source)?;
 
-    // We need to strip the shebang line, if it starts with `#!` then
-    // it should skip the current line and read the next line
-    if source.starts_with("#!") {
-        source.clear();
-        let _ = buffer.read_line(&mut source)?;
-    }
-
     let mut warnings = vec![];
 
     // Now we begin the parsing of the line...
@@ -395,5 +388,38 @@ pub fn parse_test_case_metadata(path: &PathBuf) -> Result<ParsedMetadata, io::Er
         Ok(ParsedMetadata { warnings, metadata: builder.build() })
     } else {
         Ok(ParsedMetadata { warnings, metadata: TestMetadata::default() })
+    }
+}
+
+/// Remove the configuration line from the top of a case, along with the blank
+/// line that separates it from the template. The configuration line is the one
+/// that [parse_test_case_metadata] reads, and isn't part of the template.
+pub fn strip_config_line(contents: &str) -> &str {
+    if !contents.starts_with("//") {
+        return contents;
+    }
+
+    let template = contents.split_once('\n').map_or("", |(_, rest)| rest);
+    template.strip_prefix("\r\n").or_else(|| template.strip_prefix('\n')).unwrap_or(template)
+}
+
+#[cfg(test)]
+mod test_super {
+    use super::*;
+
+    #[test]
+    fn test_strip_config_line() {
+        // The line and the blank line after it are removed.
+        assert_eq!(strip_config_line("// run=pass\n\n<p>a</p>\n"), "<p>a</p>\n");
+        assert_eq!(strip_config_line("// run=pass\r\n\r\n<p>a</p>\r\n"), "<p>a</p>\r\n");
+
+        // Only one blank line belongs to the configuration.
+        assert_eq!(strip_config_line("// run=pass\n\n\n<p>a</p>"), "\n<p>a</p>");
+        assert_eq!(strip_config_line("// run=pass\n<p>a</p>"), "<p>a</p>");
+        assert_eq!(strip_config_line("// run=pass"), "");
+
+        // Cases without a configuration line are left as they are.
+        assert_eq!(strip_config_line("<p>a</p>\n"), "<p>a</p>\n");
+        assert_eq!(strip_config_line(""), "");
     }
 }

@@ -13,27 +13,31 @@
 //! Additionally, it's also possible for the case file to specify at the
 //! top of the file what testing parameters should be provided, for example:
 //! ```ignore
-//! // stage=parse, run=fail
+//! // stage=check, run=fail
 //!
 //! {% block %} Hello World! {% endblock %}
 //! ```
 //!
 //! In this example, the case specifies that the stage should only go up to the
-//! "parsing" stage and then stop processing, and that the test case should
-//! fail.
+//! "check" (parsing) stage and then stop processing, and that the test case
+//! should fail. The keys are parsed in `testing-internal/src/metadata.rs`.
+//!
+//! The configuration line isn't part of the template, so the case runs on a
+//! copy without it, or the blank line that follows it. Line numbers in the
+//! snapshots count from the first line of the template.
 #![cfg(test)]
 
 use std::{
     fs, io,
-    path::Path,
-    sync::{Arc, Mutex},
+    path::{MAIN_SEPARATOR, PathBuf},
+    sync::{Arc, Mutex, OnceLock},
 };
 
 use bl_lints::settings::FixMode;
 use bl_reporting::{Report, Reporter};
 use bl_testing_internal::{
     TestingInput,
-    metadata::{HandleWarnings, StageKind, TestResult},
+    metadata::{HandleWarnings, StageKind, TestResult, strip_config_line},
 };
 use bl_testing_macros::generate_tests;
 use bl_utils::{
@@ -43,55 +47,51 @@ use bl_utils::{
 };
 use bl_workspace::{Workspace, WorkspaceBuilder, settings::Settings};
 use bracketlint::commands;
-use regex::Regex;
+use tempfile::TempDir;
 
 use crate::{ANSI_REGEX, REGENERATE_OUTPUT};
 
-/// Convert a [Path] into a [String] whilst also escaping any special
-/// characters that may be present in the path. This is useful for when
-/// the test-suite runs on Windows, as the path may contain backslashes
-/// which are interpreted as escape characters.
-fn stringify_test_dir_path(path: &Path) -> String {
-    // On windows, the backslashes are special characters, therefore we need
-    // to escape them.
-    #[cfg(target_os = "windows")]
-    let test_dir = {
-        let mut dir = regex::escape(&adjust_canonicalisation(path).display().to_string());
+/// The directory that the case runs in, which `$DIR` stands for in the
+/// snapshots. Each case runs in a process of its own, so there is only one.
+static CASE_DIR: OnceLock<PathBuf> = OnceLock::new();
 
-        // @@Hack: on windows, the separator is a backslash, which is problematic
-        //         for ui-tests, since they expect a `/` (forward slash) as the
-        // connector         between `$DIR` and the filename. So, we replace the
-        // backslashes after         the directory, and then we will replace
-        // with a forward slash.
-        dir.push_str("\\\\");
-        dir
-    };
+/// The copy of a case that the case runs on, without its configuration line.
+/// It lives in a temporary directory, which is removed when the copy is
+/// dropped.
+struct CaseCopy {
+    /// The path of the copied case.
+    path: PathBuf,
 
-    #[cfg(not(target_os = "windows"))]
-    let test_dir = {
-        let mut dir = adjust_canonicalisation(path).display().to_string();
-        dir.push('/');
-        dir
-    };
+    /// The directory that the copy lives in.
+    _dir: TempDir,
+}
 
-    test_dir
+impl CaseCopy {
+    /// Copy the case at `test.path` into a temporary directory, without the
+    /// configuration line at the top of it.
+    fn new(test: &TestingInput) -> io::Result<Self> {
+        let contents = fs::read_to_string(&test.path)?;
+        let dir = tempfile::Builder::new().prefix("bracketlint-ui-").tempdir()?;
+
+        // The workspace reports canonical paths, so `$DIR` has to be one too.
+        CASE_DIR.set(adjust_canonicalisation(dir.path())).expect("one case per process");
+        let path = CASE_DIR.get().unwrap().join(test.path.file_name().unwrap());
+        fs::write(&path, strip_config_line(&contents))?;
+
+        Ok(Self { path, _dir: dir })
+    }
 }
 
 /// This function will strip the provided content string of all ANSI escape
-/// codes, and replace all references to the test directory with `$DIR`.
-fn strip_contents(contents: &str, test: &TestingInput) -> String {
+/// codes, and replace all references to the directory that the case ran in
+/// with `$DIR`.
+fn strip_contents(contents: &str) -> String {
     // Remove any ANSI escape codes generated from the reporting...
     let stripped = ANSI_REGEX.replace_all(contents, "");
 
-    // Replace the directory by `$DIR`
-    let test_dir = test.path.parent().unwrap();
-    let stringified_test_dir = stringify_test_dir_path(test_dir);
-    let dir_regex = Regex::new(stringified_test_dir.as_str()).unwrap();
-
-    // @@Hack: the forward slash at the end is unconditional, since we
-    // need to re-add it because we removed it in the `stringify_test_dir_path`
-    // function.
-    dir_regex.replace_all(stripped.as_ref(), r"$$DIR/").replace("\r\n", "\n")
+    // Replace the directory by `$DIR`, followed by a `/` on every platform.
+    let dir = format!("{}{MAIN_SEPARATOR}", CASE_DIR.get().unwrap().display());
+    stripped.replace(&dir, "$DIR/").replace("\r\n", "\n")
 }
 
 /// Given the testing input, and a pre-filtered [Vec<Report>] based on
@@ -140,7 +140,7 @@ impl OutputKind {
 /// If [`REGENERATE_OUTPUT`] is set to `true`, then the file will be overwritten
 /// with the new stripped contents.
 fn compare_output(test: &TestingInput, kind: OutputKind, contents: &str) -> std::io::Result<()> {
-    let actual_contents = strip_contents(contents, test);
+    let actual_contents = strip_contents(contents);
 
     // We want to load the `.{stderr|stdout}` file and verify that the contents of
     // the file match to the created report. If the `.stderr` file does not
@@ -294,8 +294,10 @@ fn handle_test(test: TestingInput) {
     log::set_logger(&LOGGER).unwrap_or_else(|_| panic!("couldn't initiate logger"));
     log::set_max_level(log::LevelFilter::Info);
 
-    // Create a workspace for the test case.
-    let files = vec![test.path.clone()];
+    // Create a workspace for the test case, which runs on a copy of the case
+    // without its configuration line.
+    let case = CaseCopy::new(&test).unwrap();
+    let files = vec![case.path.clone()];
     let settings = Settings::new(true, FixMode::Generate, false);
     let builder = WorkspaceBuilder::new()
         .with_settings(settings)

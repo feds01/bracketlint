@@ -1,5 +1,3 @@
-// run=pass, stage=fmt
-
 <p>Hello <span>world</span>, this is <a href="#">a link</a>!</p>
 <pre>
   keep   this

@@ -1,5 +1,3 @@
-// run=pass, stage=fmt
-
 <form action="/search" method="get">
     <label for="q">Search</label>
     <input type="text" id="q" name="q">

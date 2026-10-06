@@ -1,10 +1,12 @@
 error: An error occurred when parsing the `JavaScript`.
  --> $DIR/script_with_expression.html:1:3
   |
-1 | // run=fail, stage=fmt
-  |   ---------- type assertion are a TypeScript only feature. Convert your file to a TypeScript file or remove the syntax.
+1 |   <script>
+  |  ___-
+2 | | const data = {{ data }};
+  | |___- type assertion are a TypeScript only feature. Convert your file to a TypeScript file or remove the syntax.
 error: An error occurred when parsing the `JavaScript`.
- --> $DIR/script_with_expression.html:1:12
+ --> $DIR/script_with_expression.html:2:3
   |
-1 | // run=fail, stage=fmt
-  |            - unterminated regex literal
+2 | const data = {{ data }};
+  |   - unterminated regex literal

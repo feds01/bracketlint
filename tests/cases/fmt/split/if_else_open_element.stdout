@@ -1,5 +1,3 @@
-// run=pass, stage=fmt
-
 <section>
     {% if user %}
         <div class="logged-in">

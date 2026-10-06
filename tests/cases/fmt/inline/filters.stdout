@@ -1,5 +1,3 @@
-// run=pass, stage=fmt
-
 <p>{{ name|upper: }}</p>
 <p>{{ bio|truncatewords:30 }}</p>
 <p>{{ value|default:"nothing" }}</p>

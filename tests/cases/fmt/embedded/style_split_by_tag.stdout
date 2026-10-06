@@ -1,5 +1,3 @@
-// run=fail, stage=fmt
-
 <style>
 body { margin: 0 }
     {% if dark %}
