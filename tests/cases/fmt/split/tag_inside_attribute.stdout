@@ -1,0 +1,8 @@
+// run=pass, stage=fmt
+
+<li class="item 
+{% if active %}
+active
+{% endif %}
+">Item</li>
+

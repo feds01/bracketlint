@@ -1,0 +1,8 @@
+// run=pass, stage=fmt
+
+{# a comment on its own line #}
+<div>
+    {# inside an element #}
+    <p>text</p>{# trailing #}
+</div>
+

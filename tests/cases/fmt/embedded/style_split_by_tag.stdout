@@ -1,0 +1,11 @@
+// run=fail, stage=fmt
+
+<style>
+body { margin: 0 }
+    {% if dark %}
+        body {
+        	background: #000;
+        	color: #fff;
+}
+{% endif %}
+

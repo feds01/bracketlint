@@ -1,0 +1,11 @@
+// run=pass, stage=fmt
+
+<ul>
+{% for user in users %}
+{% if user.active %}
+<li class="active">{{ user.name }}</li>
+{% else %}
+<li>{{ user.name }}</li>
+{% endif %}
+{% endfor %}
+</ul>
