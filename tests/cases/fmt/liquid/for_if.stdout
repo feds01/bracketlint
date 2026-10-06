@@ -1,0 +1,10 @@
+<ul class="products">
+{% for product in collection.products %}
+        {% if product.available %}
+            <li><a href="{{ product.url }}">{{ product.title }}</a></li>
+        {% else %}
+            <li class="sold-out">{{ product.title }}</li>
+            {% endif %}
+        {% endfor %}
+        </ul>
+

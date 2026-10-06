@@ -1,0 +1,16 @@
+info: parsed module '$DIR/tablerow.html':
+body
+├─text
+├─unprocessable_tag
+├─inline
+│ └─access_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "product"
+│   └─field
+│     └─name "title"
+├─generic_tag
+│ ├─name "endtablerow"
+│ └─args
+└─text
+

@@ -1,0 +1,8 @@
+info: parsed module '$DIR/escaped_string.html':
+body
+├─text
+├─inline
+│ └─lit_expr
+│   └─str_lit "Say \"
+└─text
+

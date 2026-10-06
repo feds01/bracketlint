@@ -1,0 +1,9 @@
+// run=pass, stage=check
+
+{% if product.price > 100 %}
+<span>Premium</span>
+{% elsif product.price > 20 %}
+<span>Standard</span>
+{% else %}
+<span>Budget</span>
+{% endif %}

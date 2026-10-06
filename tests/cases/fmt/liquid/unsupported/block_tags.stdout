@@ -1,0 +1,2 @@
+<div>{% unless customer %}<a href="/account/login">Log in</a>{% endunless  %}{% capture greeting %}<span>Hello {{ customer.first_name }}</span>{% endcapture  %}</div>
+

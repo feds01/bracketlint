@@ -1,0 +1,13 @@
+info: parsed module '$DIR/hash_brace_text.html':
+body
+├─text
+├─inline
+│ └─access_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "product"
+│   └─field
+│     └─name "title"
+├─comment
+└─text
+

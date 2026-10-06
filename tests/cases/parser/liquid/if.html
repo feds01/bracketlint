@@ -1,0 +1,16 @@
+// run=pass, stage=check
+
+{% if customer %}
+<p>Welcome back, {{ customer.first_name }}!</p>
+{% else %}
+<a href="/account/login">Log in</a>
+{% endif %}
+{% if product.price > 100 and product.available %}
+<span>Free shipping</span>
+{% endif %}
+{% if cart.item_count == 0 or cart.total_price <= 0 %}
+<p>Your cart is empty.</p>
+{% endif %}
+{% if product.type != "gift" %}
+{% if product.inventory < 5 %}<span>Low stock</span>{% endif %}
+{% endif %}

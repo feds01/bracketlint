@@ -1,0 +1,7 @@
+// run=fail, stage=check
+
+{% unless product.available %}
+<span>Sold out</span>
+{% else %}
+<button>Add to cart</button>
+{% endunless %}

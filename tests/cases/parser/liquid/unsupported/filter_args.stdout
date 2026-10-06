@@ -1,0 +1,36 @@
+info: parsed module '$DIR/filter_args.html':
+body
+├─text
+├─inline
+│ └─filtered_expr
+│   ├─subject
+│   │ └─access_expr
+│   │   ├─subject
+│   │   │ └─var_expr
+│   │   │   └─name "product"
+│   │   └─field
+│   │     └─name "title"
+│   └─filter
+│     ├─name "slice"
+│     └─args
+│       └─arg
+│         └─lit_expr
+│           └─int_lit 0
+├─text
+├─inline
+│ └─filtered_expr
+│   ├─subject
+│   │ └─access_expr
+│   │   ├─subject
+│   │   │ └─var_expr
+│   │   │   └─name "product"
+│   │   └─field
+│   │     └─name "subtitle"
+│   └─filter
+│     ├─name "default"
+│     └─args
+│       └─arg
+│         └─lit_expr
+│           └─str_lit "None"
+└─text
+

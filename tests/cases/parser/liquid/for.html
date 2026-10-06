@@ -1,0 +1,14 @@
+// run=pass, stage=check
+
+<ul>
+{% for product in collection.products %}
+{% if product.hidden %}{% continue %}{% endif %}
+<li class="{% if forloop.first %}first{% endif %}">{{ forloop.index }}. {{ product.title }}</li>
+{% if forloop.index >= 10 %}{% break %}{% endif %}
+{% endfor %}
+</ul>
+<ol>
+{% for item in cart.items reversed %}
+<li>{{ item.title }}</li>
+{% endfor %}
+</ol>

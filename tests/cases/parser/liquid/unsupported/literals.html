@@ -1,0 +1,4 @@
+// run=pass, stage=check
+
+{% if product.available == true and product.discount != nil %}<span>Deal</span>{% endif %}
+{% if product.description == blank or product.tags == empty %}<span>Incomplete</span>{% endif %}

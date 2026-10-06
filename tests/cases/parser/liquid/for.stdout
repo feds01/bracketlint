@@ -1,0 +1,103 @@
+info: parsed module '$DIR/for.html':
+body
+├─text
+├─for
+│ ├─target
+│ │ └─name "product"
+│ ├─iterator
+│ │ └─access_expr
+│ │   ├─subject
+│ │   │ └─var_expr
+│ │   │   └─name "collection"
+│ │   └─field
+│ │     └─name "products"
+│ └─loop_body
+│   └─body
+│     ├─if
+│     │ └─clauses
+│     │   └─if_clause
+│     │     ├─condition
+│     │     │ └─access_expr
+│     │     │   ├─subject
+│     │     │   │ └─var_expr
+│     │     │   │   └─name "product"
+│     │     │   └─field
+│     │     │     └─name "hidden"
+│     │     └─clause_body
+│     │       └─body
+│     │         └─continue
+│     ├─text
+│     ├─if
+│     │ └─clauses
+│     │   └─if_clause
+│     │     ├─condition
+│     │     │ └─access_expr
+│     │     │   ├─subject
+│     │     │   │ └─var_expr
+│     │     │   │   └─name "forloop"
+│     │     │   └─field
+│     │     │     └─name "first"
+│     │     └─clause_body
+│     │       └─body
+│     │         └─text
+│     ├─text
+│     ├─inline
+│     │ └─access_expr
+│     │   ├─subject
+│     │   │ └─var_expr
+│     │   │   └─name "forloop"
+│     │   └─field
+│     │     └─name "index"
+│     ├─text
+│     ├─inline
+│     │ └─access_expr
+│     │   ├─subject
+│     │   │ └─var_expr
+│     │   │   └─name "product"
+│     │   └─field
+│     │     └─name "title"
+│     ├─text
+│     └─if
+│       └─clauses
+│         └─if_clause
+│           ├─condition
+│           │ └─bin_expr
+│           │   ├─lhs
+│           │   │ └─access_expr
+│           │   │   ├─subject
+│           │   │   │ └─var_expr
+│           │   │   │   └─name "forloop"
+│           │   │   └─field
+│           │   │     └─name "index"
+│           │   ├─operator `>=`
+│           │   └─rhs
+│           │     └─lit_expr
+│           │       └─int_lit 10
+│           └─clause_body
+│             └─body
+│               └─break
+├─text
+├─for
+│ ├─target
+│ │ └─name "item"
+│ ├─iterator
+│ │ └─access_expr
+│ │   ├─subject
+│ │   │ └─var_expr
+│ │   │   └─name "cart"
+│ │   └─field
+│ │     └─name "items"
+│ ├─loop_body
+│ │ └─body
+│ │   ├─text
+│ │   ├─inline
+│ │   │ └─access_expr
+│ │   │   ├─subject
+│ │   │   │ └─var_expr
+│ │   │   │   └─name "item"
+│ │   │   └─field
+│ │   │     └─name "title"
+│ │   └─text
+│ └─reversed
+└─text
+

@@ -1,0 +1,5 @@
+// run=fail, stage=check
+
+{%- assign name = "world" -%}
+<p>{{- name -}}</p>
+{%- if name -%}<span>hi</span>{%- endif -%}

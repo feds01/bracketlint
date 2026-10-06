@@ -1,0 +1,11 @@
+// run=pass, stage=fmt
+
+<div>
+{% if product.featured %}
+<span>Featured</span>
+{% elsif product.new %}
+<span>New</span>
+{% else %}
+<span>Regular</span>
+{% endif %}
+</div>

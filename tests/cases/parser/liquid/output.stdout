@@ -1,0 +1,88 @@
+info: parsed module '$DIR/output.html':
+body
+├─text
+├─inline
+│ └─access_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "product"
+│   └─field
+│     └─name "title"
+├─text
+├─inline
+│ └─index_expr
+│   ├─subject
+│   │ └─access_expr
+│   │   ├─subject
+│   │   │ └─var_expr
+│   │   │   └─name "product"
+│   │   └─field
+│   │     └─name "tags"
+│   └─index
+│     └─lit_expr
+│       └─int_lit 0
+├─inline
+│ └─index_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "product"
+│   └─index
+│     └─lit_expr
+│       └─str_lit "vendor"
+├─inline
+│ └─index_expr
+│   ├─subject
+│   │ └─access_expr
+│   │   ├─subject
+│   │   │ └─var_expr
+│   │   │   └─name "product"
+│   │   └─field
+│   │     └─name "images"
+│   └─index
+│     └─var_expr
+│       └─name "index"
+├─text
+├─inline
+│ └─access_expr
+│   ├─subject
+│   │ └─access_expr
+│   │   ├─subject
+│   │   │ └─var_expr
+│   │   │   └─name "collection"
+│   │   └─field
+│   │     └─name "products"
+│   └─field
+│     └─name "size"
+├─inline
+│ └─access_expr
+│   ├─subject
+│   │ └─access_expr
+│   │   ├─subject
+│   │   │ └─access_expr
+│   │   │   ├─subject
+│   │   │   │ └─var_expr
+│   │   │   │   └─name "collection"
+│   │   │   └─field
+│   │   │     └─name "products"
+│   │   └─field
+│   │     └─name "first"
+│   └─field
+│     └─name "title"
+├─inline
+│ └─access_expr
+│   ├─subject
+│   │ └─index_expr
+│   │   ├─subject
+│   │   │ └─access_expr
+│   │   │   ├─subject
+│   │   │   │ └─var_expr
+│   │   │   │   └─name "collection"
+│   │   │   └─field
+│   │   │     └─name "products"
+│   │   └─index
+│   │     └─lit_expr
+│   │       └─int_lit -1
+│   └─field
+│     └─name "title"
+└─text
+

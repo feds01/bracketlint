@@ -1,0 +1,124 @@
+info: parsed module '$DIR/if.html':
+body
+├─if
+│ ├─clauses
+│ │ └─if_clause
+│ │   ├─condition
+│ │   │ └─var_expr
+│ │   │   └─name "customer"
+│ │   └─clause_body
+│ │     └─body
+│ │       ├─text
+│ │       ├─inline
+│ │       │ └─access_expr
+│ │       │   ├─subject
+│ │       │   │ └─var_expr
+│ │       │   │   └─name "customer"
+│ │       │   └─field
+│ │       │     └─name "first_name"
+│ │       └─text
+│ └─otherwise
+│   └─body
+│     └─text
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─bin_expr
+│     │   │   ├─lhs
+│     │   │   │ └─access_expr
+│     │   │   │   ├─subject
+│     │   │   │   │ └─var_expr
+│     │   │   │   │   └─name "product"
+│     │   │   │   └─field
+│     │   │   │     └─name "price"
+│     │   │   ├─operator `>`
+│     │   │   └─rhs
+│     │   │     └─lit_expr
+│     │   │       └─int_lit 100
+│     │   ├─operator `and`
+│     │   └─rhs
+│     │     └─access_expr
+│     │       ├─subject
+│     │       │ └─var_expr
+│     │       │   └─name "product"
+│     │       └─field
+│     │         └─name "available"
+│     └─clause_body
+│       └─body
+│         └─text
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─bin_expr
+│     │   │   ├─lhs
+│     │   │   │ └─access_expr
+│     │   │   │   ├─subject
+│     │   │   │   │ └─var_expr
+│     │   │   │   │   └─name "cart"
+│     │   │   │   └─field
+│     │   │   │     └─name "item_count"
+│     │   │   ├─operator `==`
+│     │   │   └─rhs
+│     │   │     └─lit_expr
+│     │   │       └─int_lit 0
+│     │   ├─operator `or`
+│     │   └─rhs
+│     │     └─bin_expr
+│     │       ├─lhs
+│     │       │ └─access_expr
+│     │       │   ├─subject
+│     │       │   │ └─var_expr
+│     │       │   │   └─name "cart"
+│     │       │   └─field
+│     │       │     └─name "total_price"
+│     │       ├─operator `<=`
+│     │       └─rhs
+│     │         └─lit_expr
+│     │           └─int_lit 0
+│     └─clause_body
+│       └─body
+│         └─text
+└─if
+  └─clauses
+    └─if_clause
+      ├─condition
+      │ └─bin_expr
+      │   ├─lhs
+      │   │ └─access_expr
+      │   │   ├─subject
+      │   │   │ └─var_expr
+      │   │   │   └─name "product"
+      │   │   └─field
+      │   │     └─name "type"
+      │   ├─operator `!=`
+      │   └─rhs
+      │     └─lit_expr
+      │       └─str_lit "gift"
+      └─clause_body
+        └─body
+          └─if
+            └─clauses
+              └─if_clause
+                ├─condition
+                │ └─bin_expr
+                │   ├─lhs
+                │   │ └─access_expr
+                │   │   ├─subject
+                │   │   │ └─var_expr
+                │   │   │   └─name "product"
+                │   │   └─field
+                │   │     └─name "inventory"
+                │   ├─operator `<`
+                │   └─rhs
+                │     └─lit_expr
+                │       └─int_lit 5
+                └─clause_body
+                  └─body
+                    └─text
+

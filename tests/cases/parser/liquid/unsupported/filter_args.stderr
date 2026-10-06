@@ -1,0 +1,10 @@
+error: unexpectedly encountered a `,`
+ --> $DIR/filter_args.html:1:31
+  |
+1 | <p>{{ product.title | slice: 0, 10 }}</p>
+  |                               -
+error: unexpectedly encountered a `,`
+ --> $DIR/filter_args.html:2:41
+  |
+2 | <p>{{ product.subtitle | default: "None", allow_false: true }}</p>
+  |                                         -

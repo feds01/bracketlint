@@ -1,0 +1,5 @@
+// run=pass, stage=check
+
+<h1>{{ product.title }}</h1>
+<p>{{ product.tags[0] }} {{ product["vendor"] }} {{ product.images[index] }}</p>
+<p>{{ collection.products.size }} {{ collection.products.first.title }} {{ collection.products[-1].title }}</p>

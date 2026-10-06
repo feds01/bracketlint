@@ -1,0 +1,8 @@
+// run=pass, stage=check
+
+{% liquid
+  assign total = cart.total_price
+  if total > 100
+    echo "Free shipping"
+  endif
+%}

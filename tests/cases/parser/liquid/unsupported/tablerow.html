@@ -1,0 +1,7 @@
+// run=pass, stage=check
+
+<table>
+{% tablerow product in collection.products cols:2 %}
+{{ product.title }}
+{% endtablerow %}
+</table>
