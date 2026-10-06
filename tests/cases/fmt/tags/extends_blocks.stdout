@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block title  %}
+{% block title %}
     My page
 {% endblock %}
-{% block content  %}
+{% block content %}
     <h1>{{ page.title }}</h1>
     <div class="content">{{ page.body }}</div>
 {% endblock %}

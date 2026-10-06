@@ -1,5 +1,5 @@
 <div>
-{# {% comment %}Not rendered{% endcomment %} #}
+{% comment %}Not rendered{% endcomment %}
 
         <p>{{ product.title }}</p>
         </div>

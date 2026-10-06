@@ -623,7 +623,7 @@ impl<'s> Parser<'s> {
     fn parse_variable_block(&mut self) -> ParseResult<AstNode<ast::Statement>> {
         let token = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
         let expr = self.in_tree(Delimiter::Brace, None, |g| {
-            let subject = g.parse_expr()?;
+            let (subject, subject_span) = g.track_span(|g| g.parse_expr())?;
 
             // If the subject is an identifier, we ha
             if !g.exhausted() && subject.body.is_var() {
@@ -632,7 +632,7 @@ impl<'s> Parser<'s> {
 
                 return Ok(g.node_with_joined_span(
                     ast::Expr::Call(ast::CallExpr { subject, args }),
-                    token.span,
+                    subject_span,
                 ));
             }
 
@@ -754,12 +754,11 @@ impl<'s> Parser<'s> {
                 TokenKind::Dot => self.parse_property_access(subject, subject_span)?,
                 // Array index access syntax: ident[...]
                 TokenKind::Tree(Delimiter::Bracket, _) => {
-                    let span = token.span;
                     let index = self.in_tree(Delimiter::Bracket, None, |g| g.parse_expr())?;
 
                     self.node_with_joined_span(
                         ast::Expr::Index(ast::IndexExpr { subject, index }),
-                        span,
+                        subject_span,
                     )
                 }
                 // Filter
@@ -946,7 +945,7 @@ impl<'s> Parser<'s> {
         // Next, parse either until we reach an `endfor` or `empty` token.
         //
         // If it's an empty token, then we reach the end of the loop.
-        let (loop_body, ending_token) = self.parse_body_until_block_footer(
+        let (loop_body, ending_token, _) = self.parse_body_until_block_footer(
             ExpectedItem::empty(),
             |kind| {
                 matches!(kind, TokenKind::Keyword(token::Keyword::EndFor | token::Keyword::Empty))
@@ -959,7 +958,7 @@ impl<'s> Parser<'s> {
 
         // If we ended with an `{% empty %}` token, then we parse the empty block.
         let loop_empty = if ending_token == TokenKind::Keyword(token::Keyword::Empty) {
-            let (body, _) = self.parse_body_until_block_footer(
+            let (body, _, _) = self.parse_body_until_block_footer(
                 ExpectedItem::empty(),
                 |kind| matches!(kind, TokenKind::Keyword(token::Keyword::EndFor)),
                 |g| {
@@ -1130,7 +1129,7 @@ impl<'s> Parser<'s> {
         })?;
 
         // Now parse a bunch of general statements until we reach the end of the block.
-        let (block_body, _) = self.parse_body_until_block_footer(
+        let (block_body, _, _) = self.parse_body_until_block_footer(
             ExpectedItem::empty(),
             |kind| matches!(kind, TokenKind::Keyword(token::Keyword::EndWith)),
             |g| {
@@ -1173,24 +1172,24 @@ impl<'s> Parser<'s> {
         })?;
 
         // Now parse a bunch of general statements until we reach the end of the block.
-        let (block_body, _) = self.parse_body_until_block_footer(
+        let (block_body, _, end_label) = self.parse_body_until_block_footer(
             ExpectedItem::empty(),
             |kind| matches!(kind, TokenKind::Keyword(token::Keyword::EndBlock)),
             |g| {
                 g.skip_fast(TokenKind::Keyword(token::Keyword::EndBlock)); // `<endblock>` Skip the endblock token.
 
-                if g.peek().is_some() {
-                    // @@Todo: check if the name matches the label, if the labels mismatch then
-                    // we should generate an error.
-                    let _ = g.parse_name()?;
-                }
-
-                Ok(())
+                // @@Todo: check if the name matches the label, if the labels mismatch then
+                // we should generate an error.
+                if g.peek().is_some() { Ok(Some(g.parse_name()?)) } else { Ok(None) }
             },
         )?;
 
         Ok(self.node_with_joined_span(
-            ast::Statement::Tag(ast::Tag::Block(ast::Block { label: Some(label), block_body })),
+            ast::Statement::Tag(ast::Tag::Block(ast::Block {
+                label: Some(label),
+                block_body,
+                end_label,
+            })),
             token.span,
         ))
     }
@@ -1203,7 +1202,7 @@ impl<'s> Parser<'s> {
         })?;
 
         // Now eat until the end of the block.
-        let (block_body, _) = self.parse_body_until_block_footer(
+        let (block_body, _, _) = self.parse_body_until_block_footer(
             ExpectedItem::empty(),
             |kind| matches!(kind, TokenKind::Keyword(token::Keyword::EndRaw)),
             |g| {
@@ -1241,12 +1240,15 @@ impl<'s> Parser<'s> {
         Ok(self.node_with_joined_span(ast::Statement::Comment(ast::Comment {}), start))
     }
 
+    /// Parse statements until the footer tag that `peek_fn` accepts, and then
+    /// parse the footer with `g`. Returns the body, the kind of the footer's
+    /// first token, and what `g` returns.
     fn parse_body_until_block_footer<U>(
         &mut self,
         expected: ExpectedItem,
         peek_fn: impl Fn(TokenKind) -> bool,
         g: impl FnMut(&mut Self) -> ParseResult<U>,
-    ) -> ParseResult<(AstNode<ast::Body>, TokenKind)> {
+    ) -> ParseResult<(AstNode<ast::Body>, TokenKind, U)> {
         let mut statements = thin_vec![];
         let start = self.current_pos();
         let mut end: Option<_> = None;
@@ -1260,8 +1262,7 @@ impl<'s> Parser<'s> {
                     && peek_fn(inner.kind)
                 {
                     // Parse the end of the block now and record the span.
-                    end = Some(*inner);
-                    self.in_tree(Delimiter::Percent, None, g)?;
+                    end = Some((*inner, self.in_tree(Delimiter::Percent, None, g)?));
                     break;
                 }
             }
@@ -1275,10 +1276,10 @@ impl<'s> Parser<'s> {
 
         // If there is no end, then we generate an error about an un-closed
         // block.
-        if let Some(end) = end {
+        if let Some((end, footer)) = end {
             let span = start.join(end.span);
             let contents = self.nodes_with_span(statements, span);
-            Ok((self.node_with_joined_span(ast::Body { contents }, span), end.kind))
+            Ok((self.node_with_joined_span(ast::Body { contents }, span), end.kind, footer))
         } else {
             self.err_with_location(ParseErrorKind::UnclosedTag, expected, None, self.eof_pos())
         }

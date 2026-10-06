@@ -1,0 +1,7 @@
+// run=pass, stage=fmt, dialect=liquid
+
+{% for product in collection.products %}
+{% if product.hidden %}{% continue %}{% endif %}
+{% if forloop.index > 4 %}{% break %}{% endif %}
+<li>{{ product.title }}</li>
+{% endfor %}
