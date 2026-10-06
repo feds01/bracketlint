@@ -2,7 +2,7 @@
 
 <li class="item 
 {% if active %}
-active
+    active
 {% endif %}
 ">Item</li>
 

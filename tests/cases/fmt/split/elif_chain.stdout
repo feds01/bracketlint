@@ -2,11 +2,11 @@
 
 <div>
     {% if a %}
-<span>a</span>
+        <span>a</span>
 {% elif b %}
-<span>b</span>
+    <span>b</span>
 {% else %}
-<span>neither</span>
+    <span>neither</span>
 {% endif %}
 </div>
 

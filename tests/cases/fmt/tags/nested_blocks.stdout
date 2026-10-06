@@ -1,8 +1,8 @@
 // run=pass, stage=fmt
 {% block outer  %}
-<div>
+    <div>
 {% block inner  %}    
-<p>inner</p>
+        <p>inner</p>
 {% endblock %}
 </div>
 {% endblock %}

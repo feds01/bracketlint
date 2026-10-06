@@ -2,9 +2,9 @@
 
 <ul>
 {% for item in items %}
-<li>{{ item }}</li>
+        <li>{{ item }}</li>
     {% empty %}
-<li>No items</li>
+        <li>No items</li>
 {% endfor %}
 </ul>
 

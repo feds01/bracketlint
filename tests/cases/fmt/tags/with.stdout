@@ -1,5 +1,5 @@
 // run=pass, stage=fmt
 {% with total as items|length: %}
-<p>{{ total }}items</p>
+    <p>{{ total }}items</p>
 {% endwith %}
 
