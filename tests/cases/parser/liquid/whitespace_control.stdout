@@ -1,0 +1,24 @@
+info: parsed module '$DIR/whitespace_control.html' as liquid:
+body
+├─generic_tag
+│ ├─name "assign"
+│ └─args
+│   └─arg
+│     ├─name "name"
+│     └─lit_expr
+│       └─str_lit "world"
+├─text
+├─inline
+│ └─var_expr
+│   └─name "name"
+├─text
+└─if
+  └─clauses
+    └─if_clause
+      ├─condition
+      │ └─var_expr
+      │   └─name "name"
+      └─clause_body
+        └─body
+          └─text
+

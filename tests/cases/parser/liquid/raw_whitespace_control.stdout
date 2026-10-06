@@ -1,0 +1,8 @@
+info: parsed module '$DIR/raw_whitespace_control.html' as liquid:
+body
+├─text
+├─raw
+│ └─body
+│   └─text
+└─text
+

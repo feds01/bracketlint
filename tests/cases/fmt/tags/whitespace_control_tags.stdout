@@ -1,0 +1,11 @@
+{%- extends "base.html" -%}
+{%- block content -%}
+{%- with total = items|length -%}
+        {%- if total > 1 -%}
+            <p>{{- total -}} items</p>
+        {%- elif total == 1 -%}
+            <p>One item</p>
+    {%- endif -%}
+{%- endwith -%}
+{%- endblock content -%}
+

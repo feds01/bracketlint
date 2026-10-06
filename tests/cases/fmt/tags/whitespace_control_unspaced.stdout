@@ -1,0 +1,8 @@
+<p>{{ name -}}</p>
+<p>{{- 1 }} {{ -1 }}</p>
+{%- if user -%}
+    <p>{{ user.name }}</p>
+{% else -%}
+    <p>Guest</p>
+{% endif -%}
+{%- raw-%}{{ x }}{%-endraw-%}

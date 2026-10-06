@@ -159,12 +159,16 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         Ok(())
     }
 
+    /// Push a tag whose contents `f` pushes, with the whitespace control
+    /// markers of `trim` next to its delimiters.
     fn within_tag<F: FnOnce(&mut Self) -> Result<(), FmtError>>(
         &mut self,
         kind: TagKind,
+        trim: bl_ast::Trim,
         f: F,
     ) -> Result<(), FmtError> {
         self.push_hunk(kind.left());
+        self.push_marker(trim.left);
         self.push_hunk(" ");
 
         // Run F without an indent level.
@@ -172,9 +176,30 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
 
         // Add the closing tag.
         self.push_hunk(" ");
+        self.push_marker(trim.right);
         self.push_hunk(kind.right());
 
         Ok(())
+    }
+
+    /// Push a line with a `{% ... %}` tag that holds `contents`, e.g. the
+    /// `{% endif %}` of an if block.
+    fn push_tag_line(&mut self, contents: &str, trim: bl_ast::Trim) -> Result<(), FmtError> {
+        self.add_indent();
+        self.within_tag(TagKind::Block, trim, |this| {
+            this.push_hunk(contents);
+            Ok(())
+        })?;
+        self.end_line();
+
+        Ok(())
+    }
+
+    /// Push a whitespace control marker, if there is one.
+    fn push_marker(&mut self, marker: Option<char>) {
+        if let Some(marker) = marker {
+            self.buffer.push(marker);
+        }
     }
 
     // Extract the inline check into a separate function
@@ -274,9 +299,9 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         &mut self,
         node: bl_ast::AstNodeRef<bl_ast::Block>,
     ) -> Result<Self::BlockRet, Self::Error> {
-        let bl_ast::Block { label, block_body, end_label } = node.body();
+        let bl_ast::Block { label, block_body, end_label, trim, end_trim } = node.body();
 
-        self.within_tag(TagKind::Block, |this| {
+        self.within_tag(TagKind::Block, *trim, |this| {
             this.push_hunk("block");
             if let Some(label) = label {
                 this.push_hunk(" ");
@@ -293,12 +318,10 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         match end_label {
             Some(end_label) => {
                 let end_label = self.ctx.source.hunk(end_label.ast_ref().span().range);
-                self.push_line(&format!("{{% endblock {end_label} %}}"));
+                self.push_tag_line(&format!("endblock {end_label}"), *end_trim)
             }
-            None => self.push_line("{% endblock %}"),
+            None => self.push_tag_line("endblock", *end_trim),
         }
-
-        Ok(())
     }
 
     type WithRet = ();
@@ -307,10 +330,10 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         &mut self,
         node: bl_ast::AstNodeRef<bl_ast::With>,
     ) -> Result<Self::WithRet, Self::Error> {
-        let bl_ast::With { assignments, block_body, .. } = node.body();
+        let bl_ast::With { assignments, block_body, trim, end_trim, .. } = node.body();
 
         // Keep the assignments as they are written, e.g. `a=1 b=2` or `x as y`.
-        self.within_tag(TagKind::Block, |this| {
+        self.within_tag(TagKind::Block, *trim, |this| {
             this.push_hunk("with");
             if !assignments.is_empty() {
                 this.push_hunk(" ");
@@ -324,7 +347,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         // Now visit the block body.
         self.with_block(|formatter| formatter.visit_body(block_body.ast_ref()))?;
 
-        self.push_line("{% endwith %}");
+        self.push_tag_line("endwith", *end_trim)?;
         Ok(())
     }
 
@@ -334,11 +357,20 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         &mut self,
         node: bl_ast::AstNodeRef<bl_ast::For>,
     ) -> Result<Self::ForRet, Self::Error> {
-        let bl_ast::For { target, iterator, guard, reverse_modifier, loop_body, loop_empty } =
-            node.body();
+        let bl_ast::For {
+            target,
+            iterator,
+            guard,
+            reverse_modifier,
+            loop_body,
+            loop_empty,
+            trim,
+            empty_trim,
+            end_trim,
+        } = node.body();
 
         // @@ Proof of concept: for now, we will just push a for loop into the buffer.
-        self.within_tag(TagKind::Block, |this| {
+        self.within_tag(TagKind::Block, *trim, |this| {
             this.push_hunk("for ");
             this.push_source(target.ast_ref().span());
             this.push_hunk(" in ");
@@ -366,11 +398,11 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
 
         // Check if we have an empty loop body.
         if let Some(loop_empty) = loop_empty {
-            self.push_line("{% empty %}");
+            self.push_tag_line("empty", *empty_trim)?;
             self.with_block(|formatter| formatter.visit_body(loop_empty.ast_ref()))?;
         }
 
-        self.push_line("{% endfor %}");
+        self.push_tag_line("endfor", *end_trim)?;
         Ok(())
     }
 
@@ -380,7 +412,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         &mut self,
         node: bl_ast::AstNodeRef<bl_ast::If>,
     ) -> Result<Self::IfRet, Self::Error> {
-        let bl_ast::If { clauses, otherwise } = node.body();
+        let bl_ast::If { clauses, otherwise, else_trim, end_trim } = node.body();
 
         // Walk the clauses, and format each one of them.
         for clause in clauses.iter() {
@@ -388,11 +420,11 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         }
 
         if let Some(otherwise) = otherwise {
-            self.push_line("{% else %}");
+            self.push_tag_line("else", *else_trim)?;
             self.with_block(|formatter| formatter.visit_body(otherwise.ast_ref()))?;
         }
 
-        self.push_line("{% endif %}");
+        self.push_tag_line("endif", *end_trim)?;
 
         Ok(())
     }
@@ -403,10 +435,10 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         &mut self,
         node: bl_ast::AstNodeRef<bl_ast::IfClause>,
     ) -> Result<Self::IfClauseRet, Self::Error> {
-        let bl_ast::IfClause { kind, condition, clause_body } = node.body();
+        let bl_ast::IfClause { kind, condition, clause_body, trim } = node.body();
 
         self.add_indent();
-        self.within_tag(TagKind::Block, |this| {
+        self.within_tag(TagKind::Block, *trim, |this| {
             match kind {
                 bl_ast::ClauseKind::If => this.push_hunk("if "),
                 bl_ast::ClauseKind::Elif => this.push_hunk("elif "),
@@ -531,10 +563,10 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         &mut self,
         node: bl_ast::AstNodeRef<bl_ast::Inline>,
     ) -> Result<Self::InlineRet, Self::Error> {
-        let bl_ast::Inline { expr } = node.body();
+        let bl_ast::Inline { expr, trim } = node.body();
 
         self.space_from_previous(node.span().range.start());
-        self.within_tag(TagKind::Inline, |this| {
+        self.within_tag(TagKind::Inline, *trim, |this| {
             this.visit_expr(expr.ast_ref())?;
             Ok(())
         })
@@ -546,9 +578,9 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         &mut self,
         node: bl_ast::AstNodeRef<bl_ast::Extends>,
     ) -> Result<Self::ExtendsRet, Self::Error> {
-        let bl_ast::Extends { template } = node.body();
+        let bl_ast::Extends { template, trim } = node.body();
 
-        self.within_tag(TagKind::Block, |this| {
+        self.within_tag(TagKind::Block, *trim, |this| {
             this.push_hunk("extends ");
             this.visit_expr(template.ast_ref())
         })?;
