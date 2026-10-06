@@ -8,7 +8,7 @@ body { color: red; margin:0 }
     </head>
     <body>
     {% if user %}
-        <div class="a"><span>Hello{{ user.name }}</span>
+        <div class="a"><span>Hello {{ user.name }}</span>
     {% else %}
         <div class="b">
     {% endif %}

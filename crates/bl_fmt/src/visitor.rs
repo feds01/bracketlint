@@ -36,6 +36,11 @@ impl<EngineAdaptor: ExternalLanguagesEngineAdaptor> Formatter<'_, EngineAdaptor>
     }
 }
 
+/// Whether a run of whitespace separates two items on the same line.
+fn is_inline_space(whitespace: &str) -> bool {
+    !whitespace.is_empty() && !whitespace.contains('\n')
+}
+
 pub enum TagKind {
     Block,
     Inline,
@@ -105,6 +110,22 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
     #[inline(always)]
     fn at_line_start(&self) -> bool {
         self.buffer.is_empty() || self.buffer.ends_with('\n')
+    }
+
+    /// Separate an item that continues the current line from what precedes
+    /// it with a single space, when the source has one. The lexer skips
+    /// whitespace and the engines trim it, which would otherwise turn
+    /// `{{ a }}, {{ b }}` into `{{ a }},{{ b }}` and change the output.
+    fn space_from_previous(&mut self, start: usize) {
+        let before = &self.ctx.source.source[..start];
+        let whitespace = &before[before.trim_end().len()..];
+
+        if is_inline_space(whitespace)
+            && !self.at_line_start()
+            && !self.buffer.ends_with(char::is_whitespace)
+        {
+            self.push_hunk(" ");
+        }
     }
 
     /// Push a newline into the buffer.
@@ -460,6 +481,9 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             }
         }
 
+        let start = node.span().range.start() + (text.len() - text.trim_start().len());
+        self.space_from_previous(start);
+
         // The last line is left open so that a following inline tag can
         // continue it. Any line that starts a new line in the buffer gets the
         // current indent, the first one may instead continue a line that an
@@ -510,6 +534,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
     ) -> Result<Self::InlineRet, Self::Error> {
         let bl_ast::Inline { expr } = node.body();
 
+        self.space_from_previous(node.span().range.start());
         self.within_tag(TagKind::Inline, |this| {
             this.visit_expr(expr.ast_ref())?;
             Ok(())
@@ -583,6 +608,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         &mut self,
         node: bl_ast::AstNodeRef<bl_ast::GenericTag>,
     ) -> Result<Self::GenericTagRet, Self::Error> {
+        self.space_from_previous(node.span().range.start());
         self.within_tag(TagKind::Block, |this| {
             let bl_ast::GenericTag { name, args } = node.body();
 
