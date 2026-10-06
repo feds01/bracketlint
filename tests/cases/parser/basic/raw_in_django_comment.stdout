@@ -1,0 +1,13 @@
+info: parsed module '$DIR/raw_in_django_comment.html' as django:
+body
+├─comment
+├─text
+├─inline
+│ └─access_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "user"
+│   └─field
+│     └─name "name"
+└─text
+

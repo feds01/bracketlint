@@ -65,6 +65,14 @@ impl TagContext {
     }
 }
 
+/// Whether an expression takes the filters that follow it, see
+/// [Parser::parse_singular_expr].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TakeFilters {
+    Yes,
+    No,
+}
+
 #[derive(Deref)]
 pub struct ParseFrame<'s> {
     /// The token cursor for the current frame.
@@ -685,7 +693,7 @@ impl<'s> Parser<'s> {
         // forms of either property accesses, indexing or method calls
         let (subject, subject_span) = self.track_span(|this| this.parse_expr_component(token))?;
 
-        self.parse_singular_expr(subject, subject_span)
+        self.parse_singular_expr(subject, subject_span, TakeFilters::Yes)
     }
 
     fn parse_expr_component(&mut self, token: Token) -> ParseResult<AstNode<ast::Expr>> {
@@ -729,11 +737,13 @@ impl<'s> Parser<'s> {
     /// Provided an initial subject expression that is parsed by the parent
     /// caller, this function will check if there are any additional
     /// components to the expression; in the form of either property access,
-    /// method calls, indexing, etc.
-    pub(crate) fn parse_singular_expr(
+    /// method calls, indexing, etc. Filters are only applied to the subject
+    /// when it takes them, see [TakeFilters].
+    fn parse_singular_expr(
         &mut self,
         mut subject: AstNode<ast::Expr>,
         mut subject_span: ByteRange,
+        filters: TakeFilters,
     ) -> ParseResult<AstNode<ast::Expr>> {
         // so here we need to peek to see if this is either a index_access, field access
         // or a function call...
@@ -762,7 +772,7 @@ impl<'s> Parser<'s> {
                     )
                 }
                 // Filter
-                TokenKind::Pipe => {
+                TokenKind::Pipe if filters == TakeFilters::Yes => {
                     self.skip_fast(TokenKind::Pipe); // `<pipe>` Skip the pipe token.
                     let filter = self.parse_filter(subject_span)?;
                     self.node_with_joined_span(
@@ -837,12 +847,25 @@ impl<'s> Parser<'s> {
     fn parse_filter(&mut self, subject_span: ByteRange) -> ParseResult<AstNode<ast::Filter>> {
         let name = self.parse_name()?;
         let args = if self.parse_token_fast(TokenKind::Colon).is_some() {
-            self.parse_args()?
+            let start = self.current_pos();
+            let arg = self.parse_filter_arg()?;
+            self.nodes_with_joined_span(thin_vec![arg], start)
         } else {
             AstNodes::empty(self.make_span(subject_span))
         };
 
         Ok(self.node_with_joined_span(ast::Filter { name, args }, subject_span))
+    }
+
+    /// Parse the argument of a filter, i.e. `a` in `x|f:a`. A filter takes a
+    /// single argument, which has no filters of its own, so in `x|f:a|g` the
+    /// filter `g` applies to `x|f:a` rather than to `a`.
+    fn parse_filter_arg(&mut self) -> ParseResult<AstNode<ast::Arg>> {
+        let token = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
+        let (subject, subject_span) = self.track_span(|this| this.parse_expr_component(token))?;
+        let value = self.parse_singular_expr(subject, subject_span, TakeFilters::No)?;
+
+        Ok(self.node_with_joined_span(ast::Arg { name: None, value: Some(value) }, token.span))
     }
 
     fn parse_bin_op(&mut self) -> (Option<ast::BinOp>, u8) {
@@ -1017,6 +1040,7 @@ impl<'s> Parser<'s> {
     fn parse_if_block(&mut self) -> ParseResult<AstNode<ast::Statement>> {
         let mut clauses = thin_vec![];
         let mut otherwise = None;
+        let mut closed = false;
         let start = self.current_pos();
 
         let parse_body = |this: &mut Self, preceding_token: TokenKind| {
@@ -1083,6 +1107,7 @@ impl<'s> Parser<'s> {
                             g.parse_token(TokenKind::Keyword(Keyword::EndIf))?;
                             Ok(())
                         })?;
+                        closed = true;
                         break;
                     }
                     _ => self.err_with_location(
@@ -1093,6 +1118,15 @@ impl<'s> Parser<'s> {
                     )?,
                 }
             }
+        }
+
+        if !closed {
+            return self.err_with_location(
+                ParseErrorKind::UnclosedTag,
+                ExpectedItem::empty(),
+                None,
+                self.eof_pos(),
+            );
         }
 
         let clauses = self.nodes_with_joined_span(clauses, start);
@@ -1198,10 +1232,11 @@ impl<'s> Parser<'s> {
         let start = self.current_pos();
 
         self.in_tree(Delimiter::Percent, None, |g| {
-            g.parse_token(TokenKind::Keyword(token::Keyword::Comment))
+            g.parse_token(TokenKind::Keyword(token::Keyword::Raw))
         })?;
 
-        // Now eat until the end of the block.
+        // The lexer reads the contents of the block as text, so this only
+        // finds the end of the block.
         let (block_body, _, _) = self.parse_body_until_block_footer(
             ExpectedItem::empty(),
             |kind| matches!(kind, TokenKind::Keyword(token::Keyword::EndRaw)),

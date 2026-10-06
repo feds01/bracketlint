@@ -1,0 +1,19 @@
+info: parsed module '$DIR/filter_chain.html' as django:
+body
+└─inline
+  └─filtered_expr
+    ├─subject
+    │ └─filtered_expr
+    │   ├─subject
+    │   │ └─var_expr
+    │   │   └─name "value"
+    │   └─filter
+    │     ├─name "add"
+    │     └─args
+    │       └─arg
+    │         └─lit_expr
+    │           └─str_lit "2"
+    └─filter
+      ├─name "upper"
+      └─args
+

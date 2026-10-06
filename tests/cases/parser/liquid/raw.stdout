@@ -1,3 +1,6 @@
 info: parsed module '$DIR/raw.html' as liquid:
 body
+└─raw
+  └─body
+    └─text
 

@@ -8,6 +8,5 @@ body
 │   │   └─name "product"
 │   └─field
 │     └─name "title"
-├─comment
 └─text
 

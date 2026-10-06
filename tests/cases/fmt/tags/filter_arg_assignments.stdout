@@ -1,0 +1,4 @@
+{% with name=user.name|default:"Guest" count=items|length %}
+    <p>{{ name }} has {{ count }} items</p>
+{% endwith %}
+
