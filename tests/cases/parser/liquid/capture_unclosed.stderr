@@ -1,0 +1,5 @@
+error: expected a closing `{% endcapture %}` tag
+ --> $DIR/capture_unclosed.html:1:39
+  |
+1 | {% capture greeting %}Hello {{ name }}
+  |                                       -

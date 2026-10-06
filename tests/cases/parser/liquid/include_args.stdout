@@ -4,4 +4,8 @@ body
   ├─lit_expr
   │ └─str_lit "product-card"
   └─context
+    └─arg
+      ├─name "product"
+      └─var_expr
+        └─name "product"
 

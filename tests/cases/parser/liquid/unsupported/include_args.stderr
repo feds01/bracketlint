@@ -1,5 +1,0 @@
-error: unexpectedly encountered a `,`
- --> $DIR/include_args.html:1:26
-  |
-1 | {% include "product-card", product: product %}
-  |                          -

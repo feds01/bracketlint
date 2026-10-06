@@ -1,0 +1,43 @@
+info: parsed module '$DIR/render_forms.html' as liquid:
+body
+├─render
+│ ├─template
+│ │ └─lit_expr
+│ │   └─str_lit "card"
+│ ├─with
+│ │ └─var_expr
+│ │   └─name "featured"
+│ ├─as
+│ │ └─name "product"
+│ └─args
+│   └─arg
+│     ├─name "show_price"
+│     └─lit_expr
+│       └─bool_lit true
+├─include
+│ ├─lit_expr
+│ │ └─str_lit "card"
+│ └─context
+│   ├─arg
+│   │ └─var_expr
+│   │   └─name "featured"
+│   └─arg
+│     ├─name "size"
+│     └─lit_expr
+│       └─int_lit 2
+├─include
+│ ├─lit_expr
+│ │ └─str_lit "card"
+│ └─context
+│   └─arg
+│     ├─name "size"
+│     └─lit_expr
+│       └─int_lit 2
+└─generic_tag
+  ├─name "assign"
+  └─args
+    └─arg
+      ├─name "render"
+      └─lit_expr
+        └─int_lit 1
+

@@ -1,0 +1,4 @@
+<div>{% render "card" %}</div>
+<p>Hello {% render "name" %} world</p>
+<p>Hi {% capture greeting %}there{% endcapture %}{{ greeting }}</p>
+

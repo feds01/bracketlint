@@ -14,11 +14,9 @@ body
     │ ├─lit_expr
     │ │ └─str_lit "breadcrumbs"
     │ └─context
-    ├─generic_tag
-    │ ├─name "render"
-    │ └─args
-    │   └─arg
-    │     └─lit_expr
-    │       └─str_lit "product-card"
+    ├─render
+    │ └─template
+    │   └─lit_expr
+    │     └─str_lit "product-card"
     └─text
 

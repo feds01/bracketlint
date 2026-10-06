@@ -775,6 +775,46 @@ define_tree! {
         pub context: Children!(Arg),
     }
 
+    /// A Liquid `render` tag, which renders another template with variables of
+    /// its own, i.e.
+    ///
+    /// ```liquid
+    /// {% render "card", product: product %}
+    /// {% render "card" with featured as product %}
+    /// {% render "card" for products as product %}
+    /// ```
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct Render {
+        pub template: Child!(Expr),
+
+        /// The value after `with`, which the template sees as a variable.
+        pub with_value: OptionalChild!(Expr),
+
+        /// The value after `for`, which the template is rendered for each item
+        /// of.
+        pub for_value: OptionalChild!(Expr),
+
+        /// The name after `as`, which the template sees the value as.
+        pub alias: OptionalChild!(Name),
+        pub args: Children!(Arg),
+    }
+
+    /// A Liquid `capture` block, which renders its body into a variable, i.e.
+    ///
+    /// ```liquid
+    /// {% capture greeting %}Hello {{ name }}{% endcapture %}
+    /// ```
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct Capture {
+        pub name: Child!(Name),
+        pub block_body: Child!(Body),
+
+        /// The whitespace control of the opening and the closing tag.
+        pub trim: TrimTag,
+    }
+
     /// Extend the current template with the contents of another file.
     #[derive(Clone, Debug, PartialEq)]
     #[node]
@@ -1090,6 +1130,12 @@ define_tree! {
         /// The Liquid `{% case subject %}` tag
         Case(Case),
 
+        /// The Liquid `{% render "file" %}` tag
+        Render(Render),
+
+        /// The Liquid `{% capture name %}` tag, ending with `{% endcapture %}`
+        Capture(Capture),
+
         /// The `{% continue %}` tag
         Continue(Continue),
 
@@ -1123,6 +1169,8 @@ define_tree! {
                 Tag::If(_) => "if",
                 Tag::For(_) => "for",
                 Tag::Case(_) => "case",
+                Tag::Render(_) => "render",
+                Tag::Capture(_) => "capture",
                 Tag::Continue(_) => "continue",
                 Tag::Break(_) => "break",
                 Tag::Raw(_) => "raw",
@@ -1130,7 +1178,7 @@ define_tree! {
         }
 
         pub fn is_inline(&self) -> bool {
-            matches!(self, Tag::Unprocessable(_) | Tag::Assignment(_) | Tag::Continue(_) | Tag::Break(_) | Tag::Generic(_) )
+            matches!(self, Tag::Unprocessable(_) | Tag::Assignment(_) | Tag::Continue(_) | Tag::Break(_) | Tag::Generic(_) | Tag::Render(_) | Tag::Capture(_) )
         }
 
     }

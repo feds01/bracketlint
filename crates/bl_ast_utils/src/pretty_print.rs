@@ -460,6 +460,37 @@ impl AstVisitor for AstTreePrinter<'_> {
         Ok(TreeNode::branch("case", children))
     }
 
+    type RenderRet = TreeNode;
+
+    fn visit_render(
+        &self,
+        node: ast::AstNodeRef<ast::Render>,
+    ) -> Result<Self::RenderRet, Self::Error> {
+        let walk::Render { template, with_value, for_value, alias, args } =
+            walk::walk_render(self, node)?;
+
+        let mut children = vec![TreeNode::branch("template", vec![template])];
+        children.extend(with_value.map(|value| TreeNode::branch("with", vec![value])));
+        children.extend(for_value.map(|value| TreeNode::branch("for", vec![value])));
+        children.extend(alias.map(|alias| TreeNode::branch("as", vec![alias])));
+
+        if !args.is_empty() {
+            children.push(TreeNode::branch("args", args));
+        }
+
+        Ok(TreeNode::branch("render", children))
+    }
+
+    type CaptureRet = TreeNode;
+
+    fn visit_capture(
+        &self,
+        node: ast::AstNodeRef<ast::Capture>,
+    ) -> Result<Self::CaptureRet, Self::Error> {
+        let walk::Capture { name, block_body } = walk::walk_capture(self, node)?;
+        Ok(TreeNode::branch("capture", vec![name, block_body]))
+    }
+
     type WhenRet = TreeNode;
 
     fn visit_when(&self, node: ast::AstNodeRef<ast::When>) -> Result<Self::WhenRet, Self::Error> {

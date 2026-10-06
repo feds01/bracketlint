@@ -54,6 +54,9 @@ pub(crate) enum TagContext {
 
     /// When the parser has encountered a Liquid `case` block.
     Case,
+
+    /// When the parser has encountered a Liquid `capture` block.
+    Capture,
 }
 impl TagContext {
     fn applies_to(&self, kwd: token::Keyword) -> bool {
@@ -67,6 +70,7 @@ impl TagContext {
                 matches!(kwd, token::Keyword::EndFor | token::Keyword::EndTableRow)
             }
             TagContext::Case => matches!(kwd, token::Keyword::When | token::Keyword::Else),
+            TagContext::Capture => matches!(kwd, token::Keyword::EndCapture),
         }
     }
 }
@@ -611,6 +615,10 @@ impl<'s> Parser<'s> {
                 token::Keyword::Case => {
                     self.with_tag_context(TagContext::Case, |g| g.parse_case_block())
                 }
+                token::Keyword::Capture => {
+                    self.with_tag_context(TagContext::Capture, |g| g.parse_capture_block())
+                }
+                token::Keyword::Render => self.parse_render_statement(),
 
                 // Control flow tags, that are effectively standalone.
                 token::Keyword::Break => self.parse_break_statement(),
@@ -1500,16 +1508,15 @@ impl<'s> Parser<'s> {
 
             // If the next token is a string literal, we still accept it but
             // we emit a warning since it technically not a legal block name.
-            if g.parse_token_fast(TokenKind::Str).is_some() {
-                let span = g.previous_pos();
+            if g.peek_kind() == Some(TokenKind::Str) {
+                let span = g.current_pos();
                 g.add_warning(ParseWarning::new(
                     ParseWarningKind::BlockLabelIsStringLiteral,
                     g.make_span(span),
                 ));
-                Ok(g.node_with_span(ast::Name::new(ast::Identifier::from(0u32)), span))
-            } else {
-                g.parse_name()
             }
+
+            g.parse_name_or_string()
         })?;
 
         // Now parse a bunch of general statements until we reach the end of the block.
@@ -1640,6 +1647,11 @@ impl<'s> Parser<'s> {
         let start = self.current_pos();
 
         while self.peek().is_some() {
+            // Liquid separates arguments with commas, e.g. `{% cycle "a", "b" %}`.
+            if self.options.dialect.is_liquid() {
+                self.parse_token_fast(TokenKind::Comma);
+            }
+
             match self.parse_arg() {
                 Ok(Some(arg)) => args.push(arg),
                 Ok(None) => break,
@@ -1648,6 +1660,83 @@ impl<'s> Parser<'s> {
         }
 
         Ok(self.nodes_with_joined_span(args, start))
+    }
+
+    /// Parse a Liquid `render` tag, i.e.
+    ///
+    /// ```liquid
+    /// {% render "card", product: product %}
+    /// {% render "card" with featured as product %}
+    /// {% render "card" for products as product %}
+    /// ```
+    fn parse_render_statement(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+        self.in_tree(Delimiter::Percent, None, |g| {
+            g.parse_token(TokenKind::Keyword(Keyword::Render))?;
+            let template = g.parse_expr()?;
+
+            let (with_value, for_value) = match g.peek_kind() {
+                Some(TokenKind::Keyword(Keyword::With)) => {
+                    g.skip_fast(TokenKind::Keyword(Keyword::With)); // `with` Skip the keyword.
+                    (Some(g.parse_expr()?), None)
+                }
+                Some(TokenKind::Keyword(Keyword::For)) => {
+                    g.skip_fast(TokenKind::Keyword(Keyword::For)); // `for` Skip the keyword.
+                    (None, Some(g.parse_expr()?))
+                }
+                _ => (None, None),
+            };
+
+            let alias = if (with_value.is_some() || for_value.is_some())
+                && g.parse_token_fast(TokenKind::Keyword(Keyword::As)).is_some()
+            {
+                Some(g.parse_name()?)
+            } else {
+                None
+            };
+
+            let args = g.parse_args()?;
+
+            Ok(g.node_with_span(
+                ast::Statement::Tag(ast::Tag::Render(ast::Render {
+                    template,
+                    with_value,
+                    for_value,
+                    alias,
+                    args,
+                })),
+                g.range(),
+            ))
+        })
+    }
+
+    /// Parse a Liquid `capture` block, i.e.
+    /// `{% capture greeting %}Hello {{ name }}{% endcapture %}`.
+    fn parse_capture_block(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+        let token = *self.current_token();
+
+        let (name, trim) = self.in_tag(Delimiter::Percent, |g| {
+            g.parse_token(TokenKind::Keyword(Keyword::Capture))?;
+
+            g.parse_name_or_string()
+        })?;
+
+        let (block_body, _, end_trim) = self.parse_body_until_block_footer(
+            Keyword::EndCapture,
+            |kind| kind == TokenKind::Keyword(Keyword::EndCapture),
+            |g| {
+                g.skip_fast(TokenKind::Keyword(Keyword::EndCapture)); // `<endcapture>` Skip the end token.
+                Ok(g.trim())
+            },
+        )?;
+
+        Ok(self.node_with_joined_span(
+            ast::Statement::Tag(ast::Tag::Capture(ast::Capture {
+                name,
+                block_body,
+                trim: ast::TrimTag { start: trim, end: end_trim },
+            })),
+            token.span,
+        ))
     }
 
     /// Parse an `extends` statement, i.e.
@@ -1683,7 +1772,10 @@ impl<'s> Parser<'s> {
             g.parse_token(TokenKind::Keyword(token::Keyword::Include))?;
             let template = g.parse_expr()?;
 
+            // Liquid also passes named arguments without `with`, e.g.
+            // `{% include "card", product: product %}`.
             let context = if g.parse_token_fast(TokenKind::Keyword(token::Keyword::With)).is_some()
+                || g.options.dialect.is_liquid()
             {
                 g.parse_args()?
             } else {
@@ -1756,6 +1848,18 @@ impl<'s> Parser<'s> {
         Ok(self.nodes_with_joined_span(names, start))
     }
 
+    /// Parse a name, which can also be written as a string, e.g. the `"x"` in
+    /// `{% capture "x" %}`.
+    fn parse_name_or_string(&mut self) -> ParseResult<AstNode<ast::Name>> {
+        match self.peek().copied() {
+            Some(Token { kind: TokenKind::Str, span }) => {
+                self.skip_fast(TokenKind::Str); // `<string>` Skip the string token.
+                Ok(self.node_with_span(ast::Name::new(ast::Identifier::from(0u32)), span))
+            }
+            _ => self.parse_name(),
+        }
+    }
+
     fn parse_name(&mut self) -> ParseResult<AstNode<ast::Name>> {
         match self.peek() {
             Some(Token { kind: TokenKind::Ident, span }) => {
@@ -1796,13 +1900,28 @@ impl<'s> Parser<'s> {
 
     fn parse_arg(&mut self) -> ParseResult<Option<AstNode<ast::Arg>>> {
         match (self.peek().copied(), self.peek_second().copied()) {
-            (
-                Some(Token { kind: TokenKind::Ident, span }),
-                Some(Token { kind: TokenKind::Eq, .. }),
-            ) => {
+            (Some(Token { kind, span }), Some(Token { kind: TokenKind::Eq, .. }))
+                if kind.is_ident_like() =>
+            {
                 let name = self.parse_name()?;
                 self.parse_token(TokenKind::Eq)?;
 
+                let value = self.parse_expr()?;
+
+                Ok(Some(self.node_with_joined_span(
+                    ast::Arg { name: Some(name), value: Some(value) },
+                    span,
+                )))
+            }
+            // Liquid writes named arguments as `name: value`, and the group of a
+            // `cycle` as a string, e.g. `{% cycle "group": "a", "b" %}`.
+            (Some(Token { kind, span }), Some(Token { kind: TokenKind::Colon, .. }))
+                if self.options.dialect.is_liquid()
+                    && (kind.is_ident_like() || kind == TokenKind::Str) =>
+            {
+                let name = self.parse_name_or_string()?;
+
+                self.skip_fast(TokenKind::Colon); // `:` Skip the colon token.
                 let value = self.parse_expr()?;
 
                 Ok(Some(self.node_with_joined_span(

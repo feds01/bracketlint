@@ -1,0 +1,16 @@
+info: parsed module '$DIR/django_tag_args.html' as django:
+body
+├─text
+├─generic_tag
+│ ├─name "cycle"
+│ └─args
+│   ├─arg
+│   │ └─lit_expr
+│   │   └─str_lit "odd"
+│   └─arg
+│     └─lit_expr
+│       └─str_lit "even"
+├─text
+├─unprocessable_tag
+└─text
+

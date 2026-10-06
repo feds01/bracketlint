@@ -1,0 +1,6 @@
+// run=pass, stage=check, dialect=liquid
+
+{% render "card" with featured as product, show_price: true %}
+{% include "card" with featured, size: 2 %}
+{% include "card" size: 2 %}
+{% assign render = 1 %}
