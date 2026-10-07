@@ -1,0 +1,28 @@
+info: parsed module '$DIR/filter_chain.html' as liquid:
+body
+├─text
+├─inline
+│ └─filtered_expr
+│   ├─subject
+│   │ └─filtered_expr
+│   │   ├─subject
+│   │   │ └─access_expr
+│   │   │   ├─subject
+│   │   │   │ └─var_expr
+│   │   │   │   └─name "product"
+│   │   │   └─field
+│   │   │     └─name "price"
+│   │   └─filter
+│   │     ├─name "times"
+│   │     └─args
+│   │       └─arg
+│   │         └─lit_expr
+│   │           └─int_lit 2
+│   └─filter
+│     ├─name "round"
+│     └─args
+│       └─arg
+│         └─lit_expr
+│           └─int_lit 2
+└─text
+

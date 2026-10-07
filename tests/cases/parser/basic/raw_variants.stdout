@@ -1,0 +1,11 @@
+info: parsed module '$DIR/raw_variants.html' as jinja:
+body
+├─raw
+│ └─body
+│   └─text
+├─text
+├─inline
+│ └─var_expr
+│   └─name "b"
+└─text
+

@@ -86,7 +86,8 @@ pub fn parse_source(query: ParseQuery) -> ParseQueryResult {
     let spanned = member.spanned();
 
     // Lex the contents of the module or interactive block
-    let LexerMetadata { tokens, mut diagnostics } = Lexer::new(spanned, id).tokenise();
+    let LexerMetadata { tokens, mut diagnostics } =
+        Lexer::new(spanned, id, member.dialect).tokenise();
     let mut spans = LocalSpanMap::with_capacity(tokens.len() * 2);
 
     // @@Todo: Make this a query instead so that we can call it as a debugging

@@ -48,6 +48,18 @@ impl Dialect {
         Self::ALL.iter().copied().find(|dialect| dialect.extension() == Some(extension))
     }
 
+    /// Whether `{# ... #}` is a comment. Liquid has no such comment, so it is
+    /// text there.
+    pub fn has_hash_comments(self) -> bool {
+        matches!(self, Dialect::Django | Dialect::Jinja | Dialect::Twig)
+    }
+
+    /// Whether `{% raw %}` blocks exist, whose contents are output as they are
+    /// written. Django and Twig have `{% verbatim %}` instead.
+    pub fn has_raw_blocks(self) -> bool {
+        matches!(self, Dialect::Jinja | Dialect::Liquid)
+    }
+
     /// Check if its currently Django dialect.
     #[inline]
     pub fn is_django(self) -> bool {

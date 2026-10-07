@@ -678,14 +678,23 @@ impl<'s> Parser<'s> {
     }
 
     fn parse_expr(&mut self) -> ParseResult<AstNode<ast::Expr>> {
-        let token = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
+        let start = self.current_pos();
+        let mut expr = self.parse_value()?;
 
-        // Firstly, we have to get the initial part of the expression,
-        // and then we can check if there are any additional parts in the
-        // forms of either property accesses, indexing or method calls
-        let (subject, subject_span) = self.track_span(|this| this.parse_expr_component(token))?;
+        // A filter applies to everything before it, and its result can be
+        // accessed further, e.g. `users|first.name`.
+        while self.peek().is_some_and(|token| token.kind == TokenKind::Pipe) {
+            let subject_span = start.join(self.previous_pos());
+            self.skip_fast(TokenKind::Pipe); // `<pipe>` Skip the pipe token.
+            let filter = self.parse_filter(subject_span)?;
+            let subject = self.node_with_joined_span(
+                ast::Expr::FilteredExpr(ast::FilteredExpr { subject: expr, filter }),
+                subject_span,
+            );
+            expr = self.parse_singular_expr(subject, subject_span)?;
+        }
 
-        self.parse_singular_expr(subject, subject_span)
+        Ok(expr)
     }
 
     fn parse_expr_component(&mut self, token: Token) -> ParseResult<AstNode<ast::Expr>> {
@@ -726,11 +735,23 @@ impl<'s> Parser<'s> {
         })
     }
 
+    /// Parse a value, i.e. an expression without any filters applied to it.
+    fn parse_value(&mut self) -> ParseResult<AstNode<ast::Expr>> {
+        let token = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
+
+        // Firstly, we have to get the initial part of the expression,
+        // and then we can check if there are any additional parts in the
+        // forms of either property accesses, indexing or method calls
+        let (subject, subject_span) = self.track_span(|this| this.parse_expr_component(token))?;
+
+        self.parse_singular_expr(subject, subject_span)
+    }
+
     /// Provided an initial subject expression that is parsed by the parent
     /// caller, this function will check if there are any additional
     /// components to the expression; in the form of either property access,
     /// method calls, indexing, etc.
-    pub(crate) fn parse_singular_expr(
+    fn parse_singular_expr(
         &mut self,
         mut subject: AstNode<ast::Expr>,
         mut subject_span: ByteRange,
@@ -758,15 +779,6 @@ impl<'s> Parser<'s> {
 
                     self.node_with_joined_span(
                         ast::Expr::Index(ast::IndexExpr { subject, index }),
-                        subject_span,
-                    )
-                }
-                // Filter
-                TokenKind::Pipe => {
-                    self.skip_fast(TokenKind::Pipe); // `<pipe>` Skip the pipe token.
-                    let filter = self.parse_filter(subject_span)?;
-                    self.node_with_joined_span(
-                        ast::Expr::FilteredExpr(ast::FilteredExpr { subject, filter }),
                         subject_span,
                     )
                 }
@@ -837,12 +849,24 @@ impl<'s> Parser<'s> {
     fn parse_filter(&mut self, subject_span: ByteRange) -> ParseResult<AstNode<ast::Filter>> {
         let name = self.parse_name()?;
         let args = if self.parse_token_fast(TokenKind::Colon).is_some() {
-            self.parse_args()?
+            let start = self.current_pos();
+            let arg = self.parse_filter_arg()?;
+            self.nodes_with_joined_span(thin_vec![arg], start)
         } else {
             AstNodes::empty(self.make_span(subject_span))
         };
 
         Ok(self.node_with_joined_span(ast::Filter { name, args }, subject_span))
+    }
+
+    /// Parse the argument of a filter, i.e. `a` in `x|f:a`. A filter takes a
+    /// single argument, which has no filters of its own, so in `x|f:a|g` the
+    /// filter `g` applies to `x|f:a` rather than to `a`.
+    fn parse_filter_arg(&mut self) -> ParseResult<AstNode<ast::Arg>> {
+        let start = self.current_pos();
+        let value = self.parse_value()?;
+
+        Ok(self.node_with_joined_span(ast::Arg { name: None, value: Some(value) }, start))
     }
 
     fn parse_bin_op(&mut self) -> (Option<ast::BinOp>, u8) {
@@ -1017,6 +1041,7 @@ impl<'s> Parser<'s> {
     fn parse_if_block(&mut self) -> ParseResult<AstNode<ast::Statement>> {
         let mut clauses = thin_vec![];
         let mut otherwise = None;
+        let mut closed = false;
         let start = self.current_pos();
 
         let parse_body = |this: &mut Self, preceding_token: TokenKind| {
@@ -1083,6 +1108,7 @@ impl<'s> Parser<'s> {
                             g.parse_token(TokenKind::Keyword(Keyword::EndIf))?;
                             Ok(())
                         })?;
+                        closed = true;
                         break;
                     }
                     _ => self.err_with_location(
@@ -1093,6 +1119,15 @@ impl<'s> Parser<'s> {
                     )?,
                 }
             }
+        }
+
+        if !closed {
+            return self.err_with_location(
+                ParseErrorKind::UnclosedTag,
+                ExpectedItem::empty(),
+                None,
+                self.eof_pos(),
+            );
         }
 
         let clauses = self.nodes_with_joined_span(clauses, start);
@@ -1198,10 +1233,11 @@ impl<'s> Parser<'s> {
         let start = self.current_pos();
 
         self.in_tree(Delimiter::Percent, None, |g| {
-            g.parse_token(TokenKind::Keyword(token::Keyword::Comment))
+            g.parse_token(TokenKind::Keyword(token::Keyword::Raw))
         })?;
 
-        // Now eat until the end of the block.
+        // The lexer reads the contents of the block as text, so this only
+        // finds the end of the block.
         let (block_body, _, _) = self.parse_body_until_block_footer(
             ExpectedItem::empty(),
             |kind| matches!(kind, TokenKind::Keyword(token::Keyword::EndRaw)),

@@ -7,6 +7,7 @@ use std::cell::Cell;
 
 use bl_ast::{ByteRange, SourceId, Span, SpannedSource};
 use bl_reporting::DiagnosticsMut;
+use bl_workspace::Dialect;
 use diagnostics::{LexerDiagnostics, LexerError, LexerErrorKind};
 use token::{Delimiter, Keyword, NumberFlags, Token, TokenKind};
 
@@ -60,6 +61,9 @@ pub struct Lexer<'lex> {
     /// reporting.
     pub id: SourceId,
 
+    /// The template dialect of the source.
+    pub dialect: Dialect,
+
     /// Diagnostics that the lexer has produced.
     pub diagnostics: LexerDiagnostics,
 
@@ -72,9 +76,10 @@ pub struct Lexer<'lex> {
 }
 
 impl<'lex> Lexer<'lex> {
-    pub fn new(spanned: SpannedSource<'lex>, id: SourceId) -> Self {
+    pub fn new(spanned: SpannedSource<'lex>, id: SourceId, dialect: Dialect) -> Self {
         Self {
             id,
+            dialect,
             spanned,
             diagnostics: LexerDiagnostics::default(),
             tokens: Vec::new(),
@@ -202,6 +207,7 @@ impl<'lex> Lexer<'lex> {
         let offset = self.offset.get();
 
         let on_tree = |this: &mut Self, delimiter: Delimiter| {
+            let tree = this.tokens.len();
             this.tokens.push(Token::new(
                 TokenKind::Tree(delimiter, 0),
                 ByteRange::new(offset, this.len_consumed()),
@@ -210,6 +216,20 @@ impl<'lex> Lexer<'lex> {
 
             if this.has_fatal_error {
                 return None;
+            }
+
+            // The contents of a `{% raw %}` block are output as they are
+            // written, so they are text rather than tokens.
+            if this.dialect.has_raw_blocks()
+                && matches!(
+                    this.tokens[tree..],
+                    [
+                        Token { kind: TokenKind::Tree(Delimiter::Percent, 1), .. },
+                        Token { kind: TokenKind::Keyword(Keyword::Raw), .. }
+                    ]
+                )
+            {
+                this.hunk();
             }
 
             // Immediately try to index the next token...
@@ -303,7 +323,7 @@ impl<'lex> Lexer<'lex> {
                                 if c == '%' { Delimiter::Percent } else { Delimiter::Brace };
                             return on_tree(self, delimiter);
                         }
-                        '#' => {
+                        '#' if self.dialect.has_hash_comments() => {
                             self.skip_ascii();
                             self.comment()
                         }
@@ -516,6 +536,19 @@ impl<'lex> Lexer<'lex> {
         }
     }
 
+    /// Lex the contents of a `{% raw %}` block as text, up to its
+    /// `{% endraw %}` tag, or the end of the source if it has none.
+    fn hunk(&mut self) {
+        let start = self.offset.get();
+        let slice = unsafe { self.as_slice() };
+        let len = find_end_raw(slice).unwrap_or(slice.len());
+
+        if len > 0 {
+            self.offset.update(|x| x + len);
+            self.tokens.push(Token::new(TokenKind::Text, ByteRange::new(start, start + len - 1)));
+        }
+    }
+
     fn comment(&mut self) -> TokenKind {
         while let Some(c) = self.next() {
             if c == '#' && self.peek() == '}' {
@@ -526,6 +559,14 @@ impl<'lex> Lexer<'lex> {
 
         TokenKind::Comment
     }
+}
+
+/// The offset of the first `{% endraw %}` tag in `source`, if there is one.
+fn find_end_raw(source: &str) -> Option<usize> {
+    source.match_indices("{%").find_map(|(index, _)| {
+        let rest = source[index + 2..].trim_start().strip_prefix("endraw")?;
+        rest.trim_start().starts_with("%}").then_some(index)
+    })
 }
 
 fn is_ident_start(c: char) -> bool {

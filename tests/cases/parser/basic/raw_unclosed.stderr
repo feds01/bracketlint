@@ -1,0 +1,5 @@
+error: expected a closing tag
+ --> $DIR/raw_unclosed.html:1:33
+  |
+1 | {% raw %}<p>{{ user.name }}</p>
+  |                                -

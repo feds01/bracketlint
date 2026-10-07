@@ -1,0 +1,5 @@
+error: expected a closing tag
+ --> $DIR/unclosed_if.html:4:8
+  |
+4 | </div>
+  |       -

@@ -1,0 +1,4 @@
+// run=pass, stage=check
+
+{% with name=user.name|default:"Guest" count=items|length %}<p>{{ name }}</p>{% endwith %}
+{% include "card.html" with title=page.title|default:"Home" user=user %}

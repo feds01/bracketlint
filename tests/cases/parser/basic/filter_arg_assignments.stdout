@@ -1,0 +1,60 @@
+info: parsed module '$DIR/filter_arg_assignments.html' as django:
+body
+├─set
+│ ├─assignments
+│ │ ├─assignment
+│ │ │ ├─name "name"
+│ │ │ └─filtered_expr
+│ │ │   ├─subject
+│ │ │   │ └─access_expr
+│ │ │   │   ├─subject
+│ │ │   │   │ └─var_expr
+│ │ │   │   │   └─name "user"
+│ │ │   │   └─field
+│ │ │   │     └─name "name"
+│ │ │   └─filter
+│ │ │     ├─name "default"
+│ │ │     └─args
+│ │ │       └─arg
+│ │ │         └─lit_expr
+│ │ │           └─str_lit "Guest"
+│ │ └─assignment
+│ │   ├─name "count"
+│ │   └─filtered_expr
+│ │     ├─subject
+│ │     │ └─var_expr
+│ │     │   └─name "items"
+│ │     └─filter
+│ │       ├─name "length"
+│ │       └─args
+│ └─body
+│   ├─text
+│   ├─inline
+│   │ └─var_expr
+│   │   └─name "name"
+│   └─text
+└─include
+  ├─lit_expr
+  │ └─str_lit "card.html"
+  └─context
+    ├─arg
+    │ ├─name "title"
+    │ └─filtered_expr
+    │   ├─subject
+    │   │ └─access_expr
+    │   │   ├─subject
+    │   │   │ └─var_expr
+    │   │   │   └─name "page"
+    │   │   └─field
+    │   │     └─name "title"
+    │   └─filter
+    │     ├─name "default"
+    │     └─args
+    │       └─arg
+    │         └─lit_expr
+    │           └─str_lit "Home"
+    └─arg
+      ├─name "user"
+      └─var_expr
+        └─name "user"
+
