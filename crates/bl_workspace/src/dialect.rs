@@ -51,7 +51,7 @@ impl Dialect {
     /// Whether `{# ... #}` is a comment. Liquid has no such comment, so it is
     /// text there.
     pub fn has_hash_comments(self) -> bool {
-        self != Dialect::Liquid
+        matches!(self, Dialect::Django | Dialect::Jinja | Dialect::Twig)
     }
 
     /// Whether `{% raw %}` blocks exist, whose contents are output as they are

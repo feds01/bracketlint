@@ -65,14 +65,6 @@ impl TagContext {
     }
 }
 
-/// Whether an expression takes the filters that follow it, see
-/// [Parser::parse_singular_expr].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum TakeFilters {
-    Yes,
-    No,
-}
-
 #[derive(Deref)]
 pub struct ParseFrame<'s> {
     /// The token cursor for the current frame.
@@ -686,14 +678,23 @@ impl<'s> Parser<'s> {
     }
 
     fn parse_expr(&mut self) -> ParseResult<AstNode<ast::Expr>> {
-        let token = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
+        let start = self.current_pos();
+        let mut expr = self.parse_value()?;
 
-        // Firstly, we have to get the initial part of the expression,
-        // and then we can check if there are any additional parts in the
-        // forms of either property accesses, indexing or method calls
-        let (subject, subject_span) = self.track_span(|this| this.parse_expr_component(token))?;
+        // A filter applies to everything before it, and its result can be
+        // accessed further, e.g. `users|first.name`.
+        while self.peek().is_some_and(|token| token.kind == TokenKind::Pipe) {
+            let subject_span = start.join(self.previous_pos());
+            self.skip_fast(TokenKind::Pipe); // `<pipe>` Skip the pipe token.
+            let filter = self.parse_filter(subject_span)?;
+            let subject = self.node_with_joined_span(
+                ast::Expr::FilteredExpr(ast::FilteredExpr { subject: expr, filter }),
+                subject_span,
+            );
+            expr = self.parse_singular_expr(subject, subject_span)?;
+        }
 
-        self.parse_singular_expr(subject, subject_span, TakeFilters::Yes)
+        Ok(expr)
     }
 
     fn parse_expr_component(&mut self, token: Token) -> ParseResult<AstNode<ast::Expr>> {
@@ -734,16 +735,26 @@ impl<'s> Parser<'s> {
         })
     }
 
+    /// Parse a value, i.e. an expression without any filters applied to it.
+    fn parse_value(&mut self) -> ParseResult<AstNode<ast::Expr>> {
+        let token = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
+
+        // Firstly, we have to get the initial part of the expression,
+        // and then we can check if there are any additional parts in the
+        // forms of either property accesses, indexing or method calls
+        let (subject, subject_span) = self.track_span(|this| this.parse_expr_component(token))?;
+
+        self.parse_singular_expr(subject, subject_span)
+    }
+
     /// Provided an initial subject expression that is parsed by the parent
     /// caller, this function will check if there are any additional
     /// components to the expression; in the form of either property access,
-    /// method calls, indexing, etc. Filters are only applied to the subject
-    /// when it takes them, see [TakeFilters].
+    /// method calls, indexing, etc.
     fn parse_singular_expr(
         &mut self,
         mut subject: AstNode<ast::Expr>,
         mut subject_span: ByteRange,
-        filters: TakeFilters,
     ) -> ParseResult<AstNode<ast::Expr>> {
         // so here we need to peek to see if this is either a index_access, field access
         // or a function call...
@@ -768,15 +779,6 @@ impl<'s> Parser<'s> {
 
                     self.node_with_joined_span(
                         ast::Expr::Index(ast::IndexExpr { subject, index }),
-                        subject_span,
-                    )
-                }
-                // Filter
-                TokenKind::Pipe if filters == TakeFilters::Yes => {
-                    self.skip_fast(TokenKind::Pipe); // `<pipe>` Skip the pipe token.
-                    let filter = self.parse_filter(subject_span)?;
-                    self.node_with_joined_span(
-                        ast::Expr::FilteredExpr(ast::FilteredExpr { subject, filter }),
                         subject_span,
                     )
                 }
@@ -861,11 +863,10 @@ impl<'s> Parser<'s> {
     /// single argument, which has no filters of its own, so in `x|f:a|g` the
     /// filter `g` applies to `x|f:a` rather than to `a`.
     fn parse_filter_arg(&mut self) -> ParseResult<AstNode<ast::Arg>> {
-        let token = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
-        let (subject, subject_span) = self.track_span(|this| this.parse_expr_component(token))?;
-        let value = self.parse_singular_expr(subject, subject_span, TakeFilters::No)?;
+        let start = self.current_pos();
+        let value = self.parse_value()?;
 
-        Ok(self.node_with_joined_span(ast::Arg { name: None, value: Some(value) }, token.span))
+        Ok(self.node_with_joined_span(ast::Arg { name: None, value: Some(value) }, start))
     }
 
     fn parse_bin_op(&mut self) -> (Option<ast::BinOp>, u8) {

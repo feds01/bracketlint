@@ -62,7 +62,7 @@ pub struct Lexer<'lex> {
     pub id: SourceId,
 
     /// The template dialect of the source.
-    dialect: Dialect,
+    pub dialect: Dialect,
 
     /// Diagnostics that the lexer has produced.
     pub diagnostics: LexerDiagnostics,
@@ -229,7 +229,7 @@ impl<'lex> Lexer<'lex> {
                     ]
                 )
             {
-                this.raw_text();
+                this.hunk();
             }
 
             // Immediately try to index the next token...
@@ -538,7 +538,7 @@ impl<'lex> Lexer<'lex> {
 
     /// Lex the contents of a `{% raw %}` block as text, up to its
     /// `{% endraw %}` tag, or the end of the source if it has none.
-    fn raw_text(&mut self) {
+    fn hunk(&mut self) {
         let start = self.offset.get();
         let slice = unsafe { self.as_slice() };
         let len = find_end_raw(slice).unwrap_or(slice.len());
@@ -563,9 +563,9 @@ impl<'lex> Lexer<'lex> {
 
 /// The offset of the first `{% endraw %}` tag in `source`, if there is one.
 fn find_end_raw(source: &str) -> Option<usize> {
-    source.match_indices("{%").map(|(index, _)| index).find(|&index| {
-        let tag = source[index + 2..].trim_start();
-        tag.strip_prefix("endraw").is_some_and(|rest| rest.trim_start().starts_with("%}"))
+    source.match_indices("{%").find_map(|(index, _)| {
+        let rest = source[index + 2..].trim_start().strip_prefix("endraw")?;
+        rest.trim_start().starts_with("%}").then_some(index)
     })
 }
 
