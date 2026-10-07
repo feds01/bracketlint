@@ -1,0 +1,5 @@
+error: unexpectedly encountered an identifier
+ --> $DIR/with_as_twig.html:1:9
+  |
+1 | {% with user.name as name %}<p>{{ name }}</p>{% endwith %}
+  |         ----

@@ -25,6 +25,9 @@
 //! The configuration line isn't part of the template, so the case runs on a
 //! copy without it, or the blank line that follows it. Line numbers in the
 //! snapshots count from the first line of the template.
+//!
+//! A case can also set the template dialect to parse it in, e.g.
+//! `dialect=liquid`. Otherwise it is parsed as Django, like any `.html` file.
 #![cfg(test)]
 
 use std::{
@@ -298,7 +301,7 @@ fn handle_test(test: TestingInput) {
     // without its configuration line.
     let case = CaseCopy::new(&test).unwrap();
     let files = vec![case.path.clone()];
-    let settings = Settings::new(true, FixMode::Generate, false);
+    let settings = Settings::new(true, FixMode::Generate, false, test.metadata.dialect);
     let builder = WorkspaceBuilder::new()
         .with_settings(settings)
         .with_stdout(output_stream())

@@ -1,0 +1,19 @@
+info: parsed module '$DIR/with_as_django.html' as django:
+body
+└─set
+  ├─assignments
+  │ └─assignment
+  │   ├─name "name"
+  │   └─access_expr
+  │     ├─subject
+  │     │ └─var_expr
+  │     │   └─name "user"
+  │     └─field
+  │       └─name "name"
+  └─body
+    ├─text
+    ├─inline
+    │ └─var_expr
+    │   └─name "name"
+    └─text
+

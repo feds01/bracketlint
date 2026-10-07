@@ -46,7 +46,7 @@ pub fn fmt(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
                             continue;
                         };
 
-                        let id = workspace.members.reserve_member(file.into_path(), contents);
+                        let id = workspace.reserve_member(file.into_path(), contents);
                         let member = workspace.members.member(id);
 
                         let ParseQueryResult { node, diagnostics } =

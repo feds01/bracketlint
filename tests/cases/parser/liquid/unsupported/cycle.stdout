@@ -1,4 +1,4 @@
-info: parsed module '$DIR/cycle.html':
+info: parsed module '$DIR/cycle.html' as liquid:
 body
 └─for
   ├─target

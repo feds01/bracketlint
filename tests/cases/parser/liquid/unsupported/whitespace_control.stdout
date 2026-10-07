@@ -1,4 +1,4 @@
-info: parsed module '$DIR/whitespace_control.html':
+info: parsed module '$DIR/whitespace_control.html' as liquid:
 body
 ├─text
 ├─inline

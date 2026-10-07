@@ -1,4 +1,4 @@
-info: parsed module '$DIR/assign.html':
+info: parsed module '$DIR/assign.html' as liquid:
 body
 ├─generic_tag
 │ ├─name "assign"

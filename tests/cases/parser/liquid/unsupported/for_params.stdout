@@ -1,4 +1,4 @@
-info: parsed module '$DIR/for_params.html':
+info: parsed module '$DIR/for_params.html' as liquid:
 body
 └─for
   ├─target

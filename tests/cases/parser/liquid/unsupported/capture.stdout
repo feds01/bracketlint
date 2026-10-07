@@ -1,4 +1,4 @@
-info: parsed module '$DIR/capture.html':
+info: parsed module '$DIR/capture.html' as liquid:
 body
 ├─generic_tag
 │ ├─name "capture"

@@ -1,4 +1,4 @@
-info: parsed module '$DIR/liquid_tag.html':
+info: parsed module '$DIR/liquid_tag.html' as liquid:
 body
 └─unprocessable_tag
 

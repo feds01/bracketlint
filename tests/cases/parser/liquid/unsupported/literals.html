@@ -1,4 +1,4 @@
-// run=pass, stage=check
+// run=pass, stage=check, dialect=liquid
 
 {% if product.available == true and product.discount != nil %}<span>Deal</span>{% endif %}
 {% if product.description == blank or product.tags == empty %}<span>Incomplete</span>{% endif %}
