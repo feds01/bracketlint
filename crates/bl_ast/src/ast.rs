@@ -698,8 +698,7 @@ define_tree! {
         pub end_label: OptionalChild!(Name),
 
         /// The whitespace control of the opening and the closing tag.
-        pub trim: Trim,
-        pub end_trim: Trim,
+        pub trim: TrimTag,
     }
 
     #[derive(Clone, Debug, PartialEq)]
@@ -731,7 +730,7 @@ define_tree! {
     #[node]
     pub struct Extends {
         pub template: Child!(Expr),
-        pub trim: Trim,
+        pub trim: TrimMarker,
     }
 
     #[derive(Clone, Debug, PartialEq)]
@@ -761,8 +760,7 @@ define_tree! {
         pub kind: AssignmentKind,
 
         /// The whitespace control of the opening and the closing tag.
-        pub trim: Trim,
-        pub end_trim: Trim,
+        pub trim: TrimTag,
     }
 
     #[derive(Clone, Debug, PartialEq, Copy)]
@@ -835,9 +833,17 @@ define_tree! {
     /// the `-` in `{%- if x -%}`, which strip the whitespace on that side of
     /// the tag. Each side holds its marker, if it has one.
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-    pub struct Trim {
+    pub struct TrimMarker {
         pub left: Option<char>,
         pub right: Option<char>,
+    }
+
+    /// The whitespace control markers of a block's opening and closing tags,
+    /// e.g. `{%- with x = 1 %}` and `{% endwith -%}`.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+    pub struct TrimTag {
+        pub start: TrimMarker,
+        pub end: TrimMarker,
     }
 
     #[derive(Clone, Copy, Debug, PartialEq)]
@@ -858,7 +864,7 @@ define_tree! {
         pub clause_body: Child!(Body),
 
         /// The whitespace control of the clause's tag.
-        pub trim: Trim,
+        pub trim: TrimMarker,
     }
 
     /// An `if` block consisting of the condition, block and an optional else clause
@@ -871,8 +877,8 @@ define_tree! {
         pub otherwise: OptionalChild!(Body),
 
         /// The whitespace control of the `{% else %}` and `{% endif %}` tags.
-        pub else_trim: Trim,
-        pub end_trim: Trim,
+        pub else_trim: TrimMarker,
+        pub end_trim: TrimMarker,
     }
 
     #[derive(Clone, Debug, PartialEq)]
@@ -887,9 +893,8 @@ define_tree! {
 
         /// The whitespace control of the opening, `{% empty %}` and closing
         /// tags.
-        pub trim: Trim,
-        pub empty_trim: Trim,
-        pub end_trim: Trim,
+        pub trim: TrimTag,
+        pub empty_trim: TrimMarker,
     }
 
     /// The target of a [`For`] loop, which can be a simple variable or a variable
@@ -1028,7 +1033,7 @@ define_tree! {
     #[node]
     pub struct Inline {
         pub expr: Child!(Expr),
-        pub trim: Trim,
+        pub trim: TrimMarker,
     }
 
     #[derive(Clone, Debug, PartialEq)]

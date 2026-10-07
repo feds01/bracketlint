@@ -431,19 +431,17 @@ impl<'s> Parser<'s> {
 
     /// The whitespace control markers of the tag that the current frame is in,
     /// e.g. the `-`s in `{%- if x -%}`. The lexer leaves the markers out of
-    /// the tag's tokens, so they are read from its source: a marker is the
-    /// character right after the opening delimiter, or right before the
-    /// closing one, as the lexer reads it.
-    pub(crate) fn trim(&self) -> ast::Trim {
+    /// the tag's tokens, so they are read from its source, right inside the
+    /// tag's two character delimiters.
+    pub(crate) fn trim(&self) -> ast::TrimMarker {
         let tag = self._source.hunk(self.range());
-        let markers = self.options.dialect.trim_markers();
-        let marker = |c: Option<char>| c.filter(|c| markers.contains(c));
-        let inner =
-            tag.get(2..).and_then(|tag| tag.strip_suffix("%}").or_else(|| tag.strip_suffix("}}")));
+        let inner = tag.get(2..tag.len().saturating_sub(2)).unwrap_or_default();
+        let marker =
+            |c: Option<char>| c.filter(|c| self.options.dialect.trim_markers().contains(c));
 
-        ast::Trim {
-            left: marker(inner.and_then(|inner| inner.chars().next())),
-            right: marker(inner.and_then(|inner| inner.chars().next_back())),
+        ast::TrimMarker {
+            left: marker(inner.chars().next()),
+            right: marker(inner.chars().next_back()),
         }
     }
 
@@ -453,7 +451,7 @@ impl<'s> Parser<'s> {
         &mut self,
         delimiter: Delimiter,
         mut g: impl FnMut(&mut Self) -> ParseResult<T>,
-    ) -> ParseResult<(T, ast::Trim)> {
+    ) -> ParseResult<(T, ast::TrimMarker)> {
         self.in_tree(delimiter, None, |this| Ok((g(this)?, this.trim())))
     }
 
@@ -1023,7 +1021,7 @@ impl<'s> Parser<'s> {
 
                 (Some(body), ending_trim, end_trim)
             } else {
-                (None, ast::Trim::default(), ending_trim)
+                (None, ast::TrimMarker::default(), ending_trim)
             };
 
         Ok(self.node_with_joined_span(
@@ -1034,9 +1032,8 @@ impl<'s> Parser<'s> {
                 loop_body,
                 loop_empty,
                 reverse_modifier,
-                trim,
+                trim: ast::TrimTag { start: trim, end: end_trim },
                 empty_trim,
-                end_trim,
             })),
             start,
         ))
@@ -1074,7 +1071,7 @@ impl<'s> Parser<'s> {
     fn parse_if_block(&mut self) -> ParseResult<AstNode<ast::Statement>> {
         let mut clauses = thin_vec![];
         let mut otherwise = None;
-        let mut else_trim = ast::Trim::default();
+        let mut else_trim = ast::TrimMarker::default();
         let mut end_trim = None;
         let start = self.current_pos();
 
@@ -1212,8 +1209,7 @@ impl<'s> Parser<'s> {
                 assignments,
                 block_body,
                 kind: ast::AssignmentKind::With,
-                trim,
-                end_trim,
+                trim: ast::TrimTag { start: trim, end: end_trim },
             })),
             token.span,
         ))
@@ -1259,8 +1255,7 @@ impl<'s> Parser<'s> {
                 label: Some(label),
                 block_body,
                 end_label,
-                trim,
-                end_trim,
+                trim: ast::TrimTag { start: trim, end: end_trim },
             })),
             token.span,
         ))
