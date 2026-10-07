@@ -693,6 +693,9 @@ define_tree! {
     pub struct Block {
         pub label: OptionalChild!(Name),
         pub block_body: Child!(Body),
+
+        /// The label repeated in `{% endblock label %}`, if there is one.
+        pub end_label: OptionalChild!(Name),
     }
 
     #[derive(Clone, Debug, PartialEq)]

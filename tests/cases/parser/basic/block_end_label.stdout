@@ -1,0 +1,9 @@
+info: parsed module '$DIR/block_end_label.html' as django:
+body
+└─block
+  ├─name "content"
+  ├─body
+  │ └─text
+  └─end_label
+    └─name "content"
+

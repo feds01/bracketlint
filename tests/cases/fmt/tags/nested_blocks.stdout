@@ -1,6 +1,6 @@
-{% block outer  %}
+{% block outer %}
     <div>
-{% block inner  %}    
+{% block inner %}    
         <p>inner</p>
 {% endblock %}
 </div>

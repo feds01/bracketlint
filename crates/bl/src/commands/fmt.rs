@@ -52,10 +52,14 @@ pub fn fmt(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
                         let ParseQueryResult { node, diagnostics } =
                             parse_source(ParseQuery::new(id, member));
 
+                        // Files that failed to parse keep no document, so they aren't
+                        // formatted: the formatter would drop the parts that it
+                        // couldn't parse.
+                        let has_errors = diagnostics.iter().any(|report| report.is_error());
                         pipeline_diagnostics.extend(diagnostics);
 
                         let member = workspace.members.member_mut(id);
-                        member.document = node;
+                        member.document = if has_errors { None } else { node };
                     }
                     Err(err) => {
                         // @@todo: Create a diagnostic for the error, and print it!
@@ -78,6 +82,10 @@ pub fn fmt(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
     //
     // @@Temp: for now we will just print the produced contents.
     for (source, member) in workspace.members.iter() {
+        if member.document.is_none() {
+            continue;
+        }
+
         let FormatQueryResult { buffer, diagnostics } =
             fmt_module(FormatQuery { member, source, options });
         pipeline_diagnostics.extend(diagnostics);

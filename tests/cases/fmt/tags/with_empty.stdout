@@ -1,0 +1,4 @@
+{% with %}
+    <p>{{ user.name }}</p>
+{% endwith %}
+

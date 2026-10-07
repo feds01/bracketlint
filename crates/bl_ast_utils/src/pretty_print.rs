@@ -368,10 +368,11 @@ impl AstVisitor for AstTreePrinter<'_> {
         &self,
         node: ast::AstNodeRef<ast::Block>,
     ) -> Result<Self::BlockRet, Self::Error> {
-        let walk::Block { label, block_body } = walk::walk_block(self, node)?;
+        let walk::Block { label, block_body, end_label } = walk::walk_block(self, node)?;
 
-        let children =
-            if let Some(name) = label { vec![name, block_body] } else { vec![block_body] };
+        let mut children = label.into_iter().collect::<Vec<_>>();
+        children.push(block_body);
+        children.extend(end_label.map(|name| TreeNode::branch("end_label", vec![name])));
 
         Ok(TreeNode::branch("block", children))
     }

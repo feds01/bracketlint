@@ -1,4 +1,4 @@
-<p>{{ name|upper: }}</p>
+<p>{{ name|upper }}</p>
 <p>{{ bio|truncatewords:30 }}</p>
 <p>{{ value|default:"nothing" }}</p>
 

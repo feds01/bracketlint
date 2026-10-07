@@ -1,0 +1,6 @@
+<ul>
+{% for key, value in data.items reversed %}
+        <li>{{ key }}: {{ value }}</li>
+        {% endfor %}
+        </ul>
+

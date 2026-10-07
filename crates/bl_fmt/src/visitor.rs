@@ -1,6 +1,5 @@
 use bl_ast::{
-    AstNodes, AstVisitorMutSelf, SourceId, SpannedSource, ast_visitor_mut_self_default_impl,
-    walk_mut_self,
+    AstVisitorMutSelf, SourceId, SpannedSource, ast_visitor_mut_self_default_impl, walk_mut_self,
 };
 use bl_reporting::inline::{InlineSnippet, note_on_span};
 
@@ -44,7 +43,6 @@ fn is_inline_space(whitespace: &str) -> bool {
 pub enum TagKind {
     Block,
     Inline,
-    Comment,
 }
 
 impl TagKind {
@@ -52,7 +50,6 @@ impl TagKind {
         match self {
             TagKind::Block => "{%",
             TagKind::Inline => "{{",
-            TagKind::Comment => "{#",
         }
     }
 
@@ -60,7 +57,6 @@ impl TagKind {
         match self {
             TagKind::Block => "%}",
             TagKind::Inline => "}}",
-            TagKind::Comment => "#}",
         }
     }
 }
@@ -139,6 +135,14 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         self.buffer.push_str(hunk);
     }
 
+    /// Push the source at `span` exactly as it is written. This is used for
+    /// anything the formatter can't rebuild from the tree without losing part
+    /// of it, e.g. a tag that the parser doesn't know.
+    fn push_source(&mut self, span: bl_ast::Span) {
+        let source = self.ctx.source.hunk(span.range);
+        self.push_hunk(source);
+    }
+
     /// Run a function with an increased indent level.
     ///
     /// Assume that the formatter function is called within a block, meaning
@@ -169,26 +173,6 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         // Add the closing tag.
         self.push_hunk(" ");
         self.push_hunk(kind.right());
-
-        Ok(())
-    }
-
-    fn visit_list_of_formatters_with_separator<T, F>(
-        &mut self,
-        list: &'_ AstNodes<T>,
-        fmt: &mut F,
-        separator: &str,
-    ) -> Result<(), FmtError>
-    where
-        F: FnMut(&mut Self, bl_ast::AstNodeRef<T>) -> Result<(), FmtError>,
-    {
-        list.iter().map(|item| item.ast_ref()).try_fold(false, |need_separator, item| {
-            if need_separator {
-                self.push_hunk(separator);
-            }
-            fmt(self, item)?;
-            Ok(true)
-        })?;
 
         Ok(())
     }
@@ -251,8 +235,38 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
     type Error = FmtError;
 
     ast_visitor_mut_self_default_impl!(
-        hiding: Text, For, If, IfClause, Comment, Inline, Body, GenericTag, Arg, Name, AccessExpr, Lit, Filter, Block, With, Assignment, Extends
+        hiding: Text, Tag, For, If, IfClause, Comment, Inline, Body, Name, Expr, Block, With, Extends
     );
+
+    type TagRet = ();
+
+    /// Tags that the formatter has no layout for are kept as they are written.
+    /// The match is exhaustive so that a new kind of tag has to be added here.
+    fn visit_tag(
+        &mut self,
+        node: bl_ast::AstNodeRef<bl_ast::Tag>,
+    ) -> Result<Self::TagRet, Self::Error> {
+        match node.body() {
+            bl_ast::Tag::Block(block) => self.visit_block(node.with_body(block)),
+            bl_ast::Tag::With(with) => self.visit_with(node.with_body(with)),
+            bl_ast::Tag::Extends(extends) => self.visit_extends(node.with_body(extends)),
+            bl_ast::Tag::If(if_block) => self.visit_if(node.with_body(if_block)),
+            bl_ast::Tag::For(for_loop) => self.visit_for(node.with_body(for_loop)),
+            bl_ast::Tag::Generic(_)
+            | bl_ast::Tag::Unprocessable(_)
+            | bl_ast::Tag::Assignment(_)
+            | bl_ast::Tag::MacroDef(_)
+            | bl_ast::Tag::Include(_)
+            | bl_ast::Tag::Import(_)
+            | bl_ast::Tag::Continue(_)
+            | bl_ast::Tag::Break(_)
+            | bl_ast::Tag::Raw(_) => {
+                self.space_from_previous(node.span().range.start());
+                self.push_source(node.span());
+                Ok(())
+            }
+        }
+    }
 
     type BlockRet = ();
 
@@ -260,13 +274,13 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         &mut self,
         node: bl_ast::AstNodeRef<bl_ast::Block>,
     ) -> Result<Self::BlockRet, Self::Error> {
-        let bl_ast::Block { label, block_body } = node.body();
+        let bl_ast::Block { label, block_body, end_label } = node.body();
 
         self.within_tag(TagKind::Block, |this| {
-            this.push_hunk("block ");
+            this.push_hunk("block");
             if let Some(label) = label {
-                this.visit_name(label.ast_ref())?;
                 this.push_hunk(" ");
+                this.visit_name(label.ast_ref())?;
             }
 
             Ok(())
@@ -276,7 +290,14 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         // Now visit the block body.
         self.with_block(|formatter| formatter.visit_body(block_body.ast_ref()))?;
 
-        self.push_line("{% endblock %}");
+        match end_label {
+            Some(end_label) => {
+                let end_label = self.ctx.source.hunk(end_label.ast_ref().span().range);
+                self.push_line(&format!("{{% endblock {end_label} %}}"));
+            }
+            None => self.push_line("{% endblock %}"),
+        }
+
         Ok(())
     }
 
@@ -288,16 +309,13 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
     ) -> Result<Self::WithRet, Self::Error> {
         let bl_ast::With { assignments, block_body, .. } = node.body();
 
+        // Keep the assignments as they are written, e.g. `a=1 b=2` or `x as y`.
         self.within_tag(TagKind::Block, |this| {
-            this.push_hunk("with ");
-
-            this.visit_list_of_formatters_with_separator(
-                assignments,
-                &mut |this: &mut Self, assignment: bl_ast::AstNodeRef<'_, bl_ast::Assignment>| {
-                    this.visit_assignment(assignment)
-                },
-                ", ",
-            )?;
+            this.push_hunk("with");
+            if !assignments.is_empty() {
+                this.push_hunk(" ");
+                this.push_source(assignments.span());
+            }
 
             Ok(())
         })?;
@@ -307,21 +325,6 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         self.with_block(|formatter| formatter.visit_body(block_body.ast_ref()))?;
 
         self.push_line("{% endwith %}");
-        Ok(())
-    }
-
-    type AssignmentRet = ();
-
-    fn visit_assignment(
-        &mut self,
-        node: bl_ast::AstNodeRef<bl_ast::Assignment>,
-    ) -> Result<Self::AssignmentRet, Self::Error> {
-        let bl_ast::Assignment { name, value } = node.body();
-
-        self.visit_name(name.ast_ref())?;
-        self.push_hunk(" as ");
-        self.visit_expr(value.ast_ref())?;
-
         Ok(())
     }
 
@@ -337,20 +340,21 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         // @@ Proof of concept: for now, we will just push a for loop into the buffer.
         self.within_tag(TagKind::Block, |this| {
             this.push_hunk("for ");
-            this.visit_for_target(target.ast_ref())?;
+            this.push_source(target.ast_ref().span());
             this.push_hunk(" in ");
             this.visit_expr(iterator.ast_ref())?;
+
+            // Check if there's a reverse modifier on the loop, which comes
+            // before the guard.
+            if let Some(reverse_modifier) = reverse_modifier {
+                this.push_hunk(" ");
+                this.visit_name(reverse_modifier.ast_ref())?;
+            }
 
             // Check if we have an if guard on the loop itself.
             if let Some(guard) = guard {
                 this.push_hunk(" if ");
                 this.visit_expr(guard.ast_ref())?;
-            }
-
-            // Check if there's a reverse modifier on the loop.
-            if let Some(reverse_modifier) = reverse_modifier {
-                this.push_hunk(" reverse");
-                this.visit_name(reverse_modifier.ast_ref())?;
             }
 
             Ok(())
@@ -513,14 +517,9 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         &mut self,
         node: bl_ast::AstNodeRef<bl_ast::Comment>,
     ) -> Result<Self::CommentRet, Self::Error> {
-        // @@Todo: we need to be more sophisticated about this, as we want to remember
-        // where the "anchor" points of the comment are, so we can treat the whole
-        // area as verbatim.
-        self.within_tag(TagKind::Comment, |this| {
-            let text = this.ctx.source.hunk(node.span().range);
-            this.push_hunk(text);
-            Ok(())
-        })?;
+        // The span of the comment includes its delimiters, which are either
+        // `{# ... #}` or `{% comment %} ... {% endcomment %}`.
+        self.push_source(node.span());
         self.end_line();
 
         Ok(())
@@ -558,110 +557,25 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         Ok(())
     }
 
-    type AccessExprRet = ();
-
-    fn visit_access_expr(
-        &mut self,
-        node: bl_ast::AstNodeRef<bl_ast::AccessExpr>,
-    ) -> Result<Self::AccessExprRet, Self::Error> {
-        let bl_ast::AccessExpr { subject, field } = node.body();
-
-        self.visit_expr(subject.ast_ref())?;
-        self.push_hunk(".");
-        self.visit_name(field.ast_ref())
-    }
-
     type NameRet = ();
 
     fn visit_name(
         &mut self,
         node: bl_ast::AstNodeRef<bl_ast::Name>,
     ) -> Result<Self::NameRet, Self::Error> {
-        let name = self.ctx.source.hunk(node.span().range);
-        self.push_hunk(name);
+        self.push_source(node.span());
         Ok(())
     }
 
-    type FilterRet = ();
+    type ExprRet = ();
 
-    fn visit_filter(
+    /// Expressions are kept as they are written, since the dialects differ in
+    /// how they write filters, arguments and operators.
+    fn visit_expr(
         &mut self,
-        node: bl_ast::AstNodeRef<bl_ast::Filter>,
-    ) -> Result<Self::FilterRet, Self::Error> {
-        let bl_ast::Filter { name, args } = node.body();
-
-        self.push_hunk("|");
-        self.visit_name(name.ast_ref())?;
-        self.push_hunk(":");
-        self.visit_list_of_formatters_with_separator(
-            args,
-            &mut |this: &mut Self, arg: bl_ast::AstNodeRef<'_, bl_ast::Arg>| this.visit_arg(arg),
-            " ",
-        )?;
-
-        Ok(())
-    }
-
-    type GenericTagRet = ();
-
-    fn visit_generic_tag(
-        &mut self,
-        node: bl_ast::AstNodeRef<bl_ast::GenericTag>,
-    ) -> Result<Self::GenericTagRet, Self::Error> {
-        self.space_from_previous(node.span().range.start());
-        self.within_tag(TagKind::Block, |this| {
-            let bl_ast::GenericTag { name, args } = node.body();
-
-            this.visit_name(name.ast_ref())?;
-            this.push_hunk(" ");
-            this.visit_list_of_formatters_with_separator(
-                args,
-                &mut |this: &mut Self, arg: bl_ast::AstNodeRef<'_, bl_ast::Arg>| {
-                    this.visit_arg(arg)
-                },
-                " ",
-            )?;
-            Ok(())
-        })
-    }
-
-    type ArgRet = ();
-
-    fn visit_arg(
-        &mut self,
-        node: bl_ast::AstNodeRef<bl_ast::Arg>,
-    ) -> Result<Self::ArgRet, Self::Error> {
-        let bl_ast::Arg { name, value } = node.body();
-
-        if let Some(name) = name {
-            self.visit_name(name.ast_ref())?;
-            self.push_hunk("=");
-        }
-
-        if let Some(value) = value {
-            self.visit_expr(value.ast_ref())?;
-        }
-
-        Ok(())
-    }
-
-    type LitRet = ();
-
-    fn visit_lit(
-        &mut self,
-        node: bl_ast::AstNodeRef<bl_ast::Lit>,
-    ) -> Result<Self::LitRet, Self::Error> {
-        match node.body() {
-            bl_ast::Lit::Int(_) | bl_ast::Lit::Float(_) | bl_ast::Lit::Str(_) => {
-                let lit = self.ctx.source.hunk(node.span().range);
-                self.push_hunk(lit);
-            }
-            bl_ast::Lit::Bool(bool) => match bool.value {
-                true => self.push_hunk("true"),
-                false => self.push_hunk("false"),
-            },
-        }
-
+        node: bl_ast::AstNodeRef<bl_ast::Expr>,
+    ) -> Result<Self::ExprRet, Self::Error> {
+        self.push_source(node.span());
         Ok(())
     }
 }

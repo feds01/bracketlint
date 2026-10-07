@@ -1,4 +1,4 @@
-{% if collection.products.size0 %}
+{% if collection.products.size > 0 %}
     <p>{{ collection.products.size }} products</p>
 {% endif %}
 

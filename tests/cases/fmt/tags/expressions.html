@@ -1,0 +1,8 @@
+// run=pass, stage=fmt
+
+{% if user.age >= 18 and not user.banned %}
+<p>{{ items[0] }} {{ user.name|default:"anon" }}</p>
+{% endif %}
+{% with first=items.0 count=items|length %}
+<p>{{ first }} of {{ count }}</p>
+{% endwith %}

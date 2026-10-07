@@ -1,4 +1,4 @@
-{% with total as items|length: %}
+{% with total=items|length %}
     <p>{{ total }} items</p>
 {% endwith %}
 
