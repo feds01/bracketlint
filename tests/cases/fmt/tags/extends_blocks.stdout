@@ -1,4 +1,3 @@
-// run=pass, stage=fmt
 {% extends "base.html" %}
 {% block title  %}
     My page

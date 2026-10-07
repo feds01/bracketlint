@@ -1,5 +1,3 @@
-// run=pass, stage=fmt
-
 <div class="card">
     <div class="card-body">
         <h1>Title</h1>

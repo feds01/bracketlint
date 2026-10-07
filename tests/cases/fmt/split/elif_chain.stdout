@@ -1,5 +1,3 @@
-// run=pass, stage=fmt
-
 <div>
     {% if a %}
         <span>a</span>

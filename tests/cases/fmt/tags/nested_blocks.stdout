@@ -1,4 +1,3 @@
-// run=pass, stage=fmt
 {% block outer  %}
     <div>
 {% block inner  %}    
