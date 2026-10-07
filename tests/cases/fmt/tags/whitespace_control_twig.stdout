@@ -1,0 +1,4 @@
+{%~ if user ~%}
+    <p>{{~ user.name ~}}</p>
+{%~ endif ~%}
+

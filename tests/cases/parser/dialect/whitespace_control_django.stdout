@@ -1,0 +1,12 @@
+info: parsed module '$DIR/whitespace_control_django.html' as django:
+body
+├─text
+├─inline
+│ └─access_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "user"
+│   └─field
+│     └─name "name"
+└─text
+

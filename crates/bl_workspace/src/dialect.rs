@@ -60,6 +60,18 @@ impl Dialect {
         matches!(self, Dialect::Jinja | Dialect::Liquid)
     }
 
+    /// The markers that control the whitespace around a tag when they are
+    /// written next to its delimiters, e.g. the `-` in `{%- if x -%}`. Django
+    /// has none.
+    pub fn trim_markers(self) -> &'static [char] {
+        match self {
+            Dialect::Django => &[],
+            Dialect::Jinja => &['-', '+'],
+            Dialect::Liquid => &['-'],
+            Dialect::Twig => &['-', '~'],
+        }
+    }
+
     /// Check if its currently Django dialect.
     #[inline]
     pub fn is_django(self) -> bool {

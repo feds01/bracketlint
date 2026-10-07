@@ -265,6 +265,11 @@ impl<'lex> Lexer<'lex> {
                 ch @ ('(' | '[') => {
                     return on_tree(self, Delimiter::try_from(ch).unwrap());
                 }
+                // A whitespace control marker belongs to the delimiter after
+                // it, e.g. the `-` in `-%}`.
+                c if self.is_trim_marker(c) && self.at_closing_delimiter(0) => {
+                    return self.advance_token();
+                }
                 c if is_ident_start(c) => self.ident(c),
                 '0'..='9' => self.number(ShouldSkip::No),
                 '|' => TokenKind::Pipe,
@@ -348,6 +353,14 @@ impl<'lex> Lexer<'lex> {
     /// analysis later on.
     fn eat_token_tree(&mut self, delimiter: Delimiter) -> TokenKind {
         let delim_offset = self.offset.get() - delimiter.width(); // we need to ge the previous location to accurately denote the error...
+
+        // A whitespace control marker belongs to the delimiter before it, e.g.
+        // the `-` in `{%-`. The markers are all ASCII.
+        if matches!(delimiter, Delimiter::Percent | Delimiter::Brace)
+            && self.is_trim_marker(self.peek())
+        {
+            self.skip_ascii();
+        }
 
         // we need to reset self.prev here as it might be polluted with previous token
         // trees
@@ -526,7 +539,15 @@ impl<'lex> Lexer<'lex> {
         debug_assert!(is_ident_start(first));
 
         let start = self.offset.get() - first.len_utf8();
-        self.eat_while_and_discard(is_id_continue);
+
+        // An identifier can contain a `-`, but not the whitespace control marker
+        // of the delimiter right after it, e.g. the `-` in `x-%}`.
+        while is_id_continue(self.peek())
+            && !(self.is_trim_marker(self.peek()) && self.at_closing_delimiter(1))
+        {
+            self.skip_ascii();
+        }
+
         let name = &self.spanned.source[start..self.offset.get()];
 
         if let Ok(keyword) = Keyword::try_from(name) {
@@ -541,12 +562,23 @@ impl<'lex> Lexer<'lex> {
     fn hunk(&mut self) {
         let start = self.offset.get();
         let slice = unsafe { self.as_slice() };
-        let len = find_end_raw(slice).unwrap_or(slice.len());
+        let len = find_end_raw(slice, self.dialect.trim_markers()).unwrap_or(slice.len());
 
         if len > 0 {
             self.offset.update(|x| x + len);
             self.tokens.push(Token::new(TokenKind::Text, ByteRange::new(start, start + len - 1)));
         }
+    }
+
+    /// Whether `c` controls the whitespace around a tag when it is written
+    /// next to one of the tag's delimiters, e.g. the `-` in `{%-`.
+    fn is_trim_marker(&self, c: char) -> bool {
+        self.dialect.trim_markers().contains(&c)
+    }
+
+    /// Whether the `n`th character from here starts a `%}` or `}}` delimiter.
+    fn at_closing_delimiter(&self, n: usize) -> bool {
+        matches!((self.nth_char(n), self.nth_char(n + 1)), ('%' | '}', '}'))
     }
 
     fn comment(&mut self) -> TokenKind {
@@ -562,10 +594,15 @@ impl<'lex> Lexer<'lex> {
 }
 
 /// The offset of the first `{% endraw %}` tag in `source`, if there is one.
-fn find_end_raw(source: &str) -> Option<usize> {
+/// The tag can have any of the whitespace control `markers`, e.g.
+/// `{%- endraw -%}`.
+fn find_end_raw(source: &str, markers: &[char]) -> Option<usize> {
     source.match_indices("{%").find_map(|(index, _)| {
-        let rest = source[index + 2..].trim_start().strip_prefix("endraw")?;
-        rest.trim_start().starts_with("%}").then_some(index)
+        let tag = &source[index + 2..];
+        let tag = tag.strip_prefix(markers).unwrap_or(tag).trim_start();
+        let rest = tag.strip_prefix("endraw")?.trim_start();
+
+        rest.strip_prefix(markers).unwrap_or(rest).starts_with("%}").then_some(index)
     })
 }
 

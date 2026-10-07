@@ -696,6 +696,9 @@ define_tree! {
 
         /// The label repeated in `{% endblock label %}`, if there is one.
         pub end_label: OptionalChild!(Name),
+
+        /// The whitespace control of the opening and the closing tag.
+        pub trim: TrimTag,
     }
 
     #[derive(Clone, Debug, PartialEq)]
@@ -727,6 +730,7 @@ define_tree! {
     #[node]
     pub struct Extends {
         pub template: Child!(Expr),
+        pub trim: TrimMarker,
     }
 
     #[derive(Clone, Debug, PartialEq)]
@@ -754,6 +758,9 @@ define_tree! {
         pub assignments: Children!(Assignment),
         pub block_body: Child!(Body),
         pub kind: AssignmentKind,
+
+        /// The whitespace control of the opening and the closing tag.
+        pub trim: TrimTag,
     }
 
     #[derive(Clone, Debug, PartialEq, Copy)]
@@ -822,6 +829,23 @@ define_tree! {
         pub contents: Children!(Statement),
     }
 
+    /// The whitespace control markers written next to a tag's delimiters, e.g.
+    /// the `-` in `{%- if x -%}`, which strip the whitespace on that side of
+    /// the tag. Each side holds its marker, if it has one.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+    pub struct TrimMarker {
+        pub left: Option<char>,
+        pub right: Option<char>,
+    }
+
+    /// The whitespace control markers of a block's opening and closing tags,
+    /// e.g. `{%- with x = 1 %}` and `{% endwith -%}`.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+    pub struct TrimTag {
+        pub start: TrimMarker,
+        pub end: TrimMarker,
+    }
+
     #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum ClauseKind {
         If,
@@ -838,6 +862,9 @@ define_tree! {
         pub condition: Child!(Expr),
         /// The body of the `if-statement`
         pub clause_body: Child!(Body),
+
+        /// The whitespace control of the clause's tag.
+        pub trim: TrimMarker,
     }
 
     /// An `if` block consisting of the condition, block and an optional else clause
@@ -848,6 +875,10 @@ define_tree! {
         pub clauses: Children!(IfClause),
         /// The else clause.
         pub otherwise: OptionalChild!(Body),
+
+        /// The whitespace control of the `{% else %}` and `{% endif %}` tags.
+        pub else_trim: TrimMarker,
+        pub end_trim: TrimMarker,
     }
 
     #[derive(Clone, Debug, PartialEq)]
@@ -859,6 +890,11 @@ define_tree! {
         pub reverse_modifier: OptionalChild!(Name),
         pub loop_body: Child!(Body),
         pub loop_empty: OptionalChild!(Body),
+
+        /// The whitespace control of the opening, `{% empty %}` and closing
+        /// tags.
+        pub trim: TrimTag,
+        pub empty_trim: TrimMarker,
     }
 
     /// The target of a [`For`] loop, which can be a simple variable or a variable
@@ -997,6 +1033,7 @@ define_tree! {
     #[node]
     pub struct Inline {
         pub expr: Child!(Expr),
+        pub trim: TrimMarker,
     }
 
     #[derive(Clone, Debug, PartialEq)]

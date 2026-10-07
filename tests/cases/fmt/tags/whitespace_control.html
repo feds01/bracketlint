@@ -1,0 +1,13 @@
+// run=pass, stage=fmt, dialect=jinja
+
+<ul>
+{%- for item in items %}
+<li>{{- item -}}</li>
+{%+ endfor -%}
+</ul>
+{#- a trimmed comment -#}
+{%- if user -%}
+<p>{{ user.name }}</p>
+{%- else -%}
+<p>Guest</p>
+{%- endif %}

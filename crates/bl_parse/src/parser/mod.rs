@@ -429,6 +429,32 @@ impl<'s> Parser<'s> {
         }
     }
 
+    /// The whitespace control markers of the tag that the current frame is in,
+    /// e.g. the `-`s in `{%- if x -%}`. The lexer leaves the markers out of
+    /// the tag's tokens, so they are read from its source, right inside the
+    /// tag's two character delimiters.
+    pub(crate) fn trim(&self) -> ast::TrimMarker {
+        let tag = self._source.hunk(self.range());
+        let inner = tag.get(2..tag.len().saturating_sub(2)).unwrap_or_default();
+        let marker =
+            |c: Option<char>| c.filter(|c| self.options.dialect.trim_markers().contains(c));
+
+        ast::TrimMarker {
+            left: marker(inner.chars().next()),
+            right: marker(inner.chars().next_back()),
+        }
+    }
+
+    /// Run `g` in the tag that is the next token, like [Parser::in_tree], and
+    /// also return the tag's whitespace control markers.
+    pub(crate) fn in_tag<T>(
+        &mut self,
+        delimiter: Delimiter,
+        mut g: impl FnMut(&mut Self) -> ParseResult<T>,
+    ) -> ParseResult<(T, ast::TrimMarker)> {
+        self.in_tree(delimiter, None, |this| Ok((g(this)?, this.trim())))
+    }
+
     /// Get the current [TagContext] that the parser is in, if any.
     pub(crate) fn tag_context(&self) -> Option<TagContext> {
         self.frame.tag_context
@@ -622,7 +648,7 @@ impl<'s> Parser<'s> {
 
     fn parse_variable_block(&mut self) -> ParseResult<AstNode<ast::Statement>> {
         let token = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
-        let expr = self.in_tree(Delimiter::Brace, None, |g| {
+        let (expr, trim) = self.in_tag(Delimiter::Brace, |g| {
             let (subject, subject_span) = g.track_span(|g| g.parse_expr())?;
 
             // If the subject is an identifier, we ha
@@ -639,7 +665,8 @@ impl<'s> Parser<'s> {
             Ok(subject)
         })?;
 
-        Ok(self.node_with_joined_span(ast::Statement::Inline(ast::Inline { expr }), token.span))
+        Ok(self
+            .node_with_joined_span(ast::Statement::Inline(ast::Inline { expr, trim }), token.span))
     }
 
     fn parse_compound_expr(&mut self, min_precedence: u8) -> ParseResult<AstNode<ast::Expr>> {
@@ -940,8 +967,8 @@ impl<'s> Parser<'s> {
         let start = self.current_pos();
 
         // Parse the header first, which is within the current token.
-        let (target, iterator, reverse_modifier, guard) =
-            self.in_tree(Delimiter::Percent, None, |g| {
+        let ((target, iterator, reverse_modifier, guard), trim) =
+            self.in_tag(Delimiter::Percent, |g| {
                 g.parse_token(TokenKind::Keyword(token::Keyword::For))?;
                 let target = g.parse_for_target()?;
 
@@ -969,32 +996,33 @@ impl<'s> Parser<'s> {
         // Next, parse either until we reach an `endfor` or `empty` token.
         //
         // If it's an empty token, then we reach the end of the loop.
-        let (loop_body, ending_token, _) = self.parse_body_until_block_footer(
+        let (loop_body, ending_token, ending_trim) = self.parse_body_until_block_footer(
             ExpectedItem::empty(),
             |kind| {
                 matches!(kind, TokenKind::Keyword(token::Keyword::EndFor | token::Keyword::Empty))
             },
             |g| {
                 g.skip_token(); // `<empty>` | `<end_for>` Skip the empty token.
-                Ok(())
+                Ok(g.trim())
             },
         )?;
 
         // If we ended with an `{% empty %}` token, then we parse the empty block.
-        let loop_empty = if ending_token == TokenKind::Keyword(token::Keyword::Empty) {
-            let (body, _, _) = self.parse_body_until_block_footer(
-                ExpectedItem::empty(),
-                |kind| matches!(kind, TokenKind::Keyword(token::Keyword::EndFor)),
-                |g| {
-                    g.skip_token(); // `<end_for>` Skip the empty token.
-                    Ok(())
-                },
-            )?;
+        let (loop_empty, empty_trim, end_trim) =
+            if ending_token == TokenKind::Keyword(token::Keyword::Empty) {
+                let (body, _, end_trim) = self.parse_body_until_block_footer(
+                    ExpectedItem::empty(),
+                    |kind| matches!(kind, TokenKind::Keyword(token::Keyword::EndFor)),
+                    |g| {
+                        g.skip_token(); // `<end_for>` Skip the empty token.
+                        Ok(g.trim())
+                    },
+                )?;
 
-            Some(body)
-        } else {
-            None
-        };
+                (Some(body), ending_trim, end_trim)
+            } else {
+                (None, ast::TrimMarker::default(), ending_trim)
+            };
 
         Ok(self.node_with_joined_span(
             ast::Statement::Tag(ast::Tag::For(ast::For {
@@ -1004,6 +1032,8 @@ impl<'s> Parser<'s> {
                 loop_body,
                 loop_empty,
                 reverse_modifier,
+                trim: ast::TrimTag { start: trim, end: end_trim },
+                empty_trim,
             })),
             start,
         ))
@@ -1041,7 +1071,8 @@ impl<'s> Parser<'s> {
     fn parse_if_block(&mut self) -> ParseResult<AstNode<ast::Statement>> {
         let mut clauses = thin_vec![];
         let mut otherwise = None;
-        let mut closed = false;
+        let mut else_trim = ast::TrimMarker::default();
+        let mut end_trim = None;
         let start = self.current_pos();
 
         let parse_body = |this: &mut Self, preceding_token: TokenKind| {
@@ -1079,7 +1110,7 @@ impl<'s> Parser<'s> {
 
                 match token {
                     Token { kind: TokenKind::Keyword(Keyword::If | Keyword::Elif), .. } => {
-                        let condition = self.in_tree(Delimiter::Percent, None, |g| {
+                        let (condition, trim) = self.in_tag(Delimiter::Percent, |g| {
                             g.skip_token();
                             g.parse_compound_expr(0)
                         })?;
@@ -1091,24 +1122,22 @@ impl<'s> Parser<'s> {
                         };
                         let clause_body = parse_body(self, token.kind)?;
                         clauses.push(self.node_with_joined_span(
-                            ast::IfClause { kind: clause_kind, condition, clause_body },
+                            ast::IfClause { kind: clause_kind, condition, clause_body, trim },
                             start,
                         ));
                     }
                     Token { kind: TokenKind::Keyword(Keyword::Else), .. } => {
-                        self.in_tree(Delimiter::Percent, None, |g| {
-                            g.parse_token(TokenKind::Keyword(Keyword::Else))?;
-                            Ok(())
+                        ((), else_trim) = self.in_tag(Delimiter::Percent, |g| {
+                            g.parse_token(TokenKind::Keyword(Keyword::Else))
                         })?;
 
                         otherwise = Some(parse_body(self, token.kind)?);
                     }
                     Token { kind: TokenKind::Keyword(Keyword::EndIf), .. } => {
-                        self.in_tree(Delimiter::Percent, None, |g| {
-                            g.parse_token(TokenKind::Keyword(Keyword::EndIf))?;
-                            Ok(())
+                        let ((), trim) = self.in_tag(Delimiter::Percent, |g| {
+                            g.parse_token(TokenKind::Keyword(Keyword::EndIf))
                         })?;
-                        closed = true;
+                        end_trim = Some(trim);
                         break;
                     }
                     _ => self.err_with_location(
@@ -1121,18 +1150,18 @@ impl<'s> Parser<'s> {
             }
         }
 
-        if !closed {
+        let Some(end_trim) = end_trim else {
             return self.err_with_location(
                 ParseErrorKind::UnclosedTag,
                 ExpectedItem::empty(),
                 None,
                 self.eof_pos(),
             );
-        }
+        };
 
         let clauses = self.nodes_with_joined_span(clauses, start);
         Ok(self.node_with_joined_span(
-            ast::Statement::Tag(ast::Tag::If(ast::If { clauses, otherwise })),
+            ast::Statement::Tag(ast::Tag::If(ast::If { clauses, otherwise, else_trim, end_trim })),
             start,
         ))
     }
@@ -1158,20 +1187,20 @@ impl<'s> Parser<'s> {
         let token = *self.current_token();
 
         // Parse the header first, we should get `block <name>`.
-        let assignments = self.in_tree(Delimiter::Percent, None, |g| {
+        let (assignments, trim) = self.in_tag(Delimiter::Percent, |g| {
             g.parse_token(TokenKind::Keyword(token::Keyword::With))?;
             g.parse_assignments()
         })?;
 
         // Now parse a bunch of general statements until we reach the end of the block.
-        let (block_body, _, _) = self.parse_body_until_block_footer(
+        let (block_body, _, end_trim) = self.parse_body_until_block_footer(
             ExpectedItem::empty(),
             |kind| matches!(kind, TokenKind::Keyword(token::Keyword::EndWith)),
             |g| {
                 g.skip_fast(TokenKind::Keyword(token::Keyword::EndWith)); // `<endwith>` Skip the end token.
                 let _ = g.parse_token_fast(TokenKind::Ident);
 
-                Ok(())
+                Ok(g.trim())
             },
         )?;
 
@@ -1180,6 +1209,7 @@ impl<'s> Parser<'s> {
                 assignments,
                 block_body,
                 kind: ast::AssignmentKind::With,
+                trim: ast::TrimTag { start: trim, end: end_trim },
             })),
             token.span,
         ))
@@ -1189,7 +1219,7 @@ impl<'s> Parser<'s> {
         let token = *self.current_token();
 
         // Parse the header first, we should get `block <name>`.
-        let label = self.in_tree(Delimiter::Percent, None, |g| {
+        let (label, trim) = self.in_tag(Delimiter::Percent, |g| {
             g.parse_token(TokenKind::Keyword(token::Keyword::Block))?;
 
             // If the next token is a string literal, we still accept it but
@@ -1207,7 +1237,7 @@ impl<'s> Parser<'s> {
         })?;
 
         // Now parse a bunch of general statements until we reach the end of the block.
-        let (block_body, _, end_label) = self.parse_body_until_block_footer(
+        let (block_body, _, (end_label, end_trim)) = self.parse_body_until_block_footer(
             ExpectedItem::empty(),
             |kind| matches!(kind, TokenKind::Keyword(token::Keyword::EndBlock)),
             |g| {
@@ -1215,7 +1245,8 @@ impl<'s> Parser<'s> {
 
                 // @@Todo: check if the name matches the label, if the labels mismatch then
                 // we should generate an error.
-                if g.peek().is_some() { Ok(Some(g.parse_name()?)) } else { Ok(None) }
+                let end_label = if g.peek().is_some() { Some(g.parse_name()?) } else { None };
+                Ok((end_label, g.trim()))
             },
         )?;
 
@@ -1224,6 +1255,7 @@ impl<'s> Parser<'s> {
                 label: Some(label),
                 block_body,
                 end_label,
+                trim: ast::TrimTag { start: trim, end: end_trim },
             })),
             token.span,
         ))
@@ -1350,7 +1382,7 @@ impl<'s> Parser<'s> {
             let template = g.parse_expr()?;
 
             Ok(g.node_with_span(
-                ast::Statement::Tag(ast::Tag::Extends(ast::Extends { template })),
+                ast::Statement::Tag(ast::Tag::Extends(ast::Extends { template, trim: g.trim() })),
                 g.range(),
             ))
         })
