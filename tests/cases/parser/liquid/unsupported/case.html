@@ -1,0 +1,12 @@
+// run=fail, stage=check
+
+{% case product.type %}
+{% when "shirt" %}
+<span>Apparel</span>
+{% when "mug", "glass" %}
+<span>Kitchen</span>
+{% when "book" or "magazine" %}
+<span>Reading</span>
+{% else %}
+<span>Other</span>
+{% endcase %}

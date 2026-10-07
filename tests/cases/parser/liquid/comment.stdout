@@ -1,0 +1,13 @@
+info: parsed module '$DIR/comment.html':
+body
+├─comment
+├─text
+├─inline
+│ └─access_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "product"
+│   └─field
+│     └─name "title"
+└─text
+

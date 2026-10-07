@@ -1,0 +1,11 @@
+info: parsed module '$DIR/whitespace_control.html':
+body
+├─text
+├─inline
+│ └─unary_expr
+│   ├─unary operator `-`
+│   └─var_expr
+│     └─name "name"
+├─text
+└─text
+

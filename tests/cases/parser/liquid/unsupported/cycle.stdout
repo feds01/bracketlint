@@ -1,0 +1,26 @@
+info: parsed module '$DIR/cycle.html':
+body
+└─for
+  ├─target
+  │ └─name "product"
+  ├─iterator
+  │ └─access_expr
+  │   ├─subject
+  │   │ └─var_expr
+  │   │   └─name "collection"
+  │   └─field
+  │     └─name "products"
+  └─loop_body
+    └─body
+      ├─text
+      ├─unprocessable_tag
+      ├─text
+      ├─inline
+      │ └─access_expr
+      │   ├─subject
+      │   │ └─var_expr
+      │   │   └─name "product"
+      │   └─field
+      │     └─name "title"
+      └─text
+

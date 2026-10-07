@@ -1,0 +1,5 @@
+// run=pass, stage=check
+
+{% render "product-card", product: product, show_price: true %}
+{% render "product-card" with featured_product as product %}
+{% render "product-card" for collection.products as product %}

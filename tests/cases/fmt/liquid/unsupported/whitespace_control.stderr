@@ -1,0 +1,19 @@
+error: expected a tag, however received a `-`
+ --> $DIR/whitespace_control.html:2:3
+  |
+2 | {%- for item in cart.items -%}
+  |   -
+  |
+  = info: expected a `identifier`
+error: unexpectedly encountered a `-`
+ --> $DIR/whitespace_control.html:3:20
+  |
+3 | <li>{{- item.title -}}</li>
+  |                    -
+error: expected a tag, however received a `-`
+ --> $DIR/whitespace_control.html:4:3
+  |
+4 | {%- endfor -%}
+  |   -
+  |
+  = info: expected a `identifier`

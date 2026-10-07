@@ -1,0 +1,24 @@
+info: parsed module '$DIR/layout.html':
+body
+├─generic_tag
+│ ├─name "layout"
+│ └─args
+│   └─arg
+│     └─lit_expr
+│       └─str_lit "default"
+└─block
+  ├─name "content"
+  └─body
+    ├─text
+    ├─include
+    │ ├─lit_expr
+    │ │ └─str_lit "breadcrumbs"
+    │ └─context
+    ├─generic_tag
+    │ ├─name "render"
+    │ └─args
+    │   └─arg
+    │     └─lit_expr
+    │       └─str_lit "product-card"
+    └─text
+

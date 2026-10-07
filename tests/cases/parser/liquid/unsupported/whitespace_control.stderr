@@ -1,0 +1,26 @@
+error: expected a tag, however received a `-`
+ --> $DIR/whitespace_control.html:1:3
+  |
+1 | {%- assign name = "world" -%}
+  |   -
+  |
+  = info: expected a `identifier`
+error: unexpectedly encountered a `-`
+ --> $DIR/whitespace_control.html:2:13
+  |
+2 | <p>{{- name -}}</p>
+  |             -
+error: expected a tag, however received a `-`
+ --> $DIR/whitespace_control.html:3:3
+  |
+3 | {%- if name -%}<span>hi</span>{%- endif -%}
+  |   -
+  |
+  = info: expected a `identifier`
+error: expected a tag, however received a `-`
+ --> $DIR/whitespace_control.html:3:33
+  |
+3 | {%- if name -%}<span>hi</span>{%- endif -%}
+  |                                 -
+  |
+  = info: expected a `identifier`

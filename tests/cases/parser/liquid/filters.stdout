@@ -1,0 +1,79 @@
+info: parsed module '$DIR/filters.html':
+body
+├─text
+├─inline
+│ └─filtered_expr
+│   ├─subject
+│   │ └─access_expr
+│   │   ├─subject
+│   │   │ └─var_expr
+│   │   │   └─name "product"
+│   │   └─field
+│   │     └─name "title"
+│   └─filter
+│     ├─name "upcase"
+│     └─args
+├─text
+├─inline
+│ └─filtered_expr
+│   ├─subject
+│   │ └─access_expr
+│   │   ├─subject
+│   │   │ └─var_expr
+│   │   │   └─name "product"
+│   │   └─field
+│   │     └─name "title"
+│   └─filter
+│     ├─name "append"
+│     └─args
+│       └─arg
+│         └─lit_expr
+│           └─str_lit " - Sale"
+├─text
+├─inline
+│ └─filtered_expr
+│   ├─subject
+│   │ └─access_expr
+│   │   ├─subject
+│   │   │ └─var_expr
+│   │   │   └─name "product"
+│   │   └─field
+│   │     └─name "price"
+│   └─filter
+│     ├─name "plus"
+│     └─args
+│       └─arg
+│         └─var_expr
+│           └─name "shipping"
+├─text
+├─inline
+│ └─filtered_expr
+│   ├─subject
+│   │ └─lit_expr
+│   │   └─str_lit "now"
+│   └─filter
+│     ├─name "date"
+│     └─args
+│       └─arg
+│         └─lit_expr
+│           └─str_lit "%Y-%m-%d"
+├─text
+├─inline
+│ └─filtered_expr
+│   ├─subject
+│   │ └─filtered_expr
+│   │   ├─subject
+│   │   │ └─access_expr
+│   │   │   ├─subject
+│   │   │   │ └─var_expr
+│   │   │   │   └─name "product"
+│   │   │   └─field
+│   │   │     └─name "description"
+│   │   └─filter
+│   │     ├─name "strip_html"
+│   │     └─args
+│   └─filter
+│     ├─name "escape"
+│     └─args
+└─text
+

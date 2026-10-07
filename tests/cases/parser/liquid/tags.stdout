@@ -1,0 +1,30 @@
+info: parsed module '$DIR/tags.html':
+body
+├─generic_tag
+│ ├─name "increment"
+│ └─args
+│   └─arg
+│     └─var_expr
+│       └─name "counter"
+├─generic_tag
+│ ├─name "decrement"
+│ └─args
+│   └─arg
+│     └─var_expr
+│       └─name "counter"
+└─generic_tag
+  ├─name "echo"
+  └─args
+    └─arg
+      └─filtered_expr
+        ├─subject
+        │ └─access_expr
+        │   ├─subject
+        │   │ └─var_expr
+        │   │   └─name "product"
+        │   └─field
+        │     └─name "title"
+        └─filter
+          ├─name "upcase"
+          └─args
+

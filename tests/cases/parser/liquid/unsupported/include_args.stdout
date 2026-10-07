@@ -1,0 +1,7 @@
+info: parsed module '$DIR/include_args.html':
+body
+└─include
+  ├─lit_expr
+  │ └─str_lit "product-card"
+  └─context
+

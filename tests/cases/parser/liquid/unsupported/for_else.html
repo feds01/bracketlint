@@ -1,0 +1,7 @@
+// run=fail, stage=check
+
+{% for product in collection.products %}
+<li>{{ product.title }}</li>
+{% else %}
+<li>No products.</li>
+{% endfor %}

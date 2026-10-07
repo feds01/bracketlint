@@ -1,0 +1,73 @@
+info: parsed module '$DIR/literals.html':
+body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─bin_expr
+│     │   │   ├─lhs
+│     │   │   │ └─access_expr
+│     │   │   │   ├─subject
+│     │   │   │   │ └─var_expr
+│     │   │   │   │   └─name "product"
+│     │   │   │   └─field
+│     │   │   │     └─name "available"
+│     │   │   ├─operator `==`
+│     │   │   └─rhs
+│     │   │     └─var_expr
+│     │   │       └─name "true"
+│     │   ├─operator `and`
+│     │   └─rhs
+│     │     └─bin_expr
+│     │       ├─lhs
+│     │       │ └─access_expr
+│     │       │   ├─subject
+│     │       │   │ └─var_expr
+│     │       │   │   └─name "product"
+│     │       │   └─field
+│     │       │     └─name "discount"
+│     │       ├─operator `!=`
+│     │       └─rhs
+│     │         └─var_expr
+│     │           └─name "nil"
+│     └─clause_body
+│       └─body
+│         └─text
+└─if
+  └─clauses
+    └─if_clause
+      ├─condition
+      │ └─bin_expr
+      │   ├─lhs
+      │   │ └─bin_expr
+      │   │   ├─lhs
+      │   │   │ └─access_expr
+      │   │   │   ├─subject
+      │   │   │   │ └─var_expr
+      │   │   │   │   └─name "product"
+      │   │   │   └─field
+      │   │   │     └─name "description"
+      │   │   ├─operator `==`
+      │   │   └─rhs
+      │   │     └─var_expr
+      │   │       └─name "blank"
+      │   ├─operator `or`
+      │   └─rhs
+      │     └─bin_expr
+      │       ├─lhs
+      │       │ └─access_expr
+      │       │   ├─subject
+      │       │   │ └─var_expr
+      │       │   │   └─name "product"
+      │       │   └─field
+      │       │     └─name "tags"
+      │       ├─operator `==`
+      │       └─rhs
+      │         └─var_expr
+      │           └─name "empty"
+      └─clause_body
+        └─body
+          └─text
+

@@ -1,0 +1,5 @@
+// run=fail, stage=check
+
+{% for product in collection.products limit:4 offset:2 %}
+<li>{{ product.title }}</li>
+{% endfor %}

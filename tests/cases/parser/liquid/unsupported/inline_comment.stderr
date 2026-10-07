@@ -1,0 +1,7 @@
+error: expected a tag, however received an unknown character `#`
+ --> $DIR/inline_comment.html:1:4
+  |
+1 | {% # This is an inline comment %}
+  |    -
+  |
+  = info: expected a `identifier`

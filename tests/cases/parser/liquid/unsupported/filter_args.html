@@ -1,0 +1,4 @@
+// run=fail, stage=check
+
+<p>{{ product.title | slice: 0, 10 }}</p>
+<p>{{ product.subtitle | default: "None", allow_false: true }}</p>

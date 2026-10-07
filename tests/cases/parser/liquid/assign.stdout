@@ -1,0 +1,34 @@
+info: parsed module '$DIR/assign.html':
+body
+├─generic_tag
+│ ├─name "assign"
+│ └─args
+│   └─arg
+│     ├─name "greeting"
+│     └─lit_expr
+│       └─str_lit "Hello"
+├─generic_tag
+│ ├─name "assign"
+│ └─args
+│   └─arg
+│     ├─name "title"
+│     └─filtered_expr
+│       ├─subject
+│       │ └─access_expr
+│       │   ├─subject
+│       │   │ └─var_expr
+│       │   │   └─name "page"
+│       │   └─field
+│       │     └─name "title"
+│       └─filter
+│         ├─name "upcase"
+│         └─args
+├─text
+├─inline
+│ └─var_expr
+│   └─name "greeting"
+├─inline
+│ └─var_expr
+│   └─name "title"
+└─text
+

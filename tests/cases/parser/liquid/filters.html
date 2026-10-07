@@ -1,0 +1,7 @@
+// run=pass, stage=check
+
+<p>{{ product.title | upcase }}</p>
+<p>{{ product.title | append: " - Sale" }}</p>
+<p>{{ product.price | plus: shipping }}</p>
+<p>{{ "now" | date: "%Y-%m-%d" }}</p>
+<p>{{ product.description | strip_html | escape }}</p>

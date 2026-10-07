@@ -1,0 +1,5 @@
+error: unexpectedly encountered an identifier
+ --> $DIR/contains.html:1:21
+  |
+1 | {% if product.title contains "Pack" %}<span>Bundle</span>{% endif %}
+  |                     --------
