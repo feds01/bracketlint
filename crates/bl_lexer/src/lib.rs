@@ -419,10 +419,9 @@ impl<'lex> Lexer<'lex> {
                 TokenKind::RightDelim(delimiter)
             }
             tree => {
-                // A mismatched closing delimiter ended the tree, so backtrack over
-                // it, so that if other trees exist, they can still be properly
-                // handled. A tree that ran into the end has nothing to backtrack
-                // over, and the previous character might not be ASCII.
+                // Step back over a closing delimiter of another tree, so that tree can
+                // still close, e.g. the `]` in `items[f(0]` closes the `[` tree. There is
+                // nothing to step back over at the end of the source.
                 if matches!(tree, Some(TreeInfo { delimiter: Some(_), .. })) {
                     self.offset.set(self.offset.get() - 1);
                 }

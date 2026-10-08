@@ -441,18 +441,9 @@ impl<'s> Parser<'s> {
 
     /// The whitespace control markers of the tag that the current frame is in,
     /// e.g. the `-`s in `{%- if x -%}`. The lexer leaves the markers out of
-    /// the tag's tokens, so they are read from its source, right inside the
-    /// tag's two character delimiters.
+    /// the tag's tokens, so they are read from its source, see [tag_trim].
     pub(crate) fn trim(&self) -> ast::TrimMarker {
-        let tag = self._source.hunk(self.range());
-        let inner = tag.get(2..tag.len().saturating_sub(2)).unwrap_or_default();
-        let marker =
-            |c: Option<char>| c.filter(|c| self.options.dialect.trim_markers().contains(c));
-
-        ast::TrimMarker {
-            left: marker(inner.chars().next()),
-            right: marker(inner.chars().next_back()),
-        }
+        tag_trim(self._source.hunk(self.range()), self.options.dialect.trim_markers())
     }
 
     /// Run `g` in the tag that is the next token, like [Parser::in_tree], and
@@ -2034,5 +2025,38 @@ impl<'s> Parser<'s> {
 
     fn exhausted(&self) -> bool {
         self.cursor.position() == self.cursor.len()
+    }
+}
+
+/// The whitespace control markers of `tag`, which are any of `markers` right
+/// inside its two character delimiters. A tag that the lexer made from a line
+/// of a `liquid` tag has no delimiters, and so no markers.
+fn tag_trim(tag: &str, markers: &[char]) -> ast::TrimMarker {
+    if !tag.starts_with('{') {
+        return ast::TrimMarker::default();
+    }
+
+    let inner = tag.get(2..tag.len().saturating_sub(2)).unwrap_or_default();
+    let marker = |c: Option<char>| c.filter(|c| markers.contains(c));
+
+    ast::TrimMarker { left: marker(inner.chars().next()), right: marker(inner.chars().next_back()) }
+}
+
+#[cfg(test)]
+mod test_super {
+    use super::*;
+
+    #[test]
+    fn test_tag_trim() {
+        let both = ast::TrimMarker { left: Some('-'), right: Some('-') };
+        assert_eq!(tag_trim("{%- if x -%}", &['-']), both);
+        assert_eq!(tag_trim("{{- x }}", &['-']).left, Some('-'));
+        assert_eq!(tag_trim("{% if x %}", &['-']), ast::TrimMarker::default());
+
+        // Django has no markers.
+        assert_eq!(tag_trim("{%- if x -%}", &[]), ast::TrimMarker::default());
+
+        // A line of a `liquid` tag, whose last character but two is a `-`.
+        assert_eq!(tag_trim("if x - y", &['-']), ast::TrimMarker::default());
     }
 }
