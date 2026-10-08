@@ -163,12 +163,14 @@ impl Dialect {
     }
 
     /// How tightly the binary operator `op` binds, as the binding powers of
-    /// its left and right side. An operator with a higher binding power groups
-    /// first, so `a or b and c` is `a or (b and c)`. `contains` is only a
-    /// keyword in Liquid, so the other dialects never parse it, and only list
-    /// it with their comparisons to cover every operator.
-    pub fn infix_binding_power(self, op: BinOp) -> (u8, u8) {
-        match self {
+    /// its left and right side, or `None` if the dialect has no such operator.
+    /// An operator with a higher binding power groups first, so `a or b and c`
+    /// is `a or (b and c)`.
+    ///
+    /// Each dialect follows its own engine, see the comment on each arm. Only
+    /// Jinja and Twig have arithmetic and `~`, and only Liquid has `contains`.
+    pub fn infix_binding_power(self, op: BinOp) -> Option<(u8, u8)> {
+        let power = match self {
             // Django's own precedences, from `smartif.py`. `in` and `not in`
             // bind looser than the other comparisons, so `a in b == c` is
             // `a in (b == c)`.
@@ -183,15 +185,24 @@ impl Dialect {
                 | BinOp::Gt
                 | BinOp::GtEq
                 | BinOp::Is
-                | BinOp::IsNot
-                | BinOp::Contains => left_assoc(10),
+                | BinOp::IsNot => left_assoc(10),
+                BinOp::Contains
+                | BinOp::Add
+                | BinOp::Sub
+                | BinOp::Mul
+                | BinOp::Div
+                | BinOp::FloorDiv
+                | BinOp::Mod
+                | BinOp::Pow
+                | BinOp::Concat => return None,
             },
 
             // Jinja's parser has a function for each level, from `parse_or`
-            // to `parse_compare`, rather than numbers, so these go up in tens.
+            // to `parse_pow`, rather than numbers, so these go up in tens.
             // Jinja chains comparisons like Python, so `a == b > c` means
-            // `a == b and b > c`, which is `(a == b) > c` here. A test binds
-            // tighter than any operator.
+            // `a == b and b > c`, which is `(a == b) > c` here. Unlike in
+            // Python, `**` is left-associative, so `a ** b ** c` is
+            // `(a ** b) ** c`. A test binds tighter than any operator.
             Dialect::Jinja => match op {
                 BinOp::Or => left_assoc(10),
                 BinOp::And => left_assoc(20),
@@ -202,13 +213,18 @@ impl Dialect {
                 | BinOp::Gt
                 | BinOp::GtEq
                 | BinOp::In
-                | BinOp::NotIn
-                | BinOp::Contains => left_assoc(40),
+                | BinOp::NotIn => left_assoc(40),
+                BinOp::Add | BinOp::Sub => left_assoc(50),
+                BinOp::Concat => left_assoc(60),
+                BinOp::Mul | BinOp::Div | BinOp::FloorDiv | BinOp::Mod => left_assoc(70),
+                BinOp::Pow => left_assoc(80),
                 BinOp::Is | BinOp::IsNot => left_assoc(100),
+                BinOp::Contains => return None,
             },
 
             // Liquid has no precedence between `and` and `or`, and evaluates
             // them from right to left, so `a and b or c` is `a and (b or c)`.
+            // Liquid does arithmetic with filters such as `plus` instead.
             Dialect::Liquid => match op {
                 BinOp::And | BinOp::Or => right_assoc(2),
                 BinOp::In | BinOp::NotIn => left_assoc(8),
@@ -216,10 +232,20 @@ impl Dialect {
                 BinOp::Gt | BinOp::GtEq | BinOp::Lt | BinOp::LtEq | BinOp::Contains => {
                     left_assoc(9)
                 }
+                BinOp::Add
+                | BinOp::Sub
+                | BinOp::Mul
+                | BinOp::Div
+                | BinOp::FloorDiv
+                | BinOp::Mod
+                | BinOp::Pow
+                | BinOp::Concat => return None,
             },
 
             // Twig's own precedences, from `CoreExtension`. A test binds
-            // tighter than the comparisons and `not`.
+            // tighter than the comparisons, `not` and the arithmetic below
+            // `**`. Twig 3.15 deprecates `~` at 40 in favour of 27, below `+`
+            // and `-`, but 40 is what it still parses with.
             Dialect::Twig => match op {
                 BinOp::Or => left_assoc(10),
                 BinOp::And => left_assoc(15),
@@ -230,19 +256,28 @@ impl Dialect {
                 | BinOp::Gt
                 | BinOp::GtEq
                 | BinOp::In
-                | BinOp::NotIn
-                | BinOp::Contains => left_assoc(20),
+                | BinOp::NotIn => left_assoc(20),
+                BinOp::Add | BinOp::Sub => left_assoc(30),
+                BinOp::Concat => left_assoc(40),
+                BinOp::Mul | BinOp::Div | BinOp::FloorDiv | BinOp::Mod => left_assoc(60),
                 BinOp::Is | BinOp::IsNot => left_assoc(100),
+                BinOp::Pow => right_assoc(200),
+                BinOp::Contains => return None,
             },
-        }
+        };
+
+        Some(power)
     }
 
     /// How tightly the prefix operator `op` binds: its operand takes every
     /// binary operator whose left binding power is at least this, see
     /// [Dialect::infix_binding_power]. `-` binds tighter than any binary
-    /// operator. `not` binds tighter than `and` and `or`, and in Twig also
-    /// tighter than the comparisons, so `not a == b` is `(not a) == b` there
-    /// and `not (a == b)` in the other dialects.
+    /// operator, including `**`, so `-a ** b` is `(-a) ** b`.
+    ///
+    /// `not` binds tighter than `and` and `or` in every dialect. In Twig it
+    /// also binds tighter than the comparisons, `+`, `-` and `~`, so
+    /// `not a == b` is `(not a) == b` there and `not (a == b)` in the other
+    /// dialects.
     pub fn prefix_binding_power(self, op: UnaryOp) -> u8 {
         match op {
             UnaryOp::Neg => u8::MAX,
@@ -319,5 +354,30 @@ mod test_super {
 
         assert_eq!(Dialect::Liquid.keyword("unless"), Some(Keyword::Unless));
         assert_eq!(Dialect::Django.keyword("unless"), None);
+    }
+
+    #[test]
+    fn test_operators_of_each_dialect() {
+        let arithmetic = [
+            BinOp::Add,
+            BinOp::Sub,
+            BinOp::Mul,
+            BinOp::Div,
+            BinOp::FloorDiv,
+            BinOp::Mod,
+            BinOp::Pow,
+            BinOp::Concat,
+        ];
+
+        for &dialect in Dialect::ALL {
+            let has_arithmetic = matches!(dialect, Dialect::Jinja | Dialect::Twig);
+            for op in arithmetic {
+                let power = dialect.infix_binding_power(op);
+                assert_eq!(power.is_some(), has_arithmetic, "`{op}` in {dialect}");
+            }
+
+            let power = dialect.infix_binding_power(BinOp::Contains);
+            assert_eq!(power.is_some(), dialect.is_liquid(), "`contains` in {dialect}");
+        }
     }
 }

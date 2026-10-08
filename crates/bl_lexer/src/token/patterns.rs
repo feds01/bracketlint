@@ -5,11 +5,15 @@
 
 /// Expands to a pattern that matches a [Token](crate::token::Token) of the
 /// given [TokenKind](crate::token::TokenKind) variant, e.g. `tok!(Eq)` matches
-/// a `=`. The variant must not hold any data, use `kw!` for keywords.
+/// a `=`. A variant that holds data takes patterns for it, e.g.
+/// `tok!(Number(_))`. Use `kw!` for keywords.
 #[macro_export]
 macro_rules! tok {
     ($kind:ident) => {
         $crate::token::Token { kind: $crate::token::TokenKind::$kind, .. }
+    };
+    ($kind:ident($($data:pat),+)) => {
+        $crate::token::Token { kind: $crate::token::TokenKind::$kind($($data),+), .. }
     };
 }
 
@@ -53,35 +57,26 @@ macro_rules! tree {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
+    use bl_ast::Dialect;
 
-    use bl_ast::{Dialect, LineRanges, SourceId, SpannedSource};
-
-    use crate::{Lexer, token::Token};
-
-    /// Lex `source` as a Jinja template.
-    fn lex(source: &str) -> Vec<Token> {
-        let path = PathBuf::new();
-        let line_ranges = LineRanges::new_from_str(source);
-        let spanned = SpannedSource::new(source, &path, &line_ranges);
-
-        Lexer::new(spanned, SourceId::default(), Dialect::Jinja).tokenise().tokens
-    }
+    use crate::tests::lex;
 
     #[test]
     fn tree_matches_the_tokens_of_a_tag() {
-        assert!(matches!(lex("{% raw %}")[..], tree!(Percent, [kw!(Raw)])));
-        assert!(matches!(lex("{% load x %}")[..], tree!(Percent, [kw!(Load), tok!(Ident)])));
+        let jinja = |source: &str| lex(source, Dialect::Jinja);
+
+        assert!(matches!(jinja("{% raw %}")[..], tree!(Percent, [kw!(Raw)])));
+        assert!(matches!(jinja("{% load x %}")[..], tree!(Percent, [kw!(Load), tok!(Ident)])));
         assert!(matches!(
-            lex("{{ x.y }}")[..],
+            jinja("{{ x.y }}")[..],
             tree!(Brace, [tok!(Ident), tok!(Dot), tok!(Ident)])
         ));
         assert!(matches!(
-            lex("{% for x in y %}")[..],
+            jinja("{% for x in y %}")[..],
             tree!(Percent, [kw!(For), tok!(Ident), kw!(In), tok!(Ident)])
         ));
         assert!(matches!(
-            lex("{% for k, v in items %}")[..],
+            jinja("{% for k, v in items %}")[..],
             tree!(Percent, [kw!(For), tok!(Ident), tok!(Comma), tok!(Ident), kw!(In), tok!(Ident)])
         ));
     }
@@ -90,6 +85,17 @@ mod tests {
     fn tree_does_not_match_the_start_of_a_longer_tag() {
         // The first two tokens are a `{% %}` tree and `raw`, but the tree has
         // two tokens inside it rather than one.
-        assert!(!matches!(lex("{% raw x %}")[..2], tree!(Percent, [kw!(Raw)])));
+        assert!(!matches!(lex("{% raw x %}", Dialect::Jinja)[..2], tree!(Percent, [kw!(Raw)])));
+    }
+
+    #[test]
+    fn tok_matches_the_data_of_a_variant() {
+        let tokens = lex("{% (-1) %}", Dialect::Jinja);
+
+        assert!(matches!(
+            tokens[..],
+            tree!(Percent, [tok!(Tree(crate::token::Delimiter::Paren, 1)), tok!(Number(_))])
+        ));
+        assert!(!matches!(tokens[..], tree!(Percent, [tok!(Tree(_, 2)), tok!(Number(_))])));
     }
 }

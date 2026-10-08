@@ -1,0 +1,149 @@
+info: parsed module '$DIR/arithmetic_tokens_jinja.html' as jinja:
+body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─var_expr
+│     │   │   └─name "a"
+│     │   ├─operator `%`
+│     │   └─rhs
+│     │     └─lit_expr
+│     │       └─int_lit 2
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─var_expr
+│     │   │   └─name "a"
+│     │   ├─operator `%`
+│     │   └─rhs
+│     │     └─lit_expr
+│     │       └─int_lit 2
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─bin_expr
+│     │   │   ├─lhs
+│     │   │   │ └─var_expr
+│     │   │   │   └─name "a"
+│     │   │   ├─operator `**`
+│     │   │   └─rhs
+│     │   │     └─var_expr
+│     │   │       └─name "b"
+│     │   ├─operator `*`
+│     │   └─rhs
+│     │     └─var_expr
+│     │       └─name "c"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─bin_expr
+│     │   │   ├─lhs
+│     │   │   │ └─var_expr
+│     │   │   │   └─name "a"
+│     │   │   ├─operator `//`
+│     │   │   └─rhs
+│     │   │     └─var_expr
+│     │   │       └─name "b"
+│     │   ├─operator `/`
+│     │   └─rhs
+│     │     └─var_expr
+│     │       └─name "c"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─var_expr
+│     │   │   └─name "a"
+│     │   ├─operator `-`
+│     │   └─rhs
+│     │     └─var_expr
+│     │       └─name "b"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─var_expr
+│     │   │   └─name "a"
+│     │   ├─operator `+`
+│     │   └─rhs
+│     │     └─var_expr
+│     │       └─name "b"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─unary_expr
+│     │   │   ├─unary operator `-`
+│     │   │   └─var_expr
+│     │   │     └─name "a"
+│     │   ├─operator `-`
+│     │   └─rhs
+│     │     └─var_expr
+│     │       └─name "b"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─var_expr
+│     │   │   └─name "a"
+│     │   ├─operator `-`
+│     │   └─rhs
+│     │     └─lit_expr
+│     │       └─int_lit 1
+│     └─clause_body
+│       └─body
+└─if
+  └─clauses
+    └─if_clause
+      ├─condition
+      │ └─bin_expr
+      │   ├─lhs
+      │   │ └─bin_expr
+      │   │   ├─lhs
+      │   │   │ └─lit_expr
+      │   │   │   └─int_lit 10
+      │   │   ├─operator `-`
+      │   │   └─rhs
+      │   │     └─lit_expr
+      │   │       └─int_lit 1
+      │   ├─operator `>`
+      │   └─rhs
+      │     └─lit_expr
+      │       └─int_lit -1
+      └─clause_body
+        └─body
+

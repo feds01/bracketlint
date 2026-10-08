@@ -1,0 +1,7 @@
+{%~ if first ~ " " ~ last == name ~%}
+    <p>{{ name }}</p>
+{%~ endif ~%}
+{% if a**b**c > 1 and n % 2 %}
+    <p>{{ n }}</p>
+{% endif %}
+

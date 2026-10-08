@@ -7,7 +7,7 @@ pub mod token;
 
 use std::cell::Cell;
 
-use bl_ast::{ByteRange, Dialect, Keyword, SourceId, Span, SpannedSource};
+use bl_ast::{BinOp, ByteRange, Dialect, Keyword, SourceId, Span, SpannedSource};
 use bl_reporting::DiagnosticsMut;
 use diagnostics::{LexerDiagnostics, LexerError, LexerErrorKind};
 use token::{Delimiter, NumberFlags, Token, TokenKind};
@@ -333,10 +333,29 @@ impl<'lex> Lexer<'lex> {
                     _ => TokenKind::Lt,
                 },
                 '-' => match self.peek() {
-                    c if c.is_ascii_digit() => self.number(ShouldSkip::Yes),
+                    c if c.is_ascii_digit() && !self.minus_subtracts() => {
+                        self.number(ShouldSkip::Yes)
+                    }
                     _ => TokenKind::Minus,
                 },
                 '+' => TokenKind::Plus,
+                '*' => match self.peek() {
+                    '*' => {
+                        self.skip_ascii();
+                        TokenKind::StarStar
+                    }
+                    _ => TokenKind::Star,
+                },
+                '/' => match self.peek() {
+                    '/' => {
+                        self.skip_ascii();
+                        TokenKind::SlashSlash
+                    }
+                    _ => TokenKind::Slash,
+                },
+                // `~` is also Twig's whitespace control marker, which the arm
+                // for markers above takes when it is next to the delimiter.
+                '~' => TokenKind::Tilde,
                 c @ ('\'' | '"') => self.string(c),
                 c => TokenKind::Unexpected(c),
             }
@@ -709,6 +728,17 @@ impl<'lex> Lexer<'lex> {
         matches!(self.tokens.last(), Some(tok!(Dot)))
     }
 
+    /// Whether a `-` here subtracts, because the dialect has a binary `-` and
+    /// the last token ends an operand, e.g. in `a -1` or `10-1`. Otherwise a
+    /// `-` right before a digit starts a negative number, e.g. in `x > -1`.
+    fn minus_subtracts(&self) -> bool {
+        self.dialect.infix_binding_power(BinOp::Sub).is_some()
+            && self
+                .tokens
+                .last()
+                .is_some_and(|token| token.kind.is_ident_like() || token.kind.is_lit())
+    }
+
     /// Lex the contents of a `{% raw %}` block as text, up to its
     /// `{% endraw %}` tag, or the end of the source if it has none.
     fn hunk(&mut self) {
@@ -765,4 +795,145 @@ fn is_ident_start(c: char) -> bool {
 /// True if `c` is valid as a non-first character of an identifier.
 pub(crate) fn is_id_continue(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == '_' || c == '-'
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use bl_ast::{Dialect, LineRanges, SourceId, SpannedSource};
+
+    use crate::{Lexer, tok, token::Token, tree};
+
+    /// The tokens that `source` lexes to in `dialect`.
+    pub(crate) fn lex(source: &str, dialect: Dialect) -> Vec<Token> {
+        let path = PathBuf::new();
+        let line_ranges = LineRanges::new_from_str(source);
+        let spanned = SpannedSource::new(source, &path, &line_ranges);
+
+        Lexer::new(spanned, SourceId::default(), dialect).tokenise().tokens
+    }
+
+    #[test]
+    fn doubled_operators_are_one_token() {
+        assert!(matches!(
+            lex("{% a ** b * c // d / e %}", Dialect::Jinja)[..],
+            tree!(
+                Percent,
+                [
+                    tok!(Ident),
+                    tok!(StarStar),
+                    tok!(Ident),
+                    tok!(Star),
+                    tok!(Ident),
+                    tok!(SlashSlash),
+                    tok!(Ident),
+                    tok!(Slash),
+                    tok!(Ident),
+                ]
+            )
+        ));
+    }
+
+    #[test]
+    fn percent_only_closes_a_tag_before_a_brace() {
+        for source in ["{% a % 2 %}", "{% a%2%}"] {
+            assert!(
+                matches!(
+                    lex(source, Dialect::Jinja)[..],
+                    tree!(Percent, [tok!(Ident), tok!(Percent), tok!(Number(_))])
+                ),
+                "{source}"
+            );
+        }
+    }
+
+    #[test]
+    fn operators_inside_a_tag_with_trim_markers() {
+        for (dialect, source) in [
+            (Dialect::Twig, "{{~ a ~ b ~}}"),
+            (Dialect::Twig, "{{- a ~ b -}}"),
+            (Dialect::Jinja, "{{- a ~ b -}}"),
+        ] {
+            assert!(
+                matches!(
+                    lex(source, dialect)[..],
+                    tree!(Brace, [tok!(Ident), tok!(Tilde), tok!(Ident)])
+                ),
+                "{source} in {dialect}"
+            );
+        }
+
+        assert!(matches!(
+            lex("{%~ a~b~%}", Dialect::Twig)[..],
+            tree!(Percent, [tok!(Ident), tok!(Tilde), tok!(Ident)])
+        ));
+
+        for (dialect, source) in
+            [(Dialect::Jinja, "{%- a - b-%}"), (Dialect::Liquid, "{%- a - b -%}")]
+        {
+            assert!(
+                matches!(
+                    lex(source, dialect)[..],
+                    tree!(Percent, [tok!(Ident), tok!(Minus), tok!(Ident)])
+                ),
+                "{source} in {dialect}"
+            );
+        }
+
+        assert!(matches!(
+            lex("{%+ a + b +%}", Dialect::Jinja)[..],
+            tree!(Percent, [tok!(Ident), tok!(Plus), tok!(Ident)])
+        ));
+    }
+
+    #[test]
+    fn minus_before_a_digit_subtracts_after_an_operand() {
+        for dialect in [Dialect::Jinja, Dialect::Twig] {
+            assert!(
+                matches!(
+                    lex("{% a -1 %}", dialect)[..],
+                    tree!(Percent, [tok!(Ident), tok!(Minus), tok!(Number(_))])
+                ),
+                "{dialect}"
+            );
+            assert!(
+                matches!(
+                    lex("{% 10-1 %}", dialect)[..],
+                    tree!(Percent, [tok!(Number(_)), tok!(Minus), tok!(Number(_))])
+                ),
+                "{dialect}"
+            );
+        }
+
+        // After an operator or a delimiter, `-1` is a negative number.
+        assert!(matches!(
+            lex("{% a - -1 %}", Dialect::Jinja)[..],
+            tree!(Percent, [tok!(Ident), tok!(Minus), tok!(Number(_))])
+        ));
+        assert!(matches!(
+            lex("{% (-1) %}", Dialect::Jinja)[..],
+            tree!(Percent, [tok!(Tree(crate::token::Delimiter::Paren, 1)), tok!(Number(_))])
+        ));
+
+        // Django and Liquid have no binary `-`.
+        for dialect in [Dialect::Django, Dialect::Liquid] {
+            assert!(
+                matches!(
+                    lex("{% a -1 %}", dialect)[..],
+                    tree!(Percent, [tok!(Ident), tok!(Number(_))])
+                ),
+                "{dialect}"
+            );
+        }
+    }
+
+    #[test]
+    fn tilde_is_only_a_trim_marker_in_twig() {
+        assert!(matches!(lex("{{ a ~}}", Dialect::Twig)[..], tree!(Brace, [tok!(Ident)])));
+        assert!(matches!(
+            lex("{{ a ~}}", Dialect::Jinja)[..],
+            tree!(Brace, [tok!(Ident), tok!(Tilde)])
+        ));
+    }
 }

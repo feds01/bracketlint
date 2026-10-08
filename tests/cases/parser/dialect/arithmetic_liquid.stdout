@@ -1,0 +1,75 @@
+info: parsed module '$DIR/arithmetic_liquid.html' as liquid:
+body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─var_expr
+│     │   └─name "a"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─var_expr
+│     │   └─name "a"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─var_expr
+│     │   └─name "a"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─var_expr
+│     │   └─name "a"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─var_expr
+│     │   └─name "a"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─var_expr
+│     │   └─name "a"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─var_expr
+│     │   └─name "a"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─var_expr
+│     │   └─name "a"
+│     └─clause_body
+│       └─body
+└─if
+  └─clauses
+    └─if_clause
+      ├─condition
+      │ └─var_expr
+      │   └─name "a"
+      └─clause_body
+        └─body
+

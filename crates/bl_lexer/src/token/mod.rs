@@ -132,6 +132,21 @@ pub enum TokenKind {
     /// Plus, `+`
     Plus,
 
+    /// Star, `*`
+    Star,
+
+    /// Two stars, `**`, the power operator
+    StarStar,
+
+    /// Slash, `/`
+    Slash,
+
+    /// Two slashes, `//`, the floor division operator
+    SlashSlash,
+
+    /// Tilde, `~`, the string concatenation operator in Jinja and Twig
+    Tilde,
+
     /// Exclamation, `!`
     Exclamation,
 
@@ -263,6 +278,11 @@ impl fmt::Display for TokenKind {
             TokenKind::GtEq => write!(f, ">="),
             TokenKind::Minus => write!(f, "-"),
             TokenKind::Plus => write!(f, "+"),
+            TokenKind::Star => write!(f, "*"),
+            TokenKind::StarStar => write!(f, "**"),
+            TokenKind::Slash => write!(f, "/"),
+            TokenKind::SlashSlash => write!(f, "//"),
+            TokenKind::Tilde => write!(f, "~"),
             TokenKind::Percent => write!(f, "%"),
             TokenKind::Exclamation => write!(f, "!"),
             TokenKind::Dot => write!(f, "."),

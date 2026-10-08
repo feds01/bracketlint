@@ -435,8 +435,8 @@ define_tree! {
         root_module: bl_ast::ast,
     }}
 
-    /// All logic operators. How tightly each one binds depends on the dialect,
-    /// see [crate::Dialect::infix_binding_power].
+    /// All binary operators. Which of them a dialect has, and how tightly each
+    /// one binds, depends on the dialect, see [crate::Dialect::infix_binding_power].
     #[derive(Copy, Clone, Debug, PartialEq)]
     #[node]
     pub enum BinOp {
@@ -466,6 +466,22 @@ define_tree! {
         IsNot,
         /// `contains`, in Liquid
         Contains,
+        /// `+`, in Jinja and Twig
+        Add,
+        /// `-`, in Jinja and Twig
+        Sub,
+        /// `*`, in Jinja and Twig
+        Mul,
+        /// `/`, in Jinja and Twig
+        Div,
+        /// `//`, in Jinja and Twig
+        FloorDiv,
+        /// `%`, in Jinja and Twig
+        Mod,
+        /// `**`, in Jinja and Twig
+        Pow,
+        /// `~`, which concatenates strings, in Jinja and Twig
+        Concat,
     }
 
     impl fmt::Display for BinOp {
@@ -484,6 +500,14 @@ define_tree! {
                 BinOp::Is => write!(f, "is"),
                 BinOp::IsNot => write!(f, "is not"),
                 BinOp::Contains => write!(f, "contains"),
+                BinOp::Add => write!(f, "+"),
+                BinOp::Sub => write!(f, "-"),
+                BinOp::Mul => write!(f, "*"),
+                BinOp::Div => write!(f, "/"),
+                BinOp::FloorDiv => write!(f, "//"),
+                BinOp::Mod => write!(f, "%"),
+                BinOp::Pow => write!(f, "**"),
+                BinOp::Concat => write!(f, "~"),
             }
         }
     }
