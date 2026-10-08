@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use bl_workspace::Dialect;
+use bl_ast::Dialect;
 use clap::{
     Parser,
     builder::{PossibleValuesParser, TypedValueParser},

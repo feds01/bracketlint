@@ -3,8 +3,8 @@
 
 use std::{fmt, path::PathBuf};
 
-use bl_ast::SourceId;
-use bl_workspace::{Dialect, WorkspaceMembers};
+use bl_ast::{Dialect, SourceId};
+use bl_workspace::WorkspaceMembers;
 
 /// A template that a benchmark lexes or parses.
 pub struct TestCase {

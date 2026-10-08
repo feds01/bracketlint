@@ -8,7 +8,7 @@ use std::{
     path::PathBuf,
 };
 
-use bl_workspace::Dialect;
+use bl_ast::Dialect;
 use itertools::{Itertools, peek_nth};
 use quote::{ToTokens, quote};
 
@@ -163,7 +163,7 @@ impl ToTokens for TestMetadata {
         let dialect = match dialect {
             Some(dialect) => {
                 let dialect: quote::__private::TokenStream =
-                    format!("::bl_workspace::Dialect::{dialect:?}").parse().unwrap();
+                    format!("::bl_ast::Dialect::{dialect:?}").parse().unwrap();
                 quote!(Some(#dialect))
             }
             None => quote!(None),

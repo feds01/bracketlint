@@ -7,7 +7,7 @@ use std::{
     process::Command,
 };
 
-use bl_workspace::Dialect;
+use bl_ast::Dialect;
 use serde::Deserialize;
 
 use super::corpus_dir;

@@ -2,14 +2,12 @@
 //! tokens, including the definitions of the tokens themselves.
 
 pub mod cursor;
-pub mod keywords;
 mod patterns;
 
 use core::fmt;
 
-use bl_ast::ByteRange;
+use bl_ast::{ByteRange, Keyword};
 use derive_more::Constructor;
-pub use keywords::Keyword;
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub enum Delimiter {

@@ -2,8 +2,7 @@
 
 use core::fmt;
 
-use bl_ast::{SourceId, SpannedSource};
-use bl_workspace::Dialect;
+use bl_ast::{Dialect, SourceId, SpannedSource};
 use derive_more::Constructor;
 
 use crate::{diagnostics::FmtResult, options::FormatterOptions};

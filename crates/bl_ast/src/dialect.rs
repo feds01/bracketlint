@@ -5,9 +5,10 @@ use std::path::Path;
 use serde::Deserialize;
 use strum::{Display, EnumString, IntoStaticStr, VariantArray};
 
-/// The template language that a [crate::Member] is written in. It is either
-/// given with `--dialect`, or picked from the file extension, see
-/// [Dialect::from_path].
+use crate::keywords::{KEYWORDS, Keyword, LIQUID_KEYWORDS};
+
+/// The template language that a file is written in. It is either given with
+/// `--dialect`, or picked from the file extension, see [Dialect::from_path].
 ///
 /// The lowercase name of a dialect, e.g. `liquid`, is what `--dialect` accepts.
 #[derive(
@@ -126,6 +127,20 @@ impl Dialect {
         if self.is_django() { "empty" } else { "else" }
     }
 
+    /// The keyword that the identifier `name` is in the dialect, if any.
+    /// Liquid has keywords of its own, and spells `elif` as `elsif`.
+    pub fn keyword(self, name: &str) -> Option<Keyword> {
+        if name == self.elif_tag() {
+            return Some(Keyword::Elif);
+        }
+
+        match self {
+            Dialect::Liquid if name == "elif" => None,
+            Dialect::Liquid => LIQUID_KEYWORDS.get(name).or_else(|| KEYWORDS.get(name)).copied(),
+            _ => KEYWORDS.get(name).copied(),
+        }
+    }
+
     /// Check if its currently Django dialect.
     #[inline]
     pub fn is_django(self) -> bool {
@@ -161,5 +176,20 @@ mod test_super {
 
         assert_eq!(Dialect::Liquid.name(), "liquid");
         assert!("nunjucks".parse::<Dialect>().is_err());
+    }
+
+    #[test]
+    fn test_keyword() {
+        assert_eq!(Dialect::Django.keyword("for"), Some(Keyword::For));
+        assert_eq!(Dialect::Liquid.keyword("for"), Some(Keyword::For));
+        assert_eq!(Dialect::Twig.keyword("user"), None);
+
+        assert_eq!(Dialect::Jinja.keyword("elif"), Some(Keyword::Elif));
+        assert_eq!(Dialect::Jinja.keyword("elsif"), None);
+        assert_eq!(Dialect::Liquid.keyword("elsif"), Some(Keyword::Elif));
+        assert_eq!(Dialect::Liquid.keyword("elif"), None);
+
+        assert_eq!(Dialect::Liquid.keyword("unless"), Some(Keyword::Unless));
+        assert_eq!(Dialect::Django.keyword("unless"), None);
     }
 }

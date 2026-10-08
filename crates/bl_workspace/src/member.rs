@@ -4,10 +4,8 @@
 
 use std::path::PathBuf;
 
-use bl_ast::{self as ast, LineRanges, SourceId, SpannedSource, TempSourceMap};
+use bl_ast::{self as ast, Dialect, LineRanges, SourceId, SpannedSource, TempSourceMap};
 use derive_more::Constructor;
-
-use crate::Dialect;
 
 /// A [Member] is a file that is part of a workspace. It contains the
 #[derive(Clone, Debug, Constructor)]

@@ -1,13 +1,12 @@
 //! Language token keyword definitions.
 use std::fmt;
 
-use bl_workspace::Dialect;
 use num_derive::FromPrimitive;
 use phf::phf_map;
-use strum_macros::AsRefStr;
+use strum::AsRefStr;
 
 /// Template language keywords. Most of them are shared by every dialect, and
-/// [Keyword::from_ident] finds the ones that a dialect has.
+/// [crate::Dialect::keyword] finds the ones that a dialect has.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, AsRefStr, FromPrimitive)]
 #[strum(serialize_all = "lowercase")]
 pub enum Keyword {
@@ -271,20 +270,6 @@ impl Keyword {
                 | Keyword::Render
         )
     }
-
-    /// The keyword that the identifier `name` is in `dialect`, if any. Liquid
-    /// has keywords of its own, and spells `elif` as `elsif`.
-    pub fn from_ident(name: &str, dialect: Dialect) -> Option<Keyword> {
-        if name == dialect.elif_tag() {
-            return Some(Keyword::Elif);
-        }
-
-        match dialect {
-            Dialect::Liquid if name == "elif" => None,
-            Dialect::Liquid => LIQUID_KEYWORDS.get(name).or_else(|| KEYWORDS.get(name)).copied(),
-            _ => KEYWORDS.get(name).copied(),
-        }
-    }
 }
 
 impl fmt::Display for Keyword {
@@ -295,7 +280,7 @@ impl fmt::Display for Keyword {
 
 /// A static map of keywords to their enum variants using a
 /// perfect hashing function to quickly lookup the keyword.
-static KEYWORDS: phf::Map<&'static str, Keyword> = phf_map! {
+pub(crate) static KEYWORDS: phf::Map<&'static str, Keyword> = phf_map! {
     // Control flow
     "for" => Keyword::For,
     "endfor" => Keyword::EndFor,
@@ -348,7 +333,7 @@ static KEYWORDS: phf::Map<&'static str, Keyword> = phf_map! {
 /// - https://shopify.github.io/liquid/basics/operators/
 /// - https://shopify.github.io/liquid/tags/control-flow/
 /// - https://shopify.github.io/liquid/tags/iteration/
-static LIQUID_KEYWORDS: phf::Map<&'static str, Keyword> = phf_map! {
+pub(crate) static LIQUID_KEYWORDS: phf::Map<&'static str, Keyword> = phf_map! {
     "contains" => Keyword::Contains,
     "unless" => Keyword::Unless,
     "endunless" => Keyword::EndUnless,

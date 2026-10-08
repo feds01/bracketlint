@@ -1,9 +1,8 @@
 use bl_ast::{
-    AstVisitorMutSelf, ByteRange, SourceId, Span, SpannedSource, ast_visitor_mut_self_default_impl,
-    walk_mut_self,
+    AstVisitorMutSelf, ByteRange, Dialect, SourceId, Span, SpannedSource,
+    ast_visitor_mut_self_default_impl, walk_mut_self,
 };
 use bl_reporting::inline::{InlineSnippet, note_on_span};
-use bl_workspace::Dialect;
 
 use crate::{
     adapters::{
@@ -231,7 +230,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
                 let keyword = match tag {
                     bl_ast::Tag::Generic(generic) => {
                         let name = self.ctx.source.hunk(generic.name.ast_ref().span().range);
-                        bl_lexer::token::Keyword::from_ident(name, self.ctx.dialect).is_some()
+                        self.ctx.dialect.keyword(name).is_some()
                     }
                     _ => false,
                 };

@@ -7,10 +7,11 @@ use std::{
     path::PathBuf,
 };
 
+use bl_ast::Dialect;
 use bl_fmt::{FormatQuery, FormatQueryResult, FormatterOptions, fmt_module};
 use bl_parse::{ParseQuery, ParseQueryResult, parse_source};
 use bl_reporting::Reports;
-use bl_workspace::{Dialect, WorkspaceMembers};
+use bl_workspace::WorkspaceMembers;
 use strum::IntoStaticStr;
 
 use super::source::Source;

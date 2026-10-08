@@ -13,7 +13,6 @@ bl_ast = { workspace = true }
 bl_workspace = { workspace = true }
 bl_reporting = { workspace = true }
 bl_macros = { workspace = true }
-bl_lexer = { workspace = true }
 
 biome_console = { git = "https://github.com/feds01/biome.git", rev = "c116a292ccb679c61c0d7c255ee8ccb79f5866ce", package = "biome_console" }
 biome_css_formatter = { git = "https://github.com/feds01/biome.git", rev = "c116a292ccb679c61c0d7c255ee8ccb79f5866ce", package = "biome_css_formatter" }
