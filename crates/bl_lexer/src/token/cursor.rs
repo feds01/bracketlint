@@ -209,7 +209,7 @@ impl<'t> TokenCursor<'t> {
     /// # use bl_lexer::token::{Token, TokenKind};
     ///
     /// let token = self.peek(1).unwrap_or_else(SomeErr(..))?;
-    /// assert!(token.kind.is_percent_tree());
+    /// assert!(token.kind.is_tag_tree());
     ///
     /// // Suppose that we wanna check the next token within the tree:
     ///

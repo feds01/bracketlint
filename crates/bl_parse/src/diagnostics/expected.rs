@@ -160,7 +160,7 @@ impl From<Delimiter> for ExpectedItem {
             Delimiter::Paren => ExpectedItem::LeftParen,
             Delimiter::Bracket => ExpectedItem::RightBracket,
             Delimiter::Brace => ExpectedItem::RightBracket,
-            Delimiter::Percent => ExpectedItem::Gt,
+            Delimiter::Percent | Delimiter::Line => ExpectedItem::Gt,
         }
     }
 }

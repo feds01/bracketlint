@@ -630,13 +630,16 @@ impl<'lex> Lexer<'lex> {
     }
 
     /// Lex a Liquid `{% liquid %}` tag from its `%`, where `start` is its `{`.
-    /// Each of its lines is a tag without delimiters, so the tag is lexed as an
-    /// opening `{% liquid` tree, a `{% %}` tree for each line, and a closing
-    /// tree for its `%}`, and the parser reads the lines like any other tags.
+    /// The tag is a `{% %}` tree that holds `liquid`, and then a
+    /// [Delimiter::Line] tree for each of its lines, since each line is a
+    /// tag without delimiters.
     fn liquid_tag(&mut self, start: usize) {
         let source = self.spanned.source;
+        let tree = self.tokens.len();
+        self.tokens
+            .push(Token::new(TokenKind::Tree(Delimiter::Percent, 0), ByteRange::singleton(start)));
 
-        // The opening `{% liquid`, after its whitespace control marker.
+        // The `liquid` after the `{%` and its whitespace control marker.
         self.skip_ascii();
         if self.is_trim_marker(self.peek()) {
             self.skip_ascii();
@@ -645,12 +648,10 @@ impl<'lex> Lexer<'lex> {
 
         let word = self.offset.get();
         self.offset.set(word + "liquid".len());
-        let consumed = self.len_consumed();
-        self.push_tag(
-            ByteRange::new(start, consumed),
-            ByteRange::new(word, consumed),
-            Keyword::Liquid,
-        );
+        self.tokens.push(Token::new(
+            TokenKind::Keyword(Keyword::Liquid),
+            ByteRange::new(word, self.len_consumed()),
+        ));
 
         // The lines end at the first `%}`, before its whitespace control marker.
         let body = self.offset.get();
@@ -678,12 +679,13 @@ impl<'lex> Lexer<'lex> {
             line_start += line.len() + 1;
         }
 
-        // The closing `%}`, with its whitespace control marker.
         match close {
             Some(close) => {
-                let span = ByteRange::new(body + lines.len(), close + 1);
-                self.push_tag(span, span, Keyword::EndLiquid);
                 self.offset.set(close + 2);
+
+                let len = (self.tokens.len() - tree - 1) as u32;
+                let span = ByteRange::new(start, close + 1);
+                self.tokens[tree] = Token::new(TokenKind::Tree(Delimiter::Percent, len), span);
             }
             None => {
                 self.offset.set(source.len());
@@ -695,19 +697,12 @@ impl<'lex> Lexer<'lex> {
         }
     }
 
-    /// Push a `{% %}` tree at `tree` that holds only `keyword`, at `span`.
-    /// These are the opening and closing trees of a `{% liquid %}` tag.
-    fn push_tag(&mut self, tree: ByteRange, span: ByteRange, keyword: Keyword) {
-        self.tokens.push(Token::new(TokenKind::Tree(Delimiter::Percent, 1), tree));
-        self.tokens.push(Token::new(TokenKind::Keyword(keyword), span));
-    }
-
     /// Lex a line of a Liquid `{% liquid %}` tag, from `start` up to `end`, as
-    /// the contents of a `{% %}` tree.
+    /// a [Delimiter::Line] tree.
     fn liquid_line(&mut self, start: usize, end: usize) {
         let tree = self.tokens.len();
         let span = ByteRange::new(start, end - 1);
-        self.tokens.push(Token::new(TokenKind::Tree(Delimiter::Percent, 0), span));
+        self.tokens.push(Token::new(TokenKind::Tree(Delimiter::Line, 0), span));
 
         self.offset.set(start);
         self.end.set(end);
@@ -737,7 +732,7 @@ impl<'lex> Lexer<'lex> {
         self.end.set(self.spanned.source.len());
 
         let len = (self.tokens.len() - tree - 1) as u32;
-        self.tokens[tree] = Token::new(TokenKind::Tree(Delimiter::Percent, len), span);
+        self.tokens[tree] = Token::new(TokenKind::Tree(Delimiter::Line, len), span);
     }
 
     /// Whether the last token is a `.`, so that a number after it is the index

@@ -243,8 +243,8 @@ pub enum Keyword {
     /// ```
     Render,
     /// `liquid` - Begins a Liquid tag that holds a tag on each of its lines.
-    /// The lexer makes this keyword, rather than reading it from the source,
-    /// so that `liquid` is still a name elsewhere
+    /// The lexer only makes this keyword at the start of the tag, so that
+    /// `liquid` is still a name elsewhere
     /// ```liquid
     /// {% liquid
     ///   assign total = cart.total_price
@@ -252,8 +252,6 @@ pub enum Keyword {
     /// %}
     /// ```
     Liquid,
-    /// The end of a `liquid` tag, i.e. its `%}`, which the lexer makes
-    EndLiquid,
 }
 impl Keyword {
     pub fn identifier_like(&self) -> bool {

@@ -1,7 +1,7 @@
-error: expected a tag, however received the end of the `liquid` tag
- --> $DIR/liquid_tag_unclosed_block.html:4:1
+error: expected a closing `{% endif %}` tag
+ --> $DIR/liquid_tag_unclosed_block.html:3:16
   |
-4 | %}
-  | --
-  |
-  = info: expected a `identifier`
+3 |       echo "Free"
+  |  ________________-
+4 | | %}
+  | |_-
