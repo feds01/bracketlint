@@ -45,7 +45,7 @@ $ just ci                # run tests, clippy and the formatting check, like CI d
 $ just bench             # run the lexer and parser benchmarks
 ```
 
-The benchmarks in [`crates/bl_benchmark`](./crates/bl_benchmark) use [divan](https://github.com/nvzqz/divan). In CI, [CodSpeed](https://codspeed.io) also runs them on every pull request and reports any regressions against `main`.
+The benchmarks in [`crates/bl_benchmark`](./crates/bl_benchmark) use [divan](https://github.com/nvzqz/divan). In CI, [CodSpeed](https://codspeed.io) also runs them on every pull request that changes the code they build, and reports changes in time and memory against `main`.
 
 ### Releasing
 

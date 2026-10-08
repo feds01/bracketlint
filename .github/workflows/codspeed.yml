@@ -1,12 +1,28 @@
 name: CodSpeed
 
 on:
+  # Every commit on `main` is measured, as the baseline that PRs compare to.
   push:
     branches: [main]
   pull_request:
     branches: [main]
+    # Only the code that the benchmarks build, i.e. every crate except the CLI
+    # and the formatter.
+    paths:
+      - "crates/**"
+      - "!crates/bl/**"
+      - "!crates/bl_fmt/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".github/workflows/codspeed.yml"
   # Lets CodSpeed backfill results for earlier commits
   workflow_dispatch:
+
+# A new push to a PR cancels its earlier run, but every run on `main` finishes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   benchmarks:
@@ -23,10 +39,8 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@v7
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: nightly
+      - name: Install the toolchain in rust-toolchain.toml
+        run: rustup toolchain install
 
       - name: Dependency caching
         uses: Swatinem/rust-cache@v2
@@ -38,10 +52,10 @@ jobs:
           tool: cargo-codspeed@5.0.2
 
       - name: Build the benchmarks
-        run: cargo codspeed build -p bl_benchmark
+        run: cargo codspeed build -m simulation -m memory -p bl_benchmark
 
       - name: Run the benchmarks
         uses: CodSpeedHQ/action@v5
         with:
-          mode: simulation
+          mode: simulation,memory
           run: cargo codspeed run -p bl_benchmark

@@ -9,6 +9,10 @@ publish = false
 bench = false
 doctest = false
 
+[lints.rust]
+# Set by `cargo codspeed` when it builds the benchmarks
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(codspeed)"] }
+
 [[bench]]
 name = "lexer"
 harness = false

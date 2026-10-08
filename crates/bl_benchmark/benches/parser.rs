@@ -1,9 +1,11 @@
 use bl_benchmark::TestCase;
 use bl_parse::{ParseQuery, parse_source};
-use divan::{AllocProfiler, Bencher, counter::BytesCount};
+use divan::Bencher;
 
+// CodSpeed measures the allocations itself, in its memory mode.
+#[cfg(not(codspeed))]
 #[global_allocator]
-static ALLOC: AllocProfiler = AllocProfiler::system();
+static ALLOC: divan::AllocProfiler = divan::AllocProfiler::system();
 
 fn main() {
     divan::main();
@@ -19,7 +21,9 @@ fn parser(bencher: Bencher, case: &TestCase) {
     let (id, members) = case.to_member();
     let member = members.member(id);
 
-    bencher
-        .counter(BytesCount::of_str(&member.contents))
-        .bench(|| parse_source(ParseQuery::new(id, member)));
+    // CodSpeed has no counters, and warns about each one.
+    #[cfg(not(codspeed))]
+    let bencher = bencher.counter(divan::counter::BytesCount::of_str(&member.contents));
+
+    bencher.bench(|| parse_source(ParseQuery::new(id, member)));
 }
