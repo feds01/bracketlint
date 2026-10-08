@@ -617,13 +617,29 @@ impl<'lex> Lexer<'lex> {
 
         let start = self.offset.get() - first.len_utf8();
 
-        // An identifier can contain a `-`, but not the whitespace control marker
-        // of the delimiter right after it, e.g. the `-` in `x-%}`.
-        while is_id_continue(self.peek())
-            && !(self.is_trim_marker(self.peek()) && self.at_closing_delimiter(1))
-        {
-            self.skip_ascii();
+        // The characters of an identifier are all ASCII, so its bytes are
+        // scanned directly. It can contain a `-`, but not the whitespace control
+        // marker of the delimiter right after it, e.g. the `-` in `x-%}`.
+        let bytes = self.spanned.source.as_bytes();
+        let dash_is_marker = self.is_trim_marker('-');
+        let mut end = self.offset.get();
+
+        while let Some(&byte) = bytes.get(end) {
+            let at_marker = byte == b'-'
+                && dash_is_marker
+                && matches!(
+                    (bytes.get(end + 1), bytes.get(end + 2)),
+                    (Some(b'%' | b'}'), Some(b'}'))
+                );
+
+            if !is_id_continue(byte as char) || at_marker {
+                break;
+            }
+
+            end += 1;
         }
+
+        self.offset.set(end);
 
         let name = &self.spanned.source[start..self.offset.get()];
 
