@@ -1,0 +1,55 @@
+{# The product listing page of a shop. #}
+<link rel="stylesheet" href="{% static 'css/products.css' %}">
+<header class="page-header">
+<nav class="breadcrumbs">
+<a href="/">Home</a>
+{% for crumb in breadcrumbs %}
+<span class="separator">/</span><a href="{{ crumb.url }}">{{ crumb.title|escape }}</a>
+{% endfor %}
+</nav>
+<h1>{{ category.name }}</h1>
+{% if category.description %}
+<p class="lead">{{ category.description|striptags|truncatewords:30 }}</p>
+{% endif %}
+</header>
+<main>
+{% if products %}
+<ul class="product-list">
+{% for product in products %}
+<li class="product-card {% if product.on_sale %}sale{% endif %}" data-id="{{ product.id }}">
+<img src="{{ product.image.url }}" alt="{{ product.name }}" width="200" height="200">
+<h2><a href="{{ product.get_absolute_url }}">{{ product.name|title }}</a></h2>
+{% if product.on_sale and product.discount > 0 %}
+<span class="price old">{{ product.price|floatformat:2 }}</span>
+<span class="price">{{ product.sale_price|floatformat:2 }}</span>
+{% elif product.price == 0 %}
+<span class="price">Free</span>
+{% else %}
+<span class="price">{{ product.price|floatformat:2 }}</span>
+{% endif %}
+<p>{{ product.summary|default:"No description available." }}</p>
+{% with reviews=product.reviews.count %}
+<small>{{ reviews }} review{{ reviews|pluralize }}</small>
+{% endwith %}
+</li>
+{% empty %}
+<li>No products.</li>
+{% endfor %}
+</ul>
+{% else %}
+<p class="empty">There are no products in this category yet.</p>
+{% endif %}
+<table class="specs">
+<thead><tr><th>Name</th><th>Value</th></tr></thead>
+<tbody>
+{% for key, value in category.specs.items %}
+<tr><td>{{ key }}</td><td>{{ value|default:"-" }}</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</main>
+<script>
+const products = document.querySelectorAll(".product-card");
+function highlight(card){card.classList.add("active")}
+products.forEach(card=>card.addEventListener("click",()=>highlight(card)))
+</script>

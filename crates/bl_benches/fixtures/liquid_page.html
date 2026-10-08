@@ -1,0 +1,47 @@
+{% comment %}The collection page of a shop.{% endcomment %}
+{% assign sale_count = 0 %}
+<div class="collection">
+<h1>{{ collection.title | escape }}</h1>
+{% if collection.description != blank %}
+<div class="rte">{{ collection.description | strip_html | truncatewords: 30 }}</div>
+{% endif %}
+{% capture heading %}{{ collection.products_count }} products{% endcapture %}
+<p class="count">{{ heading }}</p>
+<ul class="grid">
+{% for product in collection.products limit: 12 %}
+<li class="grid-item {% cycle 'odd', 'even' %}">
+<a href="{{ product.url }}">
+<img src="{{ product.featured_image | image_url: width: 300 }}" alt="{{ product.title | escape }}">
+<h2>{{ product.title }}</h2>
+</a>
+{% if product.compare_at_price > product.price %}
+{% assign sale_count = sale_count | plus: 1 %}
+<span class="price sale">{{ product.price | money }}</span>
+<s>{{ product.compare_at_price | money }}</s>
+{% elsif product.available == false %}
+<span class="price">Sold out</span>
+{% else %}
+<span class="price">{{ product.price | money }}</span>
+{% endif %}
+{% case product.type %}
+{% when "shirt" %}
+<span class="tag">Apparel</span>
+{% when "mug", "glass" %}
+<span class="tag">Kitchen</span>
+{% else %}
+<span class="tag">Other</span>
+{% endcase %}
+{% unless product.tags contains "hidden" %}
+<ul class="tags">
+{% for tag in product.tags %}
+<li>{{ tag | downcase }}</li>
+{% endfor %}
+</ul>
+{% endunless %}
+</li>
+{% else %}
+<li>No products.</li>
+{% endfor %}
+</ul>
+<p>{{ sale_count }} products on sale.</p>
+</div>

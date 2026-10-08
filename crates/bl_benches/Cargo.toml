@@ -1,0 +1,23 @@
+[package]
+name = "bl_benches"
+version = "0.1.0"
+authors = { workspace = true }
+edition = { workspace = true }
+publish = false
+
+[package.metadata.dist]
+dist = false
+
+[dependencies]
+
+[dev-dependencies]
+bl_ast = { workspace = true }
+bl_fmt = { workspace = true }
+bl_lexer = { workspace = true }
+bl_parse = { workspace = true }
+bl_workspace = { workspace = true }
+divan = { version = "5.0.2", package = "codspeed-divan-compat" }
+
+[[bench]]
+name = "pipeline"
+harness = false
