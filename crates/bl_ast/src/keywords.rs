@@ -1,13 +1,12 @@
 //! Language token keyword definitions.
 use std::fmt;
 
-use num_derive::FromPrimitive;
 use phf::phf_map;
 use strum::AsRefStr;
 
 /// Template language keywords. Most of them are shared by every dialect, and
 /// [crate::Dialect::keyword] finds the ones that a dialect has.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, AsRefStr, FromPrimitive)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, AsRefStr)]
 #[strum(serialize_all = "lowercase")]
 pub enum Keyword {
     /// `for` - Begins a for loop block
