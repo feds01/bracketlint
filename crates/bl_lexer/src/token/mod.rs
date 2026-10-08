@@ -3,6 +3,7 @@
 
 pub mod cursor;
 pub mod keywords;
+mod patterns;
 
 use core::fmt;
 

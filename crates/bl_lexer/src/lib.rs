@@ -221,13 +221,7 @@ impl<'lex> Lexer<'lex> {
             // The contents of a `{% raw %}` block are output as they are
             // written, so they are text rather than tokens.
             if this.dialect.has_raw_blocks()
-                && matches!(
-                    this.tokens[tree..],
-                    [
-                        Token { kind: TokenKind::Tree(Delimiter::Percent, 1), .. },
-                        Token { kind: TokenKind::Keyword(Keyword::Raw), .. }
-                    ]
-                )
+                && matches!(this.tokens[tree..], tree!(Percent, [kw!(Raw)]))
             {
                 this.hunk();
             }
@@ -567,7 +561,7 @@ impl<'lex> Lexer<'lex> {
     /// Whether the last token is a `.`, so that a number after it is the index
     /// in an access like `items.0`.
     fn after_dot(&self) -> bool {
-        matches!(self.tokens.last(), Some(Token { kind: TokenKind::Dot, .. }))
+        matches!(self.tokens.last(), Some(tok!(Dot)))
     }
 
     /// Lex the contents of a `{% raw %}` block as text, up to its
