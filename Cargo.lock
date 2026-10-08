@@ -701,6 +701,7 @@ dependencies = [
  "bl_ast",
  "bl_reporting",
  "derive_more",
+ "memchr",
  "thin-vec",
 ]
 
