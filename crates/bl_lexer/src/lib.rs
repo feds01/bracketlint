@@ -232,6 +232,9 @@ impl<'lex> Lexer<'lex> {
 
             // The contents of a `{% raw %}` block are output as they are
             // written, so they are text rather than tokens.
+            // Reference:
+            // - Jinja: https://jinja.palletsprojects.com/en/stable/templates/#escaping
+            // - Liquid: https://shopify.github.io/liquid/tags/template/#raw
             if this.dialect.has_raw_blocks()
                 && matches!(this.tokens[tree..], tree!(Percent, [kw!(Raw)]))
             {
@@ -376,6 +379,11 @@ impl<'lex> Lexer<'lex> {
                                 if c == '%' { Delimiter::Percent } else { Delimiter::Brace };
                             return on_tree(self, delimiter);
                         }
+                        // A `{# #}` comment, which Liquid doesn't have.
+                        // Reference:
+                        // - Django: https://docs.djangoproject.com/en/stable/ref/templates/language/#comments
+                        // - Jinja: https://jinja.palletsprojects.com/en/stable/templates/#comments
+                        // - Twig: https://twig.symfony.com/doc/3.x/templates.html#comments
                         '#' if self.dialect.has_hash_comments() => {
                             self.skip_ascii();
                             self.comment()
@@ -636,6 +644,8 @@ impl<'lex> Lexer<'lex> {
 
         self.offset.set(end);
 
+        // A Liquid name can end with one `?`, e.g. `product.gift_card?`.
+        // Reference: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/lexer.rb#L23
         if self.dialect.names_can_end_with_question_mark() && self.peek() == '?' {
             self.skip_ascii();
         }
@@ -644,6 +654,7 @@ impl<'lex> Lexer<'lex> {
 
         // `liquid` is only a keyword as the name of a tag, so that it is still a
         // name elsewhere, e.g. in `{{ liquid }}`.
+        // Reference: https://shopify.github.io/liquid/tags/template/#liquid
         if name == "liquid" && self.dialect.has_liquid_tag() && self.at_tag_name() {
             return TokenKind::Keyword(Keyword::Liquid);
         }
@@ -664,12 +675,19 @@ impl<'lex> Lexer<'lex> {
 
     /// `text` without the whitespace control marker that it starts with, if
     /// it has one.
+    ///
+    /// Reference:
+    /// - Jinja: https://jinja.palletsprojects.com/en/stable/templates/#whitespace-control
+    /// - Liquid: https://shopify.github.io/liquid/basics/whitespace/
+    /// - Twig: https://twig.symfony.com/doc/3.x/templates.html#whitespace-control
     fn strip_trim_marker<'s>(&self, text: &'s str) -> &'s str {
         text.strip_prefix(self.dialect.trim_markers()).unwrap_or(text)
     }
 
     /// Whether the `{% %}` tag that starts at the next `%` is an inline
     /// comment, e.g. `{% # note %}`.
+    ///
+    /// Reference: https://shopify.github.io/liquid/tags/template/#inline-comments
     fn at_inline_comment(&self) -> bool {
         self.dialect.has_inline_comments() && self.tag_contents().starts_with('#')
     }
@@ -703,6 +721,10 @@ impl<'lex> Lexer<'lex> {
     /// The end of the line of a `liquid` tag that starts here. It ends at its
     /// newline, or at the `%}` of the tag and its whitespace control marker,
     /// without the whitespace before it.
+    ///
+    /// Reference:
+    /// - https://shopify.github.io/liquid/tags/template/#liquid
+    /// - https://shopify.github.io/liquid/basics/whitespace/
     fn line_end(&self) -> usize {
         let rest = unsafe { self.as_slice() };
         let line = &rest[..rest.find('\n').unwrap_or(rest.len())];
@@ -746,6 +768,10 @@ impl<'lex> Lexer<'lex> {
     /// Whether a `-` here subtracts, because the dialect has a binary `-` and
     /// the last token ends an operand, e.g. in `a -1` or `10-1`. Otherwise a
     /// `-` right before a digit starts a negative number, e.g. in `x > -1`.
+    ///
+    /// Reference:
+    /// - Jinja: https://jinja.palletsprojects.com/en/stable/templates/#math
+    /// - Twig: https://twig.symfony.com/doc/3.x/templates.html#math
     fn minus_subtracts(&self) -> bool {
         self.dialect.infix_binding_power(BinOp::Sub).is_some()
             && self
@@ -756,6 +782,10 @@ impl<'lex> Lexer<'lex> {
 
     /// Lex the contents of a `{% raw %}` block as text, up to its
     /// `{% endraw %}` tag, or the end of the source if it has none.
+    ///
+    /// Reference:
+    /// - Jinja: https://jinja.palletsprojects.com/en/stable/templates/#escaping
+    /// - Liquid: https://shopify.github.io/liquid/tags/template/#raw
     fn hunk(&mut self) {
         let start = self.offset.get();
         let slice = unsafe { self.as_slice() };
@@ -769,6 +799,11 @@ impl<'lex> Lexer<'lex> {
 
     /// Whether `c` controls the whitespace around a tag when it is written
     /// next to one of the tag's delimiters, e.g. the `-` in `{%-`.
+    ///
+    /// Reference:
+    /// - Jinja: https://jinja.palletsprojects.com/en/stable/templates/#whitespace-control
+    /// - Liquid: https://shopify.github.io/liquid/basics/whitespace/
+    /// - Twig: https://twig.symfony.com/doc/3.x/templates.html#whitespace-control
     fn is_trim_marker(&self, c: char) -> bool {
         self.dialect.trim_markers().contains(&c)
     }
