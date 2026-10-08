@@ -1016,11 +1016,11 @@ impl<'s> Parser<'s> {
             TokenKind::Keyword(Keyword::Or) => (Some(ast::BinOp::Or), 1),
             TokenKind::Keyword(Keyword::In) => (Some(ast::BinOp::In), 1),
             TokenKind::Keyword(Keyword::Is) => match self.peek_second() {
-                Some(kw!(Not)) => (Some(ast::BinOp::NotEq), 2),
+                Some(kw!(Not)) => (Some(ast::BinOp::IsNot), 2),
                 _ => (Some(ast::BinOp::Is), 1),
             },
             TokenKind::Keyword(Keyword::Not) => match self.peek_second() {
-                Some(kw!(In)) => (Some(ast::BinOp::NotEq), 2),
+                Some(kw!(In)) => (Some(ast::BinOp::NotIn), 2),
                 _ => (None, 0),
             },
             _ => (None, 0),
