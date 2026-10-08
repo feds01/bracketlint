@@ -1,0 +1,14 @@
+// run=pass, stage=check, dialect=jinja
+
+{% if a + b * c %}{% endif %}
+{% if a - b - c %}{% endif %}
+{% if a + b ~ c %}{% endif %}
+{% if a ~ b * c %}{% endif %}
+{% if a / b // c % d %}{% endif %}
+{% if a * b ** c %}{% endif %}
+{% if a ** b ** c %}{% endif %}
+{% if -a ** b %}{% endif %}
+{% if a ** -b %}{% endif %}
+{% if a + b > c %}{% endif %}
+{% if not a + b %}{% endif %}
+{% if a + b is odd %}{% endif %}

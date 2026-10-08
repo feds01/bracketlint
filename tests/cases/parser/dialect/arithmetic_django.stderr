@@ -1,0 +1,40 @@
+error: unexpectedly encountered a `+`
+ --> $DIR/arithmetic_django.html:1:9
+  |
+1 | {% if a + b %}{% endif %}
+  |         -
+error: unexpectedly encountered a `-`
+ --> $DIR/arithmetic_django.html:2:9
+  |
+2 | {% if a - b %}{% endif %}
+  |         -
+error: unexpectedly encountered a `*`
+ --> $DIR/arithmetic_django.html:3:9
+  |
+3 | {% if a * b %}{% endif %}
+  |         -
+error: unexpectedly encountered a `/`
+ --> $DIR/arithmetic_django.html:4:9
+  |
+4 | {% if a / b %}{% endif %}
+  |         -
+error: unexpectedly encountered a `//`
+ --> $DIR/arithmetic_django.html:5:9
+  |
+5 | {% if a // b %}{% endif %}
+  |         --
+error: unexpectedly encountered a `%`
+ --> $DIR/arithmetic_django.html:6:9
+  |
+6 | {% if a % b %}{% endif %}
+  |         -
+error: unexpectedly encountered a `**`
+ --> $DIR/arithmetic_django.html:7:9
+  |
+7 | {% if a ** b %}{% endif %}
+  |         --
+error: unexpectedly encountered a `~`
+ --> $DIR/arithmetic_django.html:8:9
+  |
+8 | {% if a ~ b %}{% endif %}
+  |         -

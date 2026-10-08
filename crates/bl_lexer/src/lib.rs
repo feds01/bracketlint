@@ -7,7 +7,7 @@ pub mod token;
 
 use std::cell::Cell;
 
-use bl_ast::{ByteRange, Dialect, Keyword, SourceId, Span, SpannedSource};
+use bl_ast::{BinOp, ByteRange, Dialect, Keyword, SourceId, Span, SpannedSource};
 use bl_reporting::DiagnosticsMut;
 use diagnostics::{LexerDiagnostics, LexerError, LexerErrorKind};
 use token::{Delimiter, NumberFlags, Token, TokenKind};
@@ -328,7 +328,9 @@ impl<'lex> Lexer<'lex> {
                     _ => TokenKind::Lt,
                 },
                 '-' => match self.peek() {
-                    c if c.is_ascii_digit() => self.number(ShouldSkip::Yes),
+                    c if c.is_ascii_digit() && !self.minus_subtracts() => {
+                        self.number(ShouldSkip::Yes)
+                    }
                     _ => TokenKind::Minus,
                 },
                 '+' => TokenKind::Plus,
@@ -721,6 +723,17 @@ impl<'lex> Lexer<'lex> {
         matches!(self.tokens.last(), Some(tok!(Dot)))
     }
 
+    /// Whether a `-` here subtracts, because the dialect has a binary `-` and
+    /// the last token ends an operand, e.g. in `a -1` or `10-1`. Otherwise a
+    /// `-` right before a digit starts a negative number, e.g. in `x > -1`.
+    fn minus_subtracts(&self) -> bool {
+        self.dialect.infix_binding_power(BinOp::Sub).is_some()
+            && self
+                .tokens
+                .last()
+                .is_some_and(|token| token.kind.is_ident_like() || token.kind.is_lit())
+    }
+
     /// Lex the contents of a `{% raw %}` block as text, up to its
     /// `{% endraw %}` tag, or the end of the source if it has none.
     fn hunk(&mut self) {
@@ -859,6 +872,40 @@ mod tests {
                 kinds(source, dialect),
                 tag(delimiter, &[TokenKind::Ident, op, TokenKind::Ident]),
                 "{source} in {dialect}"
+            );
+        }
+    }
+
+    #[test]
+    fn minus_before_a_digit_subtracts_after_an_operand() {
+        let number = TokenKind::Number(NumberFlags::Int);
+
+        for dialect in [Dialect::Jinja, Dialect::Twig] {
+            assert_eq!(
+                kinds("{% a -1 %}", dialect),
+                tag(Delimiter::Percent, &[TokenKind::Ident, TokenKind::Minus, number])
+            );
+            assert_eq!(
+                kinds("{% 10-1 %}", dialect),
+                tag(Delimiter::Percent, &[number, TokenKind::Minus, number])
+            );
+        }
+
+        // After an operator or a delimiter, `-1` is a negative number.
+        assert_eq!(
+            kinds("{% a - -1 %}", Dialect::Jinja),
+            tag(Delimiter::Percent, &[TokenKind::Ident, TokenKind::Minus, number])
+        );
+        assert_eq!(
+            kinds("{% (-1) %}", Dialect::Jinja),
+            tag(Delimiter::Percent, &[TokenKind::Tree(Delimiter::Paren, 1), number])
+        );
+
+        // Django and Liquid have no binary `-`.
+        for dialect in [Dialect::Django, Dialect::Liquid] {
+            assert_eq!(
+                kinds("{% a -1 %}", dialect),
+                tag(Delimiter::Percent, &[TokenKind::Ident, number])
             );
         }
     }

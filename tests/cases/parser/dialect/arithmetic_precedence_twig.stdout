@@ -1,0 +1,237 @@
+info: parsed module '$DIR/arithmetic_precedence_twig.html' as twig:
+body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─var_expr
+│     │   │   └─name "a"
+│     │   ├─operator `+`
+│     │   └─rhs
+│     │     └─bin_expr
+│     │       ├─lhs
+│     │       │ └─var_expr
+│     │       │   └─name "b"
+│     │       ├─operator `*`
+│     │       └─rhs
+│     │         └─var_expr
+│     │           └─name "c"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─bin_expr
+│     │   │   ├─lhs
+│     │   │   │ └─var_expr
+│     │   │   │   └─name "a"
+│     │   │   ├─operator `-`
+│     │   │   └─rhs
+│     │   │     └─var_expr
+│     │   │       └─name "b"
+│     │   ├─operator `-`
+│     │   └─rhs
+│     │     └─var_expr
+│     │       └─name "c"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─var_expr
+│     │   │   └─name "a"
+│     │   ├─operator `+`
+│     │   └─rhs
+│     │     └─bin_expr
+│     │       ├─lhs
+│     │       │ └─var_expr
+│     │       │   └─name "b"
+│     │       ├─operator `~`
+│     │       └─rhs
+│     │         └─var_expr
+│     │           └─name "c"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─var_expr
+│     │   │   └─name "a"
+│     │   ├─operator `~`
+│     │   └─rhs
+│     │     └─bin_expr
+│     │       ├─lhs
+│     │       │ └─var_expr
+│     │       │   └─name "b"
+│     │       ├─operator `*`
+│     │       └─rhs
+│     │         └─var_expr
+│     │           └─name "c"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─bin_expr
+│     │   │   ├─lhs
+│     │   │   │ └─bin_expr
+│     │   │   │   ├─lhs
+│     │   │   │   │ └─var_expr
+│     │   │   │   │   └─name "a"
+│     │   │   │   ├─operator `/`
+│     │   │   │   └─rhs
+│     │   │   │     └─var_expr
+│     │   │   │       └─name "b"
+│     │   │   ├─operator `//`
+│     │   │   └─rhs
+│     │   │     └─var_expr
+│     │   │       └─name "c"
+│     │   ├─operator `%`
+│     │   └─rhs
+│     │     └─var_expr
+│     │       └─name "d"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─var_expr
+│     │   │   └─name "a"
+│     │   ├─operator `*`
+│     │   └─rhs
+│     │     └─bin_expr
+│     │       ├─lhs
+│     │       │ └─var_expr
+│     │       │   └─name "b"
+│     │       ├─operator `**`
+│     │       └─rhs
+│     │         └─var_expr
+│     │           └─name "c"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─var_expr
+│     │   │   └─name "a"
+│     │   ├─operator `**`
+│     │   └─rhs
+│     │     └─bin_expr
+│     │       ├─lhs
+│     │       │ └─var_expr
+│     │       │   └─name "b"
+│     │       ├─operator `**`
+│     │       └─rhs
+│     │         └─var_expr
+│     │           └─name "c"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─unary_expr
+│     │   │   ├─unary operator `-`
+│     │   │   └─var_expr
+│     │   │     └─name "a"
+│     │   ├─operator `**`
+│     │   └─rhs
+│     │     └─var_expr
+│     │       └─name "b"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─var_expr
+│     │   │   └─name "a"
+│     │   ├─operator `**`
+│     │   └─rhs
+│     │     └─unary_expr
+│     │       ├─unary operator `-`
+│     │       └─var_expr
+│     │         └─name "b"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─bin_expr
+│     │   │   ├─lhs
+│     │   │   │ └─var_expr
+│     │   │   │   └─name "a"
+│     │   │   ├─operator `+`
+│     │   │   └─rhs
+│     │   │     └─var_expr
+│     │   │       └─name "b"
+│     │   ├─operator `>`
+│     │   └─rhs
+│     │     └─var_expr
+│     │       └─name "c"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─unary_expr
+│     │   │   ├─unary operator `not`
+│     │   │   └─var_expr
+│     │   │     └─name "a"
+│     │   ├─operator `+`
+│     │   └─rhs
+│     │     └─var_expr
+│     │       └─name "b"
+│     └─clause_body
+│       └─body
+└─if
+  └─clauses
+    └─if_clause
+      ├─condition
+      │ └─bin_expr
+      │   ├─lhs
+      │   │ └─var_expr
+      │   │   └─name "a"
+      │   ├─operator `+`
+      │   └─rhs
+      │     └─bin_expr
+      │       ├─lhs
+      │       │ └─var_expr
+      │       │   └─name "b"
+      │       ├─operator `is`
+      │       └─rhs
+      │         └─var_expr
+      │           └─name "odd"
+      └─clause_body
+        └─body
+

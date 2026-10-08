@@ -1,0 +1,10 @@
+{% if a+b*c > 10 %}
+    <p>{{ total }}</p>
+{% elif x ** 2 // 3 % 2 == 0 %}
+    <p>{{ x }}</p>
+{%- elif first ~ " " ~ last == name -%}
+    <p>{{ name }}</p>
+{% elif -a - -b %}
+    <p>{{ a }}</p>
+{% endif %}
+

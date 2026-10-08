@@ -1,0 +1,11 @@
+// run=fail, stage=check, dialect=liquid
+
+{% if a + b %}{% endif %}
+{% if a - b %}{% endif %}
+{% if a * b %}{% endif %}
+{% if a / b %}{% endif %}
+{% if a // b %}{% endif %}
+{% if a % b %}{% endif %}
+{% if a ** b %}{% endif %}
+{% if a ~ b %}{% endif %}
+{%- if a - b -%}{%- endif -%}

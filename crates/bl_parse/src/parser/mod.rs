@@ -709,9 +709,15 @@ impl<'s> Parser<'s> {
                 break;
             };
 
-            // check if we have higher precedence than the lhs expression...
-            let (l_precedence, r_precedence) = self.options.dialect.infix_binding_power(op);
+            // An operator that the dialect doesn't have, e.g. `*` in Django,
+            // doesn't continue the expression. It is left for the tag, which
+            // reports it as unexpected, like any token after an expression.
+            let Some((l_precedence, r_precedence)) = self.options.dialect.infix_binding_power(op)
+            else {
+                break;
+            };
 
+            // check if we have higher precedence than the lhs expression...
             if l_precedence < min_precedence {
                 break;
             }
@@ -1001,6 +1007,15 @@ impl<'s> Parser<'s> {
             TokenKind::LtEq => (Some(ast::BinOp::LtEq), 1),
             TokenKind::Gt => (Some(ast::BinOp::Gt), 1),
             TokenKind::GtEq => (Some(ast::BinOp::GtEq), 1),
+
+            TokenKind::Plus => (Some(ast::BinOp::Add), 1),
+            TokenKind::Minus => (Some(ast::BinOp::Sub), 1),
+            TokenKind::Star => (Some(ast::BinOp::Mul), 1),
+            TokenKind::Slash => (Some(ast::BinOp::Div), 1),
+            TokenKind::SlashSlash => (Some(ast::BinOp::FloorDiv), 1),
+            TokenKind::Percent => (Some(ast::BinOp::Mod), 1),
+            TokenKind::StarStar => (Some(ast::BinOp::Pow), 1),
+            TokenKind::Tilde => (Some(ast::BinOp::Concat), 1),
 
             TokenKind::Keyword(Keyword::And) => (Some(ast::BinOp::And), 1),
             TokenKind::Keyword(Keyword::Or) => (Some(ast::BinOp::Or), 1),
