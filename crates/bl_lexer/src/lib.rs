@@ -558,20 +558,15 @@ impl<'lex> Lexer<'lex> {
     }
 
     fn text(&mut self) -> TokenKind {
-        // keep eating until we find a delimiter
-        while let Some(c) = self.next() {
-            match c {
-                '{' => match self.peek() {
-                    '%' | '{' => {
-                        self.offset.update(|x| x - 1);
-                        break;
-                    }
-                    _ => continue,
-                },
-                _ => continue,
-            }
-        }
+        // Keep eating until we find the `{%` or `{{` of the next tag. A `{` is
+        // ASCII, so it can't be part of a multi-byte character, and the bytes
+        // can be searched directly.
+        let rest = unsafe { self.as_slice() }.as_bytes();
+        let len = memchr::memchr_iter(b'{', rest)
+            .find(|&index| matches!(rest.get(index + 1), Some(b'%' | b'{')))
+            .unwrap_or(rest.len());
 
+        self.offset.update(|x| x + len);
         TokenKind::Text
     }
 

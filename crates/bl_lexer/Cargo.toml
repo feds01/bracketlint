@@ -10,4 +10,5 @@ derive_more = { workspace = true }
 bl_ast = { workspace = true }
 bl_reporting = { workspace = true }
 
+memchr = { workspace = true }
 thin-vec = { workspace = true }
