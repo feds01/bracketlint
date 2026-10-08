@@ -529,15 +529,6 @@ impl AstVisitor for AstTreePrinter<'_> {
         Ok(TreeNode::leaf(labelled("empty_lit", self.source.hunk(node.span().range), "")))
     }
 
-    type BlankLitRet = TreeNode;
-
-    fn visit_blank_lit(
-        &self,
-        node: ast::AstNodeRef<ast::BlankLit>,
-    ) -> Result<Self::BlankLitRet, Self::Error> {
-        Ok(TreeNode::leaf(labelled("blank_lit", self.source.hunk(node.span().range), "")))
-    }
-
     type FilterRet = TreeNode;
 
     fn visit_filter(

@@ -791,8 +791,12 @@ impl<'s> Parser<'s> {
             (TokenKind::Ident, "true") => Some(ast::Lit::Bool(ast::BoolLit { value: true })),
             (TokenKind::Ident, "false") => Some(ast::Lit::Bool(ast::BoolLit { value: false })),
             (TokenKind::Ident, "nil" | "null") => Some(ast::Lit::Nil(ast::NilLit {})),
-            (TokenKind::Ident, "blank") => Some(ast::Lit::Blank(ast::BlankLit {})),
-            (TokenKind::Keyword(Keyword::Empty), _) => Some(ast::Lit::Empty(ast::EmptyLit {})),
+            (TokenKind::Ident, "blank") => {
+                Some(ast::Lit::Empty(ast::EmptyLit { kind: ast::EmptyKind::Blank }))
+            }
+            (TokenKind::Keyword(Keyword::Empty), _) => {
+                Some(ast::Lit::Empty(ast::EmptyLit { kind: ast::EmptyKind::Empty }))
+            }
             _ => None,
         }
     }
@@ -881,15 +885,7 @@ impl<'s> Parser<'s> {
 
         self.skip_fast(token.kind); // `<op>` Skip the operator token.
 
-        // `not` applies to a whole comparison, so `not a == b` is `not (a == b)`,
-        // but not to `and` and `or`, which bind looser.
-        let expr = match *op.body {
-            ast::UnaryOp::Not => {
-                let (precedence, _) = ast::BinOp::Eq.infix_binding_power();
-                self.parse_compound_expr(precedence)?
-            }
-            ast::UnaryOp::Neg => self.parse_expr()?,
-        };
+        let expr = self.parse_compound_expr(op.body.prefix_binding_power())?;
         Ok(self.node_with_joined_span(ast::Expr::Unary(ast::UnaryExpr { op, expr }), token.span))
     }
 
@@ -935,8 +931,7 @@ impl<'s> Parser<'s> {
             let start = self.current_pos();
             let mut args = thin_vec![self.parse_filter_arg()?];
 
-            // Liquid filters take any number of arguments, separated by commas.
-            if self.options.dialect.is_liquid() {
+            if self.options.dialect.filter_supports_arg_list() {
                 while self.parse_token_fast(TokenKind::Comma).is_some() {
                     args.push(self.parse_filter_arg()?);
                 }
@@ -959,7 +954,8 @@ impl<'s> Parser<'s> {
 
         let name = match self.peek_second() {
             Some(Token { kind: TokenKind::Colon, .. })
-                if self.options.dialect.is_liquid() && start.kind.is_ident_like() =>
+                if self.options.dialect.filter_supports_arg_list()
+                    && start.kind.is_ident_like() =>
             {
                 let name = self.parse_name()?;
                 self.skip_fast(TokenKind::Colon); // `:` Skip the colon token.
@@ -981,12 +977,7 @@ impl<'s> Parser<'s> {
         }
 
         match &(token.unwrap()).kind {
-            TokenKind::Ident
-                if self.options.dialect.is_liquid()
-                    && self._source.hunk(token.unwrap().span) == "contains" =>
-            {
-                (Some(ast::BinOp::Contains), 1)
-            }
+            TokenKind::Keyword(token::Keyword::Contains) => (Some(ast::BinOp::Contains), 1),
             TokenKind::EqEq => (Some(ast::BinOp::Eq), 1),
             TokenKind::NotEq => (Some(ast::BinOp::NotEq), 1),
             TokenKind::Lt => (Some(ast::BinOp::Lt), 1),

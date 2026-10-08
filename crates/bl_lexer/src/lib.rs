@@ -442,11 +442,7 @@ impl<'lex> Lexer<'lex> {
             '.' if self.peek_second().is_ascii_digit() && !self.after_dot() => {
                 self.skip_ascii();
                 self.eat_while_and_slice(move |c| c.is_ascii_digit());
-
-                match self.peek() {
-                    'e' | 'E' => self.eat_float_lit(start),
-                    _ => TokenKind::Number(NumberFlags::Float),
-                }
+                self.eat_float_lit(start)
             }
             // Immediate exponent
             'e' | 'E' => self.eat_float_lit(start),
@@ -454,9 +450,11 @@ impl<'lex> Lexer<'lex> {
         }
     }
 
+    /// Lex the rest of a float literal, after its fraction or right before its
+    /// exponent, i.e. the optional exponent.
     fn eat_float_lit(&mut self, start: usize) -> TokenKind {
         if !matches!(self.peek(), 'e' | 'E') {
-            return TokenKind::Number(NumberFlags::Int);
+            return TokenKind::Number(NumberFlags::Float);
         }
 
         self.skip_ascii(); // consume the exponent
@@ -559,7 +557,7 @@ impl<'lex> Lexer<'lex> {
 
         let name = &self.spanned.source[start..self.offset.get()];
 
-        if let Ok(keyword) = Keyword::try_from(name) {
+        if let Some(keyword) = Keyword::lookup(name, self.dialect) {
             TokenKind::Keyword(keyword)
         } else {
             TokenKind::Ident

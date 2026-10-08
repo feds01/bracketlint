@@ -1,6 +1,7 @@
 //! Language token keyword definitions.
 use std::fmt;
 
+use bl_workspace::Dialect;
 use num_derive::FromPrimitive;
 use phf::phf_map;
 use strum_macros::AsRefStr;
@@ -190,13 +191,34 @@ pub enum Keyword {
     /// {% endfor %}
     /// ```
     Reversed,
+
+    /// `contains` - Checks whether a string has a substring, or an array has
+    /// an item, in Liquid.
+    /// ```liquid
+    /// {% if product.title contains "Pack" %}
+    /// ```
+    Contains,
 }
 impl Keyword {
     pub fn identifier_like(&self) -> bool {
         matches!(
             self,
-            Keyword::Block | Keyword::Empty | Keyword::Load | Keyword::Import | Keyword::Comment
+            Keyword::Block
+                | Keyword::Empty
+                | Keyword::Load
+                | Keyword::Import
+                | Keyword::Comment
+                | Keyword::Contains
         )
+    }
+
+    /// The keyword that `name` is in `dialect`, if any. Liquid has keywords of
+    /// its own.
+    pub fn lookup(name: &str, dialect: Dialect) -> Option<Keyword> {
+        match dialect {
+            Dialect::Liquid => LIQUID_KEYWORDS.get(name).or_else(|| KEYWORDS.get(name)).copied(),
+            _ => KEYWORDS.get(name).copied(),
+        }
     }
 }
 
@@ -254,6 +276,11 @@ static KEYWORDS: phf::Map<&'static str, Keyword> = phf_map! {
 
     // Modifiers
     "reversed" => Keyword::Reversed,
+};
+
+/// The keywords that only Liquid has.
+static LIQUID_KEYWORDS: phf::Map<&'static str, Keyword> = phf_map! {
+    "contains" => Keyword::Contains,
 };
 
 impl TryFrom<&str> for Keyword {

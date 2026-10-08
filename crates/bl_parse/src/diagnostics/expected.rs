@@ -73,7 +73,7 @@ bitflags! {
         /// Right bracket
         const RightBracket = 1 << 23;
 
-        /// Two dots, as in a Liquid range like `(1..5)`
+        /// Two dots `..`
         const DotDot = 1 << 24;
 
         /// Convenient grouping of `operator`.

@@ -52,7 +52,7 @@ body
       │   │   ├─operator `==`
       │   │   └─rhs
       │   │     └─lit_expr
-      │   │       └─blank_lit blank
+      │   │       └─empty_lit blank
       │   ├─operator `or`
       │   └─rhs
       │     └─bin_expr

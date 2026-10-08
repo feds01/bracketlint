@@ -468,14 +468,15 @@ define_tree! {
     }
 
     impl BinOp {
-        /// Compute the precedence for an operator
+        /// Compute the precedence for an operator. `not` sits between `and`
+        /// and the comparisons, see [UnaryOp::prefix_binding_power].
         pub fn infix_binding_power(&self) -> (u8, u8) {
             match self {
                 BinOp::Or => (2, 3),
                 BinOp::And => (4, 5),
-                BinOp::In | BinOp::NotIn => (6, 7),
-                BinOp::Eq | BinOp::NotEq | BinOp::Is | BinOp::IsNot => (6, 5),
-                BinOp::Gt | BinOp::GtEq | BinOp::Lt | BinOp::LtEq | BinOp::Contains => (7, 8),
+                BinOp::In | BinOp::NotIn => (8, 9),
+                BinOp::Eq | BinOp::NotEq | BinOp::Is | BinOp::IsNot => (8, 7),
+                BinOp::Gt | BinOp::GtEq | BinOp::Lt | BinOp::LtEq | BinOp::Contains => (9, 10),
             }
         }
     }
@@ -508,6 +509,18 @@ define_tree! {
         Not,
         /// -
         Neg,
+    }
+
+    impl UnaryOp {
+        /// The precedence of the operator's operand. `not` applies to a whole
+        /// comparison, so `not a == b` is `not (a == b)`, but not to `and` and
+        /// `or`, which bind looser. `-` binds tighter than any binary operator.
+        pub fn prefix_binding_power(&self) -> u8 {
+            match self {
+                UnaryOp::Not => 6,
+                UnaryOp::Neg => u8::MAX,
+            }
+        }
     }
 
     impl fmt::Display for UnaryOp {
@@ -548,17 +561,21 @@ define_tree! {
     pub struct NilLit {
     }
 
-    /// Liquid's `empty`, which an empty string, array or hash is equal to.
+    /// Liquid's `empty` or `blank`, which values are only compared to, e.g.
+    /// `x == empty`.
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct EmptyLit {
+        pub kind: EmptyKind,
     }
 
-    /// Liquid's `blank`, which `empty` values and strings of only whitespace
-    /// are equal to.
-    #[derive(Clone, Debug, PartialEq)]
-    #[node]
-    pub struct BlankLit {
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub enum EmptyKind {
+        /// `empty`, which an empty string, array or hash is equal to.
+        Empty,
+        /// `blank`, which `empty` values and strings of only whitespace are
+        /// equal to.
+        Blank,
     }
 
     #[derive(Clone, Debug, PartialEq)]
@@ -570,7 +587,6 @@ define_tree! {
         Str(StrLit),
         Nil(NilLit),
         Empty(EmptyLit),
-        Blank(BlankLit),
     }
 
     #[derive(Clone, Debug, PartialEq)]
