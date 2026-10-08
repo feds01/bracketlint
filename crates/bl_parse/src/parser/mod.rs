@@ -11,8 +11,9 @@ use bl_ast::{
     self as ast, AstNode, AstNodes, ByteRange, Identifier, LocalSpanMap, SourceId, Span,
     SpannedSource, VarExpr,
 };
-use bl_lexer::token::{
-    self, Delimiter, Keyword, NumberFlags, Token, TokenKind, cursor::TokenCursor,
+use bl_lexer::{
+    kw, tok,
+    token::{self, Delimiter, Keyword, NumberFlags, Token, TokenKind, cursor::TokenCursor},
 };
 use bl_reporting::{
     HasDiagnosticsMut,
@@ -985,7 +986,7 @@ impl<'s> Parser<'s> {
         let start = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
 
         let name = match self.peek_second() {
-            Some(Token { kind: TokenKind::Colon, .. })
+            Some(tok!(Colon))
                 if self.options.dialect.filter_supports_arg_list()
                     && start.kind.is_ident_like() =>
             {
@@ -1021,15 +1022,11 @@ impl<'s> Parser<'s> {
             TokenKind::Keyword(token::Keyword::Or) => (Some(ast::BinOp::Or), 1),
             TokenKind::Keyword(token::Keyword::In) => (Some(ast::BinOp::In), 1),
             TokenKind::Keyword(token::Keyword::Is) => match self.peek_second() {
-                Some(Token { kind: TokenKind::Keyword(token::Keyword::Not), .. }) => {
-                    (Some(ast::BinOp::NotEq), 2)
-                }
+                Some(kw!(Not)) => (Some(ast::BinOp::NotEq), 2),
                 _ => (Some(ast::BinOp::Is), 1),
             },
             TokenKind::Keyword(token::Keyword::Not) => match self.peek_second() {
-                Some(Token { kind: TokenKind::Keyword(token::Keyword::In), .. }) => {
-                    (Some(ast::BinOp::NotEq), 2)
-                }
+                Some(kw!(In)) => (Some(ast::BinOp::NotEq), 2),
                 _ => (None, 0),
             },
             _ => (None, 0),
@@ -1172,7 +1169,7 @@ impl<'s> Parser<'s> {
                         self.node_with_span(ast::Name::new(ast::Identifier::from(0u32)), span),
                     );
                 }
-                (Some(Token { kind, span }), Some(Token { kind: TokenKind::Colon, .. }))
+                (Some(Token { kind, span }), Some(tok!(Colon)))
                     if self.options.dialect.is_liquid() && kind.is_ident_like() =>
                 {
                     let name = self.parse_name()?;
@@ -1930,9 +1927,7 @@ impl<'s> Parser<'s> {
 
     fn parse_arg(&mut self) -> ParseResult<Option<AstNode<ast::Arg>>> {
         match (self.peek().copied(), self.peek_second().copied()) {
-            (Some(Token { kind, span }), Some(Token { kind: TokenKind::Eq, .. }))
-                if kind.is_ident_like() =>
-            {
+            (Some(Token { kind, span }), Some(tok!(Eq))) if kind.is_ident_like() => {
                 let name = self.parse_name()?;
                 self.parse_token(TokenKind::Eq)?;
 
@@ -1945,7 +1940,7 @@ impl<'s> Parser<'s> {
             }
             // The name can also be a string, e.g. the group of a Liquid `cycle`
             // in `{% cycle "group": "a", "b" %}`.
-            (Some(Token { kind, span }), Some(Token { kind: TokenKind::Colon, .. }))
+            (Some(Token { kind, span }), Some(tok!(Colon)))
                 if self.options.dialect.named_args_use_colon()
                     && (kind.is_ident_like() || kind == TokenKind::Str) =>
             {
@@ -1992,10 +1987,7 @@ impl<'s> Parser<'s> {
         let start = self.current_pos();
 
         match (self.peek(), self.peek_second()) {
-            (
-                Some(Token { kind: TokenKind::Ident, .. }),
-                Some(Token { kind: TokenKind::Eq, .. }),
-            ) => {
+            (Some(tok!(Ident)), Some(tok!(Eq))) => {
                 let name = self.parse_name()?;
                 self.skip_fast(TokenKind::Eq); // `<eq>` Skip the assignment operator token.
                 let value = self.parse_expr()?;
