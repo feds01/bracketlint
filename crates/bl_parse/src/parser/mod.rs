@@ -710,7 +710,7 @@ impl<'s> Parser<'s> {
             };
 
             // check if we have higher precedence than the lhs expression...
-            let (l_precedence, r_precedence) = self.binding_power(op);
+            let (l_precedence, r_precedence) = self.options.dialect.infix_binding_power(op);
 
             if l_precedence < min_precedence {
                 break;
@@ -729,16 +729,6 @@ impl<'s> Parser<'s> {
         }
 
         Ok(lhs)
-    }
-
-    /// The binding power of `op`. Liquid has no precedence between `and` and
-    /// `or`, and evaluates them from right to left, so `a and b or c` is
-    /// `a and (b or c)`.
-    fn binding_power(&self, op: ast::BinOp) -> (u8, u8) {
-        match op {
-            ast::BinOp::And | ast::BinOp::Or if self.options.dialect.is_liquid() => (2, 2),
-            op => op.infix_binding_power(),
-        }
     }
 
     fn parse_expr(&mut self) -> ParseResult<AstNode<ast::Expr>> {
@@ -912,7 +902,7 @@ impl<'s> Parser<'s> {
 
         self.skip_fast(token.kind); // `<op>` Skip the operator token.
 
-        let expr = self.parse_compound_expr(op.body.prefix_binding_power())?;
+        let expr = self.parse_compound_expr(self.options.dialect.prefix_binding_power(*op.body))?;
         Ok(self.node_with_joined_span(ast::Expr::Unary(ast::UnaryExpr { op, expr }), token.span))
     }
 

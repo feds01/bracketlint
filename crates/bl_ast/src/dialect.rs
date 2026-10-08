@@ -5,7 +5,10 @@ use std::path::Path;
 use serde::Deserialize;
 use strum::{Display, EnumString, IntoStaticStr, VariantArray};
 
-use crate::keywords::{KEYWORDS, Keyword, LIQUID_KEYWORDS};
+use crate::{
+    BinOp, UnaryOp,
+    keywords::{KEYWORDS, Keyword, LIQUID_KEYWORDS},
+};
 
 /// The template language that a file is written in. It is either given with
 /// `--dialect`, or picked from the file extension, see [Dialect::from_path].
@@ -159,6 +162,99 @@ impl Dialect {
         }
     }
 
+    /// How tightly the binary operator `op` binds, as the binding powers of
+    /// its left and right side. An operator with a higher binding power groups
+    /// first, so `a or b and c` is `a or (b and c)`. `contains` is only a
+    /// keyword in Liquid, so the other dialects never parse it, and only list
+    /// it with their comparisons to cover every operator.
+    pub fn infix_binding_power(self, op: BinOp) -> (u8, u8) {
+        match self {
+            // Django's own precedences, from `smartif.py`. `in` and `not in`
+            // bind looser than the other comparisons, so `a in b == c` is
+            // `a in (b == c)`.
+            Dialect::Django => match op {
+                BinOp::Or => left_assoc(6),
+                BinOp::And => left_assoc(7),
+                BinOp::In | BinOp::NotIn => left_assoc(9),
+                BinOp::Eq
+                | BinOp::NotEq
+                | BinOp::Lt
+                | BinOp::LtEq
+                | BinOp::Gt
+                | BinOp::GtEq
+                | BinOp::Is
+                | BinOp::IsNot
+                | BinOp::Contains => left_assoc(10),
+            },
+
+            // Jinja's parser has a function for each level, from `parse_or`
+            // to `parse_compare`, rather than numbers, so these go up in tens.
+            // Jinja chains comparisons like Python, so `a == b > c` means
+            // `a == b and b > c`, which is `(a == b) > c` here. A test binds
+            // tighter than any operator.
+            Dialect::Jinja => match op {
+                BinOp::Or => left_assoc(10),
+                BinOp::And => left_assoc(20),
+                BinOp::Eq
+                | BinOp::NotEq
+                | BinOp::Lt
+                | BinOp::LtEq
+                | BinOp::Gt
+                | BinOp::GtEq
+                | BinOp::In
+                | BinOp::NotIn
+                | BinOp::Contains => left_assoc(40),
+                BinOp::Is | BinOp::IsNot => left_assoc(100),
+            },
+
+            // Liquid has no precedence between `and` and `or`, and evaluates
+            // them from right to left, so `a and b or c` is `a and (b or c)`.
+            Dialect::Liquid => match op {
+                BinOp::And | BinOp::Or => right_assoc(2),
+                BinOp::In | BinOp::NotIn => left_assoc(8),
+                BinOp::Eq | BinOp::NotEq | BinOp::Is | BinOp::IsNot => right_assoc(8),
+                BinOp::Gt | BinOp::GtEq | BinOp::Lt | BinOp::LtEq | BinOp::Contains => {
+                    left_assoc(9)
+                }
+            },
+
+            // Twig's own precedences, from `CoreExtension`. A test binds
+            // tighter than the comparisons and `not`.
+            Dialect::Twig => match op {
+                BinOp::Or => left_assoc(10),
+                BinOp::And => left_assoc(15),
+                BinOp::Eq
+                | BinOp::NotEq
+                | BinOp::Lt
+                | BinOp::LtEq
+                | BinOp::Gt
+                | BinOp::GtEq
+                | BinOp::In
+                | BinOp::NotIn
+                | BinOp::Contains => left_assoc(20),
+                BinOp::Is | BinOp::IsNot => left_assoc(100),
+            },
+        }
+    }
+
+    /// How tightly the prefix operator `op` binds: its operand takes every
+    /// binary operator whose left binding power is at least this, see
+    /// [Dialect::infix_binding_power]. `-` binds tighter than any binary
+    /// operator. `not` binds tighter than `and` and `or`, and in Twig also
+    /// tighter than the comparisons, so `not a == b` is `(not a) == b` there
+    /// and `not (a == b)` in the other dialects.
+    pub fn prefix_binding_power(self, op: UnaryOp) -> u8 {
+        match op {
+            UnaryOp::Neg => u8::MAX,
+            UnaryOp::Not => match self {
+                Dialect::Django => 8,
+                Dialect::Jinja => 30,
+                Dialect::Liquid => 6,
+                Dialect::Twig => 50,
+            },
+        }
+    }
+
     /// Check if its currently Django dialect.
     #[inline]
     pub fn is_django(self) -> bool {
@@ -170,6 +266,20 @@ impl Dialect {
     pub fn is_liquid(self) -> bool {
         self == Dialect::Liquid
     }
+}
+
+/// The binding powers of a left-associative operator that binds with `power`:
+/// its right side only takes operators that bind tighter, so `a == b == c` is
+/// `(a == b) == c`.
+const fn left_assoc(power: u8) -> (u8, u8) {
+    (power, power + 1)
+}
+
+/// The binding powers of a right-associative operator that binds with `power`:
+/// its right side also takes operators that bind as tightly, so `a or b or c`
+/// is `a or (b or c)`.
+const fn right_assoc(power: u8) -> (u8, u8) {
+    (power, power)
 }
 
 #[cfg(test)]

@@ -1,0 +1,211 @@
+info: parsed module '$DIR/comparison_precedence_twig.html' as twig:
+body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─bin_expr
+│     │   │   ├─lhs
+│     │   │   │ └─var_expr
+│     │   │   │   └─name "a"
+│     │   │   ├─operator `==`
+│     │   │   └─rhs
+│     │   │     └─var_expr
+│     │   │       └─name "b"
+│     │   ├─operator `>`
+│     │   └─rhs
+│     │     └─var_expr
+│     │       └─name "c"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─bin_expr
+│     │   │   ├─lhs
+│     │   │   │ └─var_expr
+│     │   │   │   └─name "a"
+│     │   │   ├─operator `==`
+│     │   │   └─rhs
+│     │   │     └─var_expr
+│     │   │       └─name "b"
+│     │   ├─operator `==`
+│     │   └─rhs
+│     │     └─var_expr
+│     │       └─name "c"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─bin_expr
+│     │   │   ├─lhs
+│     │   │   │ └─var_expr
+│     │   │   │   └─name "a"
+│     │   │   ├─operator `in`
+│     │   │   └─rhs
+│     │   │     └─var_expr
+│     │   │       └─name "b"
+│     │   ├─operator `==`
+│     │   └─rhs
+│     │     └─var_expr
+│     │       └─name "c"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─bin_expr
+│     │   │   ├─lhs
+│     │   │   │ └─var_expr
+│     │   │   │   └─name "a"
+│     │   │   ├─operator `==`
+│     │   │   └─rhs
+│     │   │     └─var_expr
+│     │   │       └─name "b"
+│     │   ├─operator `in`
+│     │   └─rhs
+│     │     └─var_expr
+│     │       └─name "c"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─bin_expr
+│     │   │   ├─lhs
+│     │   │   │ └─var_expr
+│     │   │   │   └─name "a"
+│     │   │   ├─operator `is`
+│     │   │   └─rhs
+│     │   │     └─var_expr
+│     │   │       └─name "defined"
+│     │   ├─operator `==`
+│     │   └─rhs
+│     │     └─var_expr
+│     │       └─name "b"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─var_expr
+│     │   │   └─name "a"
+│     │   ├─operator `==`
+│     │   └─rhs
+│     │     └─bin_expr
+│     │       ├─lhs
+│     │       │ └─var_expr
+│     │       │   └─name "b"
+│     │       ├─operator `is`
+│     │       └─rhs
+│     │         └─var_expr
+│     │           └─name "defined"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─unary_expr
+│     │   │   ├─unary operator `not`
+│     │   │   └─var_expr
+│     │   │     └─name "a"
+│     │   ├─operator `==`
+│     │   └─rhs
+│     │     └─var_expr
+│     │       └─name "b"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─unary_expr
+│     │   ├─unary operator `not`
+│     │   └─bin_expr
+│     │     ├─lhs
+│     │     │ └─var_expr
+│     │     │   └─name "a"
+│     │     ├─operator `is`
+│     │     └─rhs
+│     │       └─var_expr
+│     │         └─name "defined"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─unary_expr
+│     │   │   ├─unary operator `not`
+│     │   │   └─var_expr
+│     │   │     └─name "a"
+│     │   ├─operator `in`
+│     │   └─rhs
+│     │     └─var_expr
+│     │       └─name "b"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─bin_expr
+│     │   │   ├─lhs
+│     │   │   │ └─var_expr
+│     │   │   │   └─name "a"
+│     │   │   ├─operator `is not`
+│     │   │   └─rhs
+│     │   │     └─var_expr
+│     │   │       └─name "defined"
+│     │   ├─operator `==`
+│     │   └─rhs
+│     │     └─var_expr
+│     │       └─name "b"
+│     └─clause_body
+│       └─body
+└─if
+  └─clauses
+    └─if_clause
+      ├─condition
+      │ └─bin_expr
+      │   ├─lhs
+      │   │ └─bin_expr
+      │   │   ├─lhs
+      │   │   │ └─var_expr
+      │   │   │   └─name "a"
+      │   │   ├─operator `not in`
+      │   │   └─rhs
+      │   │     └─var_expr
+      │   │       └─name "b"
+      │   ├─operator `==`
+      │   └─rhs
+      │     └─var_expr
+      │       └─name "c"
+      └─clause_body
+        └─body
+
