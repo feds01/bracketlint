@@ -56,6 +56,7 @@ $ just run check foo/    # run the CLI from source
 $ just test              # run all tests
 $ just update-snapshots  # re-generate the UI test snapshots in tests/cases, and how the real-world templates in tests/corpus do
 $ just corpus            # print how the real-world templates in tests/corpus do
+$ just corpus-compare    # compare them with the baselines on main, as the comment on each PR does
 $ just ci                # run tests, clippy and the formatting check, like CI does
 $ just bench             # run benchmarks
 ```

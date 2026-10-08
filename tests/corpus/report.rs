@@ -36,7 +36,7 @@ impl Counts {
 
         Counts {
             templates,
-            passing: format!("{ok} ({}%)", (ok * 100).checked_div(templates).unwrap_or(0)),
+            passing: passing(ok, templates),
             parse_errors: count(Status::ParseError),
             fmt_errors: count(Status::FmtError),
             changed_tags: count(Status::ChangedTags),
@@ -105,8 +105,19 @@ pub fn render(results: &[CheckedSource]) -> String {
     text
 }
 
-fn table<T: Tabled>(rows: impl IntoIterator<Item = T>) -> String {
+/// A Markdown table of `rows`.
+pub fn table<T: Tabled>(rows: impl IntoIterator<Item = T>) -> String {
     Table::new(rows).with(Style::markdown()).to_string()
+}
+
+/// How many of the `templates` pass, e.g. `12 (40%)`.
+pub fn passing(ok: usize, templates: usize) -> String {
+    format!("{ok} ({}%)", (ok * 100).checked_div(templates).unwrap_or(0))
+}
+
+/// `text`, such as an error, escaped to fit in a cell of a Markdown table.
+pub fn cell(text: &str) -> String {
+    text.replace('|', "\\|").replace('\n', " ")
 }
 
 /// The [COMMON_ERRORS] most common first errors in `outcomes`, with how many
@@ -124,6 +135,6 @@ fn common_errors(outcomes: &[&Outcome]) -> Vec<ErrorRow> {
     errors
         .into_iter()
         .take(COMMON_ERRORS)
-        .map(|(error, templates)| ErrorRow { templates, error: error.replace('|', "\\|") })
+        .map(|(error, templates)| ErrorRow { templates, error: cell(error) })
         .collect()
 }

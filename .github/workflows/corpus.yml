@@ -1,0 +1,85 @@
+name: Corpus
+
+# Comments on each PR with what merging it changes in how the real-world
+# templates in tests/corpus do, compared with the baselines on `main`.
+on:
+  pull_request:
+    branches: [main]
+    # Only the code that the corpus checks with, i.e. every crate except the
+    # CLI and the benchmarks, and the corpus itself.
+    paths:
+      - "crates/**"
+      - "!crates/bl/**"
+      - "!crates/bl_benchmark/**"
+      - "!crates/bl_benches/**"
+      - "tests/corpus/**"
+      - "tests/lib.rs"
+      - "tests/Cargo.toml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".github/workflows/corpus.yml"
+
+# A new push to a PR cancels its earlier run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  corpus:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pull-requests: write # to comment on the PR
+
+    env:
+      CARGO_TERM_COLOR: always
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v7
+        with:
+          # The PR merged into `main`, and `main` itself as its first parent.
+          fetch-depth: 2
+
+      - name: Install the toolchain in rust-toolchain.toml
+        run: rustup toolchain install
+
+      - name: Dependency caching
+        uses: Swatinem/rust-cache@v2
+
+      - name: Extract the baselines on main
+        run: |
+          mkdir "$RUNNER_TEMP/baselines"
+          git archive HEAD^1 tests/corpus/baselines | tar -x -C "$RUNNER_TEMP/baselines" --strip-components=3
+
+      # Writes target/corpus/comparison.md before it checks the baselines of the
+      # PR, so the comment is posted even if they are out of date.
+      - name: Check the corpus
+        run: cargo test -p bl_tests -- corpus --nocapture
+        env:
+          CORPUS_COMPARE_WITH: ${{ runner.temp }}/baselines
+
+      - name: Write the comment
+        id: comment
+        if: ${{ !cancelled() && hashFiles('target/corpus/comparison.md') != '' }}
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          {
+            cat target/corpus/comparison.md
+            printf '\n---\n\n<sub>Comparing <code>%s</code> (%s) with <code>%s</code> (%s)</sub>\n' \
+              "$HEAD_REF" "${HEAD_SHA::7}" "$BASE_REF" "$(git rev-parse --short=7 HEAD^1)"
+          } > "$RUNNER_TEMP/comment.md"
+          cat "$RUNNER_TEMP/comment.md" >> "$GITHUB_STEP_SUMMARY"
+
+      # The token of a PR from a fork can't comment, but the job summary has it.
+      - name: Comment on the PR
+        if: ${{ !cancelled() && steps.comment.outcome == 'success' && !github.event.pull_request.head.repo.fork }}
+        uses: marocchino/sticky-pull-request-comment@v3
+        with:
+          header: corpus
+          path: ${{ runner.temp }}/comment.md
