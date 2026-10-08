@@ -1,7 +1,6 @@
 //! Language token keyword definitions.
 use std::fmt;
 
-use phf::phf_map;
 use strum::AsRefStr;
 
 /// Template language keywords. Most of them are shared by every dialect, and
@@ -277,82 +276,91 @@ impl fmt::Display for Keyword {
     }
 }
 
-/// A static map of keywords to their enum variants using a
-/// perfect hashing function to quickly lookup the keyword.
-pub(crate) static KEYWORDS: phf::Map<&'static str, Keyword> = phf_map! {
-    // Control flow
-    "for" => Keyword::For,
-    "endfor" => Keyword::EndFor,
-    "if" => Keyword::If,
-    "elif" => Keyword::Elif,
-    "else" => Keyword::Else,
-    "endif" => Keyword::EndIf,
-    "break" => Keyword::Break,
-    "continue" => Keyword::Continue,
-    "empty" => Keyword::Empty,
+/// The keyword that the identifier `name` is in every dialect, if any.
+///
+/// ##Note: A `match` compares the length and bytes of `name` directly, which is
+/// faster for these short names than hashing it into a map.
+pub(crate) fn keyword(name: &str) -> Option<Keyword> {
+    let keyword = match name {
+        // Control flow
+        "for" => Keyword::For,
+        "endfor" => Keyword::EndFor,
+        "if" => Keyword::If,
+        "elif" => Keyword::Elif,
+        "else" => Keyword::Else,
+        "endif" => Keyword::EndIf,
+        "break" => Keyword::Break,
+        "continue" => Keyword::Continue,
+        "empty" => Keyword::Empty,
 
-    // Logical operators
-    "and" => Keyword::And,
-    "or" => Keyword::Or,
-    "not" => Keyword::Not,
-    "in" => Keyword::In,
-    "as" => Keyword::As,
-    "is" => Keyword::Is,
+        // Logical operators
+        "and" => Keyword::And,
+        "or" => Keyword::Or,
+        "not" => Keyword::Not,
+        "in" => Keyword::In,
+        "as" => Keyword::As,
+        "is" => Keyword::Is,
 
-    // Context management
-    "with" => Keyword::With,
-    "endwith" => Keyword::EndWith,
+        // Context management
+        "with" => Keyword::With,
+        "endwith" => Keyword::EndWith,
 
-    // Template structure
-    "block" => Keyword::Block,
-    "endblock" => Keyword::EndBlock,
-    "extends" => Keyword::Extends,
-    "include" => Keyword::Include,
-    "load" => Keyword::Load,
+        // Template structure
+        "block" => Keyword::Block,
+        "endblock" => Keyword::EndBlock,
+        "extends" => Keyword::Extends,
+        "include" => Keyword::Include,
+        "load" => Keyword::Load,
 
-    // Comments
-    "comment" => Keyword::Comment,
-    "endcomment" => Keyword::EndComment,
-    "raw" => Keyword::Raw,
-    "endraw" => Keyword::EndRaw,
+        // Comments
+        "comment" => Keyword::Comment,
+        "endcomment" => Keyword::EndComment,
+        "raw" => Keyword::Raw,
+        "endraw" => Keyword::EndRaw,
 
-    // Constants
-    "True" => Keyword::True,
-    "False" => Keyword::False,
+        // Constants
+        "True" => Keyword::True,
+        "False" => Keyword::False,
 
-    // Template importing
-    "import" => Keyword::Import,
+        // Template importing
+        "import" => Keyword::Import,
 
-    // Modifiers
-    "reversed" => Keyword::Reversed,
-};
+        // Modifiers
+        "reversed" => Keyword::Reversed,
+        _ => return None,
+    };
+
+    Some(keyword)
+}
 
 /// The keywords that only Liquid has, which are its `contains` operator and
 /// some of its tags:
 /// - https://shopify.github.io/liquid/basics/operators/
 /// - https://shopify.github.io/liquid/tags/control-flow/
 /// - https://shopify.github.io/liquid/tags/iteration/
-pub(crate) static LIQUID_KEYWORDS: phf::Map<&'static str, Keyword> = phf_map! {
-    "contains" => Keyword::Contains,
-    "unless" => Keyword::Unless,
-    "endunless" => Keyword::EndUnless,
-    "case" => Keyword::Case,
-    "when" => Keyword::When,
-    "endcase" => Keyword::EndCase,
-    "tablerow" => Keyword::TableRow,
-    "endtablerow" => Keyword::EndTableRow,
-    "capture" => Keyword::Capture,
-    "endcapture" => Keyword::EndCapture,
-    "render" => Keyword::Render,
-};
+pub(crate) fn liquid_keyword(name: &str) -> Option<Keyword> {
+    let keyword = match name {
+        "contains" => Keyword::Contains,
+        "unless" => Keyword::Unless,
+        "endunless" => Keyword::EndUnless,
+        "case" => Keyword::Case,
+        "when" => Keyword::When,
+        "endcase" => Keyword::EndCase,
+        "tablerow" => Keyword::TableRow,
+        "endtablerow" => Keyword::EndTableRow,
+        "capture" => Keyword::Capture,
+        "endcapture" => Keyword::EndCapture,
+        "render" => Keyword::Render,
+        _ => return None,
+    };
+
+    Some(keyword)
+}
 
 impl TryFrom<&str> for Keyword {
     type Error = ();
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        match KEYWORDS.get(value) {
-            Some(keyword) => Ok(*keyword),
-            None => Err(()),
-        }
+        keyword(value).ok_or(())
     }
 }

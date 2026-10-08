@@ -7,7 +7,7 @@ use strum::{Display, EnumString, IntoStaticStr, VariantArray};
 
 use crate::{
     BinOp, UnaryOp,
-    keywords::{KEYWORDS, Keyword, LIQUID_KEYWORDS},
+    keywords::{self, Keyword},
 };
 
 /// The template language that a file is written in. It is either given with
@@ -232,8 +232,8 @@ impl Dialect {
 
         match self {
             Dialect::Liquid if name == "elif" => None,
-            Dialect::Liquid => LIQUID_KEYWORDS.get(name).or_else(|| KEYWORDS.get(name)).copied(),
-            _ => KEYWORDS.get(name).copied(),
+            Dialect::Liquid => keywords::liquid_keyword(name).or_else(|| keywords::keyword(name)),
+            _ => keywords::keyword(name),
         }
     }
 
