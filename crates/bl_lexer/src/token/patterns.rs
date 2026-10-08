@@ -31,31 +31,23 @@ macro_rules! kw {
 /// tokens of `{% raw %}`.
 ///
 /// The tree token stores how many tokens are inside the tree, which a pattern
-/// can only check against a literal, so there is an arm for each number of
-/// inner patterns. Each inner pattern has to match exactly one token, so it
-/// can't be a nested tree or `..`.
+/// can only check against a literal, so the macro counts the inner patterns
+/// with `${count(..)}`. Each inner pattern has to match exactly one token, so
+/// it can't be a nested tree or `..`. A crate that uses this macro needs
+/// `#![feature(macro_metavar_expr)]`.
 #[macro_export]
 macro_rules! tree {
-    ($delimiter:ident, [$a:pat]) => {
-        [$crate::tree!(@open $delimiter, 1), $a]
-    };
-    ($delimiter:ident, [$a:pat, $b:pat]) => {
-        [$crate::tree!(@open $delimiter, 2), $a, $b]
-    };
-    ($delimiter:ident, [$a:pat, $b:pat, $c:pat]) => {
-        [$crate::tree!(@open $delimiter, 3), $a, $b, $c]
-    };
-    ($delimiter:ident, [$a:pat, $b:pat, $c:pat, $d:pat]) => {
-        [$crate::tree!(@open $delimiter, 4), $a, $b, $c, $d]
-    };
-    ($delimiter:ident, [$($inner:pat),*]) => {
-        compile_error!("`tree!` takes 1 to 4 inner patterns, add an arm for more")
-    };
-    (@open $delimiter:ident, $len:literal) => {
-        $crate::token::Token {
-            kind: $crate::token::TokenKind::Tree($crate::token::Delimiter::$delimiter, $len),
-            ..
-        }
+    ($delimiter:ident, [$($inner:pat),* $(,)?]) => {
+        [
+            $crate::token::Token {
+                kind: $crate::token::TokenKind::Tree(
+                    $crate::token::Delimiter::$delimiter,
+                    ${count($inner)},
+                ),
+                ..
+            },
+            $($inner),*
+        ]
     };
 }
 
@@ -88,6 +80,10 @@ mod tests {
         assert!(matches!(
             lex("{% for x in y %}")[..],
             tree!(Percent, [kw!(For), tok!(Ident), kw!(In), tok!(Ident)])
+        ));
+        assert!(matches!(
+            lex("{% for k, v in items %}")[..],
+            tree!(Percent, [kw!(For), tok!(Ident), tok!(Comma), tok!(Ident), kw!(In), tok!(Ident)])
         ));
     }
 

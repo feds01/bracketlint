@@ -1,5 +1,7 @@
 //! BL lexer implementation for the parser.
 
+#![feature(macro_metavar_expr)]
+
 pub mod diagnostics;
 pub mod token;
 
