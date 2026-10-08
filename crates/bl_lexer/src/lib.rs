@@ -214,11 +214,10 @@ impl<'lex> Lexer<'lex> {
         let offset = self.offset.get();
 
         let on_tree = |this: &mut Self, delimiter: Delimiter| {
+            // The length and the span of the tree are set once it closes.
             let tree = this.tokens.len();
-            this.tokens.push(Token::new(
-                TokenKind::Tree(delimiter, 0),
-                ByteRange::new(offset, this.len_consumed()),
-            ));
+            this.tokens
+                .push(Token::new(TokenKind::Tree(delimiter, 0), ByteRange::singleton(offset)));
             this.eat_token_tree(delimiter);
 
             if this.has_fatal_error {
@@ -242,6 +241,22 @@ impl<'lex> Lexer<'lex> {
             // Immediately try to index the next token...
             this.advance_token()
         };
+
+        // Each line of a `liquid` tag is a tag without delimiters, or a comment
+        // if it starts with `#`.
+        if let Some(info) = self.tree.get()
+            && self.at_liquid_line(info)
+        {
+            if self.peek() != '#' {
+                return on_tree(self, Delimiter::Line);
+            }
+
+            self.offset.set(self.line_end());
+            return Some(Token::new(
+                TokenKind::Comment,
+                ByteRange::new(offset, self.len_consumed()),
+            ));
+        }
 
         let kind = if let Some(mut info) = self.tree.get() {
             match self.next()? {
@@ -335,10 +350,6 @@ impl<'lex> Lexer<'lex> {
                     // 3. We have a comment block, which is `{# ... #}`
                     match self.peek() {
                         '%' if self.at_inline_comment() => self.inline_comment(),
-                        '%' if self.at_liquid_tag() => {
-                            self.liquid_tag(offset);
-                            return self.advance_token();
-                        }
                         c @ ('%' | '{') => {
                             self.skip_ascii();
 
@@ -380,6 +391,13 @@ impl<'lex> Lexer<'lex> {
             self.skip_ascii();
         }
 
+        // A line of a `liquid` tag has no closing delimiter, and ends at the end
+        // of the line instead.
+        let end = self.end.get();
+        if delimiter == Delimiter::Line {
+            self.end.set(self.line_end());
+        }
+
         // we need to reset self.prev here as it might be polluted with previous token
         // trees
         let tree = Cell::new(Some(TreeInfo { start: self.tokens.len(), delimiter: None }));
@@ -390,6 +408,19 @@ impl<'lex> Lexer<'lex> {
         while !self.is_eof() {
             match self.advance_token() {
                 Some(token) => self.tokens.push(token),
+                // A closing delimiter in a line closes nothing, e.g. the `)` in
+                // `echo total)`, and the rest of the line is still lexed.
+                None if delimiter == Delimiter::Line => {
+                    let Some(TreeInfo { delimiter: Some(closer), start }) = self.tree.get() else {
+                        break;
+                    };
+
+                    let span =
+                        ByteRange::new(self.offset.get() - closer.width(), self.len_consumed());
+                    let kind = self.emit_error(LexerErrorKind::UnexpectedClose(closer), span);
+                    self.tokens.push(Token::new(kind, span));
+                    self.tree.set(Some(TreeInfo { start, delimiter: None }));
+                }
                 None => break,
             }
         }
@@ -400,6 +431,7 @@ impl<'lex> Lexer<'lex> {
         // everyone should refer to `tree`, not `self.tree` since this is now
         // the old one.
         self.tree.swap(&tree);
+        self.end.set(end);
 
         // If there is a fatal error, then we need to abort
         if self.has_fatal_error {
@@ -407,7 +439,11 @@ impl<'lex> Lexer<'lex> {
         }
 
         match tree.get() {
-            Some(TreeInfo { delimiter: Some(d), start, .. }) if d == delimiter => {
+            // A line closes at its end, rather than at a delimiter.
+            Some(TreeInfo { delimiter: closer, start })
+                if closer == Some(delimiter)
+                    || (closer.is_none() && delimiter == Delimiter::Line) =>
+            {
                 // Update the tree token with the length of the tree.
                 self.tokens[start - 1] = Token::new(
                     TokenKind::Tree(delimiter, (self.tokens.len() - start) as u32),
@@ -572,6 +608,12 @@ impl<'lex> Lexer<'lex> {
 
         let name = &self.spanned.source[start..self.offset.get()];
 
+        // `liquid` is only a keyword as the name of a tag, so that it is still a
+        // name elsewhere, e.g. in `{{ liquid }}`.
+        if name == "liquid" && self.dialect.has_liquid_tag() && self.at_tag_name() {
+            return TokenKind::Keyword(Keyword::Liquid);
+        }
+
         if let Some(keyword) = Keyword::from_ident(name, self.dialect) {
             TokenKind::Keyword(keyword)
         } else {
@@ -598,14 +640,46 @@ impl<'lex> Lexer<'lex> {
         self.dialect.has_inline_comments() && self.tag_contents().starts_with('#')
     }
 
-    /// Whether the `{% %}` tag that starts at the next `%` is a `liquid` tag.
-    /// `liquid` has to be the whole name, e.g. `{% liquid-tag %}` is not one.
-    fn at_liquid_tag(&self) -> bool {
-        self.dialect.has_liquid_tag()
-            && self.tag_contents().strip_prefix("liquid").is_some_and(|rest| {
-                rest.starts_with(char::is_whitespace)
-                    || self.strip_trim_marker(rest).starts_with("%}")
-            })
+    /// Whether the token being lexed is the first in a `{% %}` tree, i.e. the
+    /// name of the tag.
+    fn at_tag_name(&self) -> bool {
+        self.tree.get().is_some_and(|info| {
+            info.start == self.tokens.len()
+                && matches!(
+                    self.tokens[info.start - 1].kind,
+                    TokenKind::Tree(Delimiter::Percent, _)
+                )
+        })
+    }
+
+    /// Whether a line of a `liquid` tag starts here, i.e. the tree is a `{% %}`
+    /// tree whose first token is `liquid`, and its `%}` isn't next.
+    fn at_liquid_line(&self, info: TreeInfo) -> bool {
+        matches!(
+            self.tokens[info.start - 1..],
+            [
+                Token { kind: TokenKind::Tree(Delimiter::Percent, _), .. },
+                Token { kind: TokenKind::Keyword(Keyword::Liquid), .. },
+                ..
+            ]
+        ) && !self.is_eof()
+            && !self.strip_trim_marker(unsafe { self.as_slice() }).starts_with("%}")
+    }
+
+    /// The end of the line of a `liquid` tag that starts here. It ends at its
+    /// newline, or at the `%}` of the tag and its whitespace control marker,
+    /// without the whitespace before it.
+    fn line_end(&self) -> usize {
+        let rest = unsafe { self.as_slice() };
+        let line = &rest[..rest.find('\n').unwrap_or(rest.len())];
+        let line = match line.find("%}") {
+            Some(close) => {
+                line[..close].strip_suffix(self.dialect.trim_markers()).unwrap_or(&line[..close])
+            }
+            None => line,
+        };
+
+        self.offset.get() + line.trim_end().len()
     }
 
     /// Lex a Liquid inline comment, i.e. `{% # note %}`, from its `%` up to its
@@ -627,112 +701,6 @@ impl<'lex> Lexer<'lex> {
                 )
             }
         }
-    }
-
-    /// Lex a Liquid `{% liquid %}` tag from its `%`, where `start` is its `{`.
-    /// The tag is a `{% %}` tree that holds `liquid`, and then a
-    /// [Delimiter::Line] tree for each of its lines, since each line is a
-    /// tag without delimiters.
-    fn liquid_tag(&mut self, start: usize) {
-        let source = self.spanned.source;
-        let tree = self.tokens.len();
-        self.tokens
-            .push(Token::new(TokenKind::Tree(Delimiter::Percent, 0), ByteRange::singleton(start)));
-
-        // The `liquid` after the `{%` and its whitespace control marker.
-        self.skip_ascii();
-        if self.is_trim_marker(self.peek()) {
-            self.skip_ascii();
-        }
-        self.eat_while_and_discard(char::is_whitespace);
-
-        let word = self.offset.get();
-        self.offset.set(word + "liquid".len());
-        self.tokens.push(Token::new(
-            TokenKind::Keyword(Keyword::Liquid),
-            ByteRange::new(word, self.len_consumed()),
-        ));
-
-        // The lines end at the first `%}`, before its whitespace control marker.
-        let body = self.offset.get();
-        let close = source[body..].find("%}").map(|index| body + index);
-        let lines = &source[body..close.unwrap_or(source.len())];
-        let lines = lines.strip_suffix(self.dialect.trim_markers()).unwrap_or(lines);
-
-        let mut line_start = body;
-        for line in lines.split('\n') {
-            let tag = line.trim();
-
-            if !tag.is_empty() {
-                let tag_start = line_start + (line.len() - line.trim_start().len());
-                let tag_end = tag_start + tag.len();
-
-                // A line that starts with `#` is a comment.
-                if tag.starts_with('#') {
-                    let span = ByteRange::new(tag_start, tag_end - 1);
-                    self.tokens.push(Token::new(TokenKind::Comment, span));
-                } else {
-                    self.liquid_line(tag_start, tag_end);
-                }
-            }
-
-            line_start += line.len() + 1;
-        }
-
-        match close {
-            Some(close) => {
-                self.offset.set(close + 2);
-
-                let len = (self.tokens.len() - tree - 1) as u32;
-                let span = ByteRange::new(start, close + 1);
-                self.tokens[tree] = Token::new(TokenKind::Tree(Delimiter::Percent, len), span);
-            }
-            None => {
-                self.offset.set(source.len());
-                self.emit_error(
-                    LexerErrorKind::Unclosed(Delimiter::Percent),
-                    ByteRange::singleton(start),
-                );
-            }
-        }
-    }
-
-    /// Lex a line of a Liquid `{% liquid %}` tag, from `start` up to `end`, as
-    /// a [Delimiter::Line] tree.
-    fn liquid_line(&mut self, start: usize, end: usize) {
-        let tree = self.tokens.len();
-        let span = ByteRange::new(start, end - 1);
-        self.tokens.push(Token::new(TokenKind::Tree(Delimiter::Line, 0), span));
-
-        self.offset.set(start);
-        self.end.set(end);
-        let outer = self.tree.replace(Some(TreeInfo { start: tree + 1, delimiter: None }));
-
-        loop {
-            match self.advance_token() {
-                Some(token) => self.tokens.push(token),
-                None => {
-                    // A line has no closing delimiter, so one that would close it,
-                    // e.g. a stray `)`, is an error, and the rest of the line is
-                    // still lexed.
-                    let Some(TreeInfo { delimiter: Some(delimiter), .. }) = self.tree.get() else {
-                        break;
-                    };
-
-                    let closer =
-                        ByteRange::new(self.offset.get() - delimiter.width(), self.len_consumed());
-                    let kind = self.emit_error(LexerErrorKind::UnexpectedClose(delimiter), closer);
-                    self.tokens.push(Token::new(kind, closer));
-                    self.tree.set(Some(TreeInfo { start: tree + 1, delimiter: None }));
-                }
-            }
-        }
-
-        self.tree.set(outer);
-        self.end.set(self.spanned.source.len());
-
-        let len = (self.tokens.len() - tree - 1) as u32;
-        self.tokens[tree] = Token::new(TokenKind::Tree(Delimiter::Line, len), span);
     }
 
     /// Whether the last token is a `.`, so that a number after it is the index
