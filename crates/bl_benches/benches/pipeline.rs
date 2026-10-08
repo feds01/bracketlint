@@ -6,11 +6,11 @@
 
 use std::path::PathBuf;
 
-use bl_ast::SourceId;
+use bl_ast::{Dialect, SourceId};
 use bl_fmt::{FormatQuery, FormatterOptions, fmt_module};
 use bl_lexer::Lexer;
 use bl_parse::{ParseQuery, parse_source};
-use bl_workspace::{Dialect, WorkspaceMembers};
+use bl_workspace::WorkspaceMembers;
 use divan::{Bencher, black_box};
 
 fn main() {
