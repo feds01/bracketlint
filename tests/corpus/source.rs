@@ -10,7 +10,7 @@ use std::{
 use bl_ast::Dialect;
 use serde::Deserialize;
 
-use super::corpus_dir;
+use super::{corpus_dir, target_dir};
 
 /// A repository of templates at a pinned tag, of which only `paths` are
 /// downloaded, and only the files with `extension` are checked in `dialect`.
@@ -68,9 +68,7 @@ impl Source {
     /// Download the paths of the source at its tag into `target/corpus`,
     /// unless they already are, returning where they are.
     fn download(&self) -> PathBuf {
-        let checkout = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../target/corpus")
-            .join(format!("{}@{}", self.name, self.tag));
+        let checkout = target_dir().join(format!("{}@{}", self.name, self.tag));
         if checkout.exists() {
             return checkout;
         }

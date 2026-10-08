@@ -12,13 +12,13 @@ use bl_fmt::{FormatQuery, FormatQueryResult, FormatterOptions, fmt_module};
 use bl_parse::{ParseQuery, ParseQueryResult, parse_source};
 use bl_reporting::Reports;
 use bl_workspace::WorkspaceMembers;
-use strum::IntoStaticStr;
+use strum::{EnumString, IntoStaticStr};
 
 use super::source::Source;
 
 /// How a template does, from worst to best. A template gets the first status
 /// that applies to it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, IntoStaticStr)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, EnumString, IntoStaticStr)]
 #[strum(serialize_all = "kebab-case")]
 pub enum Status {
     /// Parsing it reports an error.
@@ -84,6 +84,17 @@ impl<'a> CheckedSource<'a> {
         };
         self.outcomes.iter().map(line).collect()
     }
+}
+
+/// The status of each template in a `baseline`, by path, see
+/// [CheckedSource::baseline].
+pub fn parse_baseline(baseline: &str) -> BTreeMap<String, Status> {
+    let template = |line: &str| {
+        let (status, path) = line.split_once(' ').expect("a status and a path");
+        let status = status.parse().unwrap_or_else(|_| panic!("unknown status `{status}`"));
+        (path.trim_start().to_string(), status)
+    };
+    baseline.lines().map(template).collect()
 }
 
 /// How the template `contents` does in `dialect`.

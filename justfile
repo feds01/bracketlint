@@ -49,6 +49,22 @@ update-snapshots *filter:
 corpus:
     cargo test -p bl_tests -- corpus --nocapture
 
+# Compare how the templates in tests/corpus do with the baselines at a git ref, as CI comments on pull requests, e.g. `just corpus-compare origin/main`
+corpus-compare ref="main":
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    base=$(mktemp -d)
+    trap 'rm -rf "$base"' EXIT
+    git archive "$1" tests/corpus/baselines | tar -x -C "$base" --strip-components=3
+
+    # The comparison is written before the baselines are checked, so it is
+    # shown even if they are out of date.
+    rm -f target/corpus/comparison.md
+    CORPUS_COMPARE_WITH="$base" cargo test -q -p bl_tests -- corpus || status=$?
+    cat target/corpus/comparison.md
+    exit "${status:-0}"
+
 # Run the lexer and parser benchmarks, extra args go to divan, e.g. `just bench django`
 bench *args:
     cargo bench -p bl_benchmark -- "$@"
