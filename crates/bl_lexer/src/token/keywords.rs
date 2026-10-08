@@ -7,9 +7,9 @@ use phf::phf_map;
 use strum_macros::AsRefStr;
 
 /// Template language keywords. Most of them are shared by every dialect, and
-/// [Keyword::lookup] finds the ones that a dialect has.
+/// [Keyword::from_ident] finds the ones that a dialect has.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, AsRefStr, FromPrimitive)]
-#[strum(serialize_all = "snake_case")]
+#[strum(serialize_all = "lowercase")]
 pub enum Keyword {
     /// `for` - Begins a for loop block
     /// ```django
@@ -227,10 +227,8 @@ pub enum Keyword {
     ///     {{ product.title }}
     /// {% endtablerow %}
     /// ```
-    #[strum(serialize = "tablerow")]
     TableRow,
     /// `endtablerow` - Ends a `tablerow` loop
-    #[strum(serialize = "endtablerow")]
     EndTableRow,
 }
 impl Keyword {
@@ -250,9 +248,9 @@ impl Keyword {
         )
     }
 
-    /// The keyword that `name` is in `dialect`, if any. Liquid has keywords of
-    /// its own, and spells `elif` as `elsif`.
-    pub fn lookup(name: &str, dialect: Dialect) -> Option<Keyword> {
+    /// The keyword that the identifier `name` is in `dialect`, if any. Liquid
+    /// has keywords of its own, and spells `elif` as `elsif`.
+    pub fn from_ident(name: &str, dialect: Dialect) -> Option<Keyword> {
         if name == dialect.elif_tag() {
             return Some(Keyword::Elif);
         }
@@ -321,7 +319,11 @@ static KEYWORDS: phf::Map<&'static str, Keyword> = phf_map! {
     "reversed" => Keyword::Reversed,
 };
 
-/// The keywords that only Liquid has.
+/// The keywords that only Liquid has, which are its `contains` operator and
+/// some of its tags:
+/// - https://shopify.github.io/liquid/basics/operators/
+/// - https://shopify.github.io/liquid/tags/control-flow/
+/// - https://shopify.github.io/liquid/tags/iteration/
 static LIQUID_KEYWORDS: phf::Map<&'static str, Keyword> = phf_map! {
     "contains" => Keyword::Contains,
     "unless" => Keyword::Unless,

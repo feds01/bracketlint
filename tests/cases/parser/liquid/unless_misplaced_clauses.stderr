@@ -3,7 +3,7 @@ error: unexpectedly encountered the keyword `elif`
   |
 1 | {% unless a %}A{% else %}B{% elsif c %}C{% endunless %}
   |                              -----
-error: expected a tag, however received the keyword `end_unless`
+error: expected a tag, however received the keyword `endunless`
  --> $DIR/unless_misplaced_clauses.html:1:44
   |
 1 | {% unless a %}A{% else %}B{% elsif c %}C{% endunless %}

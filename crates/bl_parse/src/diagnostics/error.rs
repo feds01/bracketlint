@@ -1,7 +1,7 @@
 //! Any parser errors that the parser can emit and report.
 
 use bl_ast::Span;
-use bl_lexer::token::TokenKind;
+use bl_lexer::token::{Keyword, TokenKind};
 use bl_reporting::{ReportBuilder, Reports, help};
 use derive_more::Constructor;
 
@@ -50,7 +50,9 @@ pub enum ParseErrorKind {
     ///
     /// <EOF>
     /// ```
-    UnclosedTag,
+    ///
+    /// It holds the keyword of the tag that closes it, e.g. `endif`.
+    UnclosedTag(Keyword),
 }
 
 impl From<ParseError> for Reports {
@@ -70,7 +72,7 @@ impl From<ParseError> for Reports {
             },
             ParseErrorKind::Statement => "expected a statement".to_string(),
             ParseErrorKind::Tag => "expected a tag".to_string(),
-            ParseErrorKind::UnclosedTag => "expected a closing tag".to_string(),
+            ParseErrorKind::UnclosedTag(end) => format!("expected a closing `{{% {end} %}}` tag"),
         };
 
         // `ParseErrorKind::Expected` format the error message in their own way,

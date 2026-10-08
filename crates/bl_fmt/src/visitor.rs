@@ -222,7 +222,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
                 if let bl_ast::Tag::Generic(generic) = tag {
                     let name = self.ctx.source.hunk(generic.name.ast_ref().span().range);
 
-                    if bl_lexer::token::Keyword::lookup(name, self.ctx.dialect).is_some() {
+                    if bl_lexer::token::Keyword::from_ident(name, self.ctx.dialect).is_some() {
                         self.end_line();
                     }
                 }

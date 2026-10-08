@@ -3,7 +3,7 @@ error: unexpectedly encountered the keyword `else`
   |
 1 | {% case size %}{% when "s" %}Small{% else %}Other{% else %}Again{% endcase %}
   |                                                     ----
-error: expected a tag, however received the keyword `end_case`
+error: expected a tag, however received the keyword `endcase`
  --> $DIR/case_misplaced_clauses.html:1:68
   |
 1 | {% case size %}{% when "s" %}Small{% else %}Other{% else %}Again{% endcase %}
@@ -15,7 +15,7 @@ error: unexpectedly encountered the keyword `when`
   |
 2 | {% case size %}{% when "s" %}Small{% else %}Other{% when "m" %}Medium{% endcase %}
   |                                                     ----
-error: expected a tag, however received the keyword `end_case`
+error: expected a tag, however received the keyword `endcase`
  --> $DIR/case_misplaced_clauses.html:2:73
   |
 2 | {% case size %}{% when "s" %}Small{% else %}Other{% when "m" %}Medium{% endcase %}

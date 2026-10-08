@@ -3,7 +3,7 @@ error: unexpectedly reached the end of input
   |
 2 | {% for item in %}
   |               -
-error: expected a tag, however received the keyword `end_for`
+error: expected a tag, however received the keyword `endfor`
  --> $DIR/parse_error.html:4:4
   |
 4 | {% endfor %}

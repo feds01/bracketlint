@@ -1063,7 +1063,7 @@ impl<'s> Parser<'s> {
         // after `{% else %}` in the other dialects.
         let dialect = self.options.dialect;
         let empty = match kind {
-            ast::LoopKind::For => Keyword::lookup(dialect.empty_loop_tag(), dialect),
+            ast::LoopKind::For => Keyword::from_ident(dialect.empty_loop_tag(), dialect),
             ast::LoopKind::TableRow => None,
         };
 
@@ -1090,7 +1090,7 @@ impl<'s> Parser<'s> {
         // Next, parse until we reach the end of the loop, or the body for an
         // empty loop.
         let (loop_body, ending_token, ending_trim) = self.parse_body_until_block_footer(
-            ExpectedItem::empty(),
+            end,
             |kind| matches!(kind, TokenKind::Keyword(kwd) if kwd == end || Some(kwd) == empty),
             |g| {
                 g.skip_token(); // `<empty>` | `<end>` Skip the empty or end token.
@@ -1100,7 +1100,7 @@ impl<'s> Parser<'s> {
 
         let (loop_empty, empty_trim, end_trim) = if ending_token != TokenKind::Keyword(end) {
             let (body, _, end_trim) = self.parse_body_until_block_footer(
-                ExpectedItem::empty(),
+                end,
                 |kind| kind == TokenKind::Keyword(end),
                 |g| {
                     g.skip_token(); // `<end>` Skip the end token.
@@ -1316,7 +1316,7 @@ impl<'s> Parser<'s> {
 
         let Some(end_trim) = end_trim else {
             return self.err_with_location(
-                ParseErrorKind::UnclosedTag,
+                ParseErrorKind::UnclosedTag(end),
                 ExpectedItem::empty(),
                 None,
                 self.eof_pos(),
@@ -1404,7 +1404,7 @@ impl<'s> Parser<'s> {
 
         let Some(end_trim) = end_trim else {
             return self.err_with_location(
-                ParseErrorKind::UnclosedTag,
+                ParseErrorKind::UnclosedTag(Keyword::EndCase),
                 ExpectedItem::empty(),
                 None,
                 self.eof_pos(),
@@ -1470,7 +1470,7 @@ impl<'s> Parser<'s> {
 
         // Now parse a bunch of general statements until we reach the end of the block.
         let (block_body, _, end_trim) = self.parse_body_until_block_footer(
-            ExpectedItem::empty(),
+            Keyword::EndWith,
             |kind| matches!(kind, TokenKind::Keyword(token::Keyword::EndWith)),
             |g| {
                 g.skip_fast(TokenKind::Keyword(token::Keyword::EndWith)); // `<endwith>` Skip the end token.
@@ -1514,7 +1514,7 @@ impl<'s> Parser<'s> {
 
         // Now parse a bunch of general statements until we reach the end of the block.
         let (block_body, _, (end_label, end_trim)) = self.parse_body_until_block_footer(
-            ExpectedItem::empty(),
+            Keyword::EndBlock,
             |kind| matches!(kind, TokenKind::Keyword(token::Keyword::EndBlock)),
             |g| {
                 g.skip_fast(TokenKind::Keyword(token::Keyword::EndBlock)); // `<endblock>` Skip the endblock token.
@@ -1547,7 +1547,7 @@ impl<'s> Parser<'s> {
         // The lexer reads the contents of the block as text, so this only
         // finds the end of the block.
         let (block_body, _, _) = self.parse_body_until_block_footer(
-            ExpectedItem::empty(),
+            Keyword::EndRaw,
             |kind| matches!(kind, TokenKind::Keyword(token::Keyword::EndRaw)),
             |g| {
                 g.skip_fast(TokenKind::Keyword(token::Keyword::EndRaw)); // `<endraw>` Skip the endraw token.
@@ -1586,10 +1586,11 @@ impl<'s> Parser<'s> {
 
     /// Parse statements until the footer tag that `peek_fn` accepts, and then
     /// parse the footer with `g`. Returns the body, the kind of the footer's
-    /// first token, and what `g` returns.
+    /// first token, and what `g` returns. If the footer is missing, the error
+    /// names `closing`, the keyword of the tag that closes the block.
     fn parse_body_until_block_footer<U>(
         &mut self,
-        expected: ExpectedItem,
+        closing: Keyword,
         peek_fn: impl Fn(TokenKind) -> bool,
         g: impl FnMut(&mut Self) -> ParseResult<U>,
     ) -> ParseResult<(AstNode<ast::Body>, TokenKind, U)> {
@@ -1625,7 +1626,12 @@ impl<'s> Parser<'s> {
             let contents = self.nodes_with_span(statements, span);
             Ok((self.node_with_joined_span(ast::Body { contents }, span), end.kind, footer))
         } else {
-            self.err_with_location(ParseErrorKind::UnclosedTag, expected, None, self.eof_pos())
+            self.err_with_location(
+                ParseErrorKind::UnclosedTag(closing),
+                ExpectedItem::empty(),
+                None,
+                self.eof_pos(),
+            )
         }
     }
 

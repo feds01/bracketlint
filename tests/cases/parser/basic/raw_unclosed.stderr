@@ -1,4 +1,4 @@
-error: expected a closing tag
+error: expected a closing `{% endraw %}` tag
  --> $DIR/raw_unclosed.html:1:33
   |
 1 | {% raw %}<p>{{ user.name }}</p>

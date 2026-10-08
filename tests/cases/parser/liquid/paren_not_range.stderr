@@ -5,7 +5,7 @@ error: unexpectedly encountered the keyword `or`
   |                          --
   |
   = info: expected a `..`
-error: expected a tag, however received the keyword `end_if`
+error: expected a tag, however received the keyword `endif`
  --> $DIR/paren_not_range.html:1:72
   |
 1 | {% if (product.available or product.preorder) %}<button>Buy</button>{% endif %}
