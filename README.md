@@ -40,6 +40,7 @@ $ just install           # install `bracketlint` from this checkout into ~/.carg
 $ just run check foo/    # run the CLI from source
 $ just test              # run all tests
 $ just update-snapshots  # re-generate the UI test snapshots in tests/cases
+$ just corpus-update     # re-record how the real-world templates in tests/corpus do, which `just test` checks
 $ just ci                # run tests, clippy and the formatting check, like CI does
 ```
 
