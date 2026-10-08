@@ -1,0 +1,12 @@
+// run=pass, stage=check, dialect=liquid
+
+{{ product.gift_card? }}
+{% if article.comments_enabled? and form.posted_successfully? %}<p>Thanks</p>{% endif %}
+{{- product.available?-}}
+{%- if items == empty? -%}{{ empty? }}{%- endif -%}
+{%- assign seen = form.ready?-%}
+{%- liquid
+  if product.gift_card?
+    echo "Gift card"
+  endif
+-%}

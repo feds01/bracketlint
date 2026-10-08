@@ -1,0 +1,10 @@
+info: parsed module '$DIR/question_mark_names_in_jinja.html' as jinja:
+body
+└─inline
+  └─access_expr
+    ├─subject
+    │ └─var_expr
+    │   └─name "product"
+    └─field
+      └─name "gift_card"
+

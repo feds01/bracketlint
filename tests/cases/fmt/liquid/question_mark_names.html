@@ -1,0 +1,5 @@
+// run=pass, stage=fmt, dialect=liquid
+
+{% if article.comments_enabled? and form.posted_successfully? %}
+<p>Thanks</p>
+{% endif %}

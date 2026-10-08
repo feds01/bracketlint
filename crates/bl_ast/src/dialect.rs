@@ -88,6 +88,12 @@ impl Dialect {
         matches!(self, Dialect::Liquid)
     }
 
+    /// Whether a name can end with a `?`, as Shopify's properties do, e.g.
+    /// `product.gift_card?`.
+    pub fn names_can_end_with_question_mark(self) -> bool {
+        matches!(self, Dialect::Liquid)
+    }
+
     /// The markers that control the whitespace around a tag when they are
     /// written next to its delimiters, e.g. the `-` in `{%- if x -%}`. Django
     /// has none.

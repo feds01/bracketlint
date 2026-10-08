@@ -1,0 +1,5 @@
+error: unexpectedly encountered an unknown character `?`
+ --> $DIR/question_mark_names_in_jinja.html:1:21
+  |
+1 | {{ product.gift_card? }}
+  |                     -

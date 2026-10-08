@@ -1,0 +1,88 @@
+info: parsed module '$DIR/question_mark_names.html' as liquid:
+body
+├─inline
+│ └─access_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "product"
+│   └─field
+│     └─name "gift_card?"
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─access_expr
+│     │   │   ├─subject
+│     │   │   │ └─var_expr
+│     │   │   │   └─name "article"
+│     │   │   └─field
+│     │   │     └─name "comments_enabled?"
+│     │   ├─operator `and`
+│     │   └─rhs
+│     │     └─access_expr
+│     │       ├─subject
+│     │       │ └─var_expr
+│     │       │   └─name "form"
+│     │       └─field
+│     │         └─name "posted_successfully?"
+│     └─clause_body
+│       └─body
+│         └─text
+├─inline
+│ └─access_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "product"
+│   └─field
+│     └─name "available?"
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─var_expr
+│     │   │   └─name "items"
+│     │   ├─operator `==`
+│     │   └─rhs
+│     │     └─var_expr
+│     │       └─name "empty?"
+│     └─clause_body
+│       └─body
+│         └─inline
+│           └─var_expr
+│             └─name "empty?"
+├─generic_tag
+│ ├─name "assign"
+│ └─args
+│   └─arg
+│     ├─name "seen"
+│     └─access_expr
+│       ├─subject
+│       │ └─var_expr
+│       │   └─name "form"
+│       └─field
+│         └─name "ready?"
+└─liquid
+  └─body
+    └─if
+      └─clauses
+        └─if_clause
+          ├─condition
+          │ └─access_expr
+          │   ├─subject
+          │   │ └─var_expr
+          │   │   └─name "product"
+          │   └─field
+          │     └─name "gift_card?"
+          └─clause_body
+            └─body
+              └─generic_tag
+                ├─name "echo"
+                └─args
+                  └─arg
+                    └─lit_expr
+                      └─str_lit "Gift card"
+

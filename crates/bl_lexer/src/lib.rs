@@ -636,6 +636,10 @@ impl<'lex> Lexer<'lex> {
 
         self.offset.set(end);
 
+        if self.dialect.names_can_end_with_question_mark() && self.peek() == '?' {
+            self.skip_ascii();
+        }
+
         let name = &self.spanned.source[start..self.offset.get()];
 
         // `liquid` is only a keyword as the name of a tag, so that it is still a
