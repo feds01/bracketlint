@@ -6,12 +6,10 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-    # Only the code that the benchmarks build, i.e. every crate except the CLI
-    # and the formatter.
+    # Only the code that the benchmarks build, i.e. every crate except the CLI.
     paths:
       - "crates/**"
       - "!crates/bl/**"
-      - "!crates/bl_fmt/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - "rust-toolchain.toml"
@@ -52,10 +50,10 @@ jobs:
           tool: cargo-codspeed@5.0.2
 
       - name: Build the benchmarks
-        run: cargo codspeed build -m simulation -m memory -p bl_benchmark
+        run: cargo codspeed build -m simulation -m memory -p bl_benchmark -p bl_benches
 
       - name: Run the benchmarks
         uses: CodSpeedHQ/action@v5
         with:
           mode: simulation,memory
-          run: cargo codspeed run -p bl_benchmark
+          run: cargo codspeed run -p bl_benchmark -p bl_benches
