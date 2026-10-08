@@ -1,0 +1,71 @@
+info: parsed module '$DIR/is_not_and_not_in.html' as django:
+body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─var_expr
+│     │   │   └─name "user"
+│     │   ├─operator `is not`
+│     │   └─rhs
+│     │     └─var_expr
+│     │       └─name "None"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─var_expr
+│     │   │   └─name "user"
+│     │   ├─operator `not in`
+│     │   └─rhs
+│     │     └─var_expr
+│     │       └─name "banned"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─bin_expr
+│     │   │   ├─lhs
+│     │   │   │ └─var_expr
+│     │   │   │   └─name "a"
+│     │   │   ├─operator `not in`
+│     │   │   └─rhs
+│     │   │     └─var_expr
+│     │   │       └─name "b"
+│     │   ├─operator `in`
+│     │   └─rhs
+│     │     └─var_expr
+│     │       └─name "c"
+│     └─clause_body
+│       └─body
+└─if
+  └─clauses
+    └─if_clause
+      ├─condition
+      │ └─bin_expr
+      │   ├─lhs
+      │   │ └─bin_expr
+      │   │   ├─lhs
+      │   │   │ └─var_expr
+      │   │   │   └─name "a"
+      │   │   ├─operator `in`
+      │   │   └─rhs
+      │   │     └─var_expr
+      │   │       └─name "b"
+      │   ├─operator `in`
+      │   └─rhs
+      │     └─var_expr
+      │       └─name "c"
+      └─clause_body
+        └─body
+
