@@ -52,7 +52,7 @@ use bl_workspace::{Workspace, WorkspaceBuilder, settings::Settings};
 use bracketlint::commands;
 use tempfile::TempDir;
 
-use crate::{ANSI_REGEX, REGENERATE_OUTPUT};
+use crate::{ANSI_REGEX, assert_snapshot};
 
 /// The directory that the case runs in, which `$DIR` stands for in the
 /// snapshots. Each case runs in a process of its own, so there is only one.
@@ -132,61 +132,15 @@ impl OutputKind {
     }
 }
 
-/// This function will compare the provided contents to the corresponding saved
-/// output file, which is either a `.stderr` or `.stdout` file (which is
-/// specified by the [OutputKind]). The provided contents are stripped of ANSI
-/// escape codes and all directory paths are replaced with `$DIR`.
-///
-/// If the file does not exist, then it will be created and the contents will be
-/// written to it.
-///
-/// If [`REGENERATE_OUTPUT`] is set to `true`, then the file will be overwritten
-/// with the new stripped contents.
+/// Compare the provided contents to the corresponding `.stderr` or `.stdout`
+/// snapshot of the case (which is specified by the [OutputKind]), once they are
+/// stripped of ANSI escape codes and the directory of the case is replaced with
+/// `$DIR`, see [assert_snapshot].
 fn compare_output(test: &TestingInput, kind: OutputKind, contents: &str) -> std::io::Result<()> {
-    let actual_contents = strip_contents(contents);
-
-    // We want to load the `.{stderr|stdout}` file and verify that the contents of
-    // the file match to the created report. If the `.stderr` file does not
-    // exist then we create it and write the generated report to that file
     let test_dir = test.path.parent().unwrap();
-    let content_path = test_dir.join(format!("{}.{}", test.filename, kind.extension()));
+    let path = test_dir.join(format!("{}.{}", test.filename, kind.extension()));
 
-    // If we specify to re-generate the output, then we will always write the
-    // content of the report into the specified file
-    if *REGENERATE_OUTPUT || !content_path.exists() {
-        // Avoid writing nothing to the `.stderr` case file
-        if !actual_contents.is_empty() {
-            fs::write(&content_path, &actual_contents)?;
-        }
-    }
-
-    // We want to delete the file if the contents are empty, and we are
-    // re-generating
-    if *REGENERATE_OUTPUT && content_path.exists() && actual_contents.is_empty() {
-        fs::remove_file(&content_path)?;
-    }
-
-    // Read the contents of the file, if we couldn't find the file then we assume
-    // that the contents of `.stderr` are empty. We can assume this because the
-    // only reason why the file wouldn't be written to is if it didn't exist
-    // prior to this and that the contents of the diagnostics are empty, so
-    // returning an empty string makes sense here.
-    let expected_contents = fs::read_to_string(content_path.clone())
-        .unwrap_or_else(|err| match err.kind() {
-            io::ErrorKind::NotFound => "".to_string(),
-            err => panic!("couldn't open file `{content_path:?}`: {:?}", err),
-        })
-        .replace("\r\n", "\n");
-
-    pretty_assertions::assert_str_eq!(
-        expected_contents,
-        actual_contents,
-        "\ncase `.{}` does not match for: {:#?}\n",
-        kind.extension(),
-        test
-    );
-
-    Ok(())
+    assert_snapshot(&path, &strip_contents(contents))
 }
 
 fn compare_stream(

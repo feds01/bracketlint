@@ -1,0 +1,9 @@
+parse-error   _includes/layouts/base.njk
+unstable      _includes/layouts/home.njk
+ok            _includes/layouts/post.njk
+parse-error   _includes/postslist.njk
+ok            content/blog.njk
+ok            content/index.njk
+parse-error   content/sitemap.xml.njk
+ok            content/tag-pages.njk
+ok            content/tags.njk

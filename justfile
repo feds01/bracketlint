@@ -37,13 +37,17 @@ run *args:
 test *args:
     cargo test "$@"
 
-# Run only the UI snapshot tests in tests/cases, optionally filtered by name
+# Run only the UI snapshot tests in tests/cases and the corpus in tests/corpus, optionally filtered by name
 test-ui *filter:
     cargo test -p bl_tests -- "$@"
 
-# Re-generate the `.stderr`/`.stdout` snapshots in tests/cases from current output
+# Re-generate the `.stderr`/`.stdout` snapshots in tests/cases, and the baselines in tests/corpus, from current output
 update-snapshots *filter:
     REGENERATE_OUTPUT=true cargo test -p bl_tests -- --skip ensure_regenerate_output_is_disabled "$@"
+
+# Check the real-world templates in tests/corpus, and print its report. `just test` runs this too
+corpus:
+    cargo test -p bl_tests -- corpus --nocapture
 
 # Run clippy, denying warnings
 clippy:

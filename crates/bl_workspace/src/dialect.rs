@@ -2,6 +2,7 @@
 
 use std::path::Path;
 
+use serde::Deserialize;
 use strum::{Display, EnumString, IntoStaticStr, VariantArray};
 
 /// The template language that a [crate::Member] is written in. It is either
@@ -10,9 +11,20 @@ use strum::{Display, EnumString, IntoStaticStr, VariantArray};
 ///
 /// The lowercase name of a dialect, e.g. `liquid`, is what `--dialect` accepts.
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Default, Display, EnumString, IntoStaticStr, VariantArray,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Default,
+    Display,
+    EnumString,
+    IntoStaticStr,
+    VariantArray,
+    Deserialize,
 )]
 #[strum(serialize_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
 pub enum Dialect {
     /// Django templates, used when nothing else identifies the dialect.
     #[default]

@@ -1,0 +1,17 @@
+fmt-error     sphinx/themes/basic/changes/frameset.html
+fmt-error     sphinx/themes/basic/changes/rstsource.html
+parse-error   sphinx/themes/basic/changes/versionchanges.html
+parse-error   sphinx/themes/basic/defindex.html
+parse-error   sphinx/themes/basic/domainindex.html
+parse-error   sphinx/themes/basic/genindex-single.html
+parse-error   sphinx/themes/basic/genindex-split.html
+parse-error   sphinx/themes/basic/genindex.html
+parse-error   sphinx/themes/basic/globaltoc.html
+parse-error   sphinx/themes/basic/layout.html
+parse-error   sphinx/themes/basic/localtoc.html
+ok            sphinx/themes/basic/page.html
+parse-error   sphinx/themes/basic/relations.html
+parse-error   sphinx/themes/basic/search.html
+parse-error   sphinx/themes/basic/searchbox.html
+parse-error   sphinx/themes/basic/searchfield.html
+parse-error   sphinx/themes/basic/sourcelink.html
