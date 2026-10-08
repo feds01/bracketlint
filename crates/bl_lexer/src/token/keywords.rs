@@ -230,6 +230,18 @@ pub enum Keyword {
     TableRow,
     /// `endtablerow` - Ends a `tablerow` loop
     EndTableRow,
+    /// `capture` - Begins a Liquid block that renders its body into a variable
+    /// ```liquid
+    /// {% capture greeting %}Hello {{ name }}{% endcapture %}
+    /// ```
+    Capture,
+    /// `endcapture` - Ends a `capture` block
+    EndCapture,
+    /// `render` - Renders another Liquid template, with variables of its own
+    /// ```liquid
+    /// {% render "product-card", product: product %}
+    /// ```
+    Render,
 }
 impl Keyword {
     pub fn identifier_like(&self) -> bool {
@@ -245,6 +257,8 @@ impl Keyword {
                 | Keyword::Case
                 | Keyword::When
                 | Keyword::TableRow
+                | Keyword::Capture
+                | Keyword::Render
         )
     }
 
@@ -333,6 +347,9 @@ static LIQUID_KEYWORDS: phf::Map<&'static str, Keyword> = phf_map! {
     "endcase" => Keyword::EndCase,
     "tablerow" => Keyword::TableRow,
     "endtablerow" => Keyword::EndTableRow,
+    "capture" => Keyword::Capture,
+    "endcapture" => Keyword::EndCapture,
+    "render" => Keyword::Render,
 };
 
 impl TryFrom<&str> for Keyword {

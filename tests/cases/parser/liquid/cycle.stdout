@@ -13,7 +13,15 @@ body
   └─loop_body
     └─body
       ├─text
-      ├─unprocessable_tag
+      ├─generic_tag
+      │ ├─name "cycle"
+      │ └─args
+      │   ├─arg
+      │   │ └─lit_expr
+      │   │   └─str_lit "odd"
+      │   └─arg
+      │     └─lit_expr
+      │       └─str_lit "even"
       ├─text
       ├─inline
       │ └─access_expr

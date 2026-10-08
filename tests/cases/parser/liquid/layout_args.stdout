@@ -1,0 +1,13 @@
+info: parsed module '$DIR/layout_args.html' as liquid:
+body
+└─generic_tag
+  ├─name "layout"
+  └─args
+    ├─arg
+    │ └─lit_expr
+    │   └─str_lit "default"
+    └─arg
+      ├─name "title"
+      └─lit_expr
+        └─str_lit "Shop"
+

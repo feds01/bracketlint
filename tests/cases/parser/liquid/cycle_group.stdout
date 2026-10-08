@@ -1,0 +1,23 @@
+info: parsed module '$DIR/cycle_group.html' as liquid:
+body
+├─text
+├─generic_tag
+│ ├─name "cycle"
+│ └─args
+│   ├─arg
+│   │ ├─name ""rows""
+│   │ └─lit_expr
+│   │   └─str_lit "odd"
+│   └─arg
+│     └─lit_expr
+│       └─str_lit "even"
+├─text
+├─inline
+│ └─access_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "product"
+│   └─field
+│     └─name "title"
+└─text
+

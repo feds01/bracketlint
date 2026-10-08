@@ -1,0 +1,20 @@
+info: parsed module '$DIR/capture.html' as liquid:
+body
+├─capture
+│ ├─name "greeting"
+│ └─body
+│   ├─text
+│   ├─inline
+│   │ └─access_expr
+│   │   ├─subject
+│   │   │ └─var_expr
+│   │   │   └─name "customer"
+│   │   └─field
+│   │     └─name "first_name"
+│   └─text
+├─text
+├─inline
+│ └─var_expr
+│   └─name "greeting"
+└─text
+

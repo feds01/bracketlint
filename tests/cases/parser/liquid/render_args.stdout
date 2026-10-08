@@ -1,0 +1,38 @@
+info: parsed module '$DIR/render_args.html' as liquid:
+body
+├─render
+│ ├─template
+│ │ └─lit_expr
+│ │   └─str_lit "product-card"
+│ └─args
+│   ├─arg
+│   │ ├─name "product"
+│   │ └─var_expr
+│   │   └─name "product"
+│   └─arg
+│     ├─name "show_price"
+│     └─lit_expr
+│       └─bool_lit true
+├─render
+│ ├─template
+│ │ └─lit_expr
+│ │   └─str_lit "product-card"
+│ ├─with
+│ │ └─var_expr
+│ │   └─name "featured_product"
+│ └─as
+│   └─name "product"
+└─render
+  ├─template
+  │ └─lit_expr
+  │   └─str_lit "product-card"
+  ├─for
+  │ └─access_expr
+  │   ├─subject
+  │   │ └─var_expr
+  │   │   └─name "collection"
+  │   └─field
+  │     └─name "products"
+  └─as
+    └─name "product"
+

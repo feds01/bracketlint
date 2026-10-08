@@ -290,7 +290,11 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             | bl_ast::Tag::Import(_)
             | bl_ast::Tag::Continue(_)
             | bl_ast::Tag::Break(_)
-            | bl_ast::Tag::Raw(_) => {
+            | bl_ast::Tag::Raw(_)
+            | bl_ast::Tag::Render(_)
+            // The body of a Liquid `capture` is rendered into a string, so its
+            // whitespace matters, just like a `raw` block's.
+            | bl_ast::Tag::Capture(_) => {
                 self.space_from_previous(node.span().range.start());
                 self.push_source(node.span());
                 Ok(())

@@ -1,0 +1,13 @@
+info: parsed module '$DIR/capture_forms.html' as liquid:
+body
+├─capture
+│ ├─name ""quoted""
+│ └─body
+│   └─text
+└─capture
+  ├─name "trimmed"
+  └─body
+    └─inline
+      └─var_expr
+        └─name "name"
+
