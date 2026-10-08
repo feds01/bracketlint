@@ -783,6 +783,8 @@ define_tree! {
     /// {% render "card" with featured as product %}
     /// {% render "card" for products as product %}
     /// ```
+    ///
+    /// Reference: https://shopify.github.io/liquid/tags/template/#render
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct Render {
@@ -805,6 +807,8 @@ define_tree! {
     /// ```liquid
     /// {% capture greeting %}Hello {{ name }}{% endcapture %}
     /// ```
+    ///
+    /// Reference: https://shopify.github.io/liquid/tags/variable/#capture
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct Capture {

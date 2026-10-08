@@ -1647,8 +1647,7 @@ impl<'s> Parser<'s> {
         let start = self.current_pos();
 
         while self.peek().is_some() {
-            // Liquid separates arguments with commas, e.g. `{% cycle "a", "b" %}`.
-            if self.options.dialect.is_liquid() {
+            if self.options.dialect.requires_comma_separated_args() {
                 self.parse_token_fast(TokenKind::Comma);
             }
 
@@ -1772,10 +1771,11 @@ impl<'s> Parser<'s> {
             g.parse_token(TokenKind::Keyword(token::Keyword::Include))?;
             let template = g.parse_expr()?;
 
-            // Liquid also passes named arguments without `with`, e.g.
-            // `{% include "card", product: product %}`.
+            // With comma separated arguments, the comma after the template
+            // starts them rather than `with`, e.g. `{% include "card", product: product
+            // %}`.
             let context = if g.parse_token_fast(TokenKind::Keyword(token::Keyword::With)).is_some()
-                || g.options.dialect.is_liquid()
+                || g.options.dialect.requires_comma_separated_args()
             {
                 g.parse_args()?
             } else {
@@ -1913,10 +1913,10 @@ impl<'s> Parser<'s> {
                     span,
                 )))
             }
-            // Liquid writes named arguments as `name: value`, and the group of a
-            // `cycle` as a string, e.g. `{% cycle "group": "a", "b" %}`.
+            // The name can also be a string, e.g. the group of a Liquid `cycle`
+            // in `{% cycle "group": "a", "b" %}`.
             (Some(Token { kind, span }), Some(Token { kind: TokenKind::Colon, .. }))
-                if self.options.dialect.is_liquid()
+                if self.options.dialect.named_args_use_colon()
                     && (kind.is_ident_like() || kind == TokenKind::Str) =>
             {
                 let name = self.parse_name_or_string()?;

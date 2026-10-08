@@ -79,6 +79,18 @@ impl Dialect {
         matches!(self, Dialect::Liquid)
     }
 
+    /// Whether a tag's arguments are separated by commas, e.g.
+    /// `{% cycle "a", "b" %}` or `{% include "card", product: product %}`.
+    pub fn requires_comma_separated_args(self) -> bool {
+        matches!(self, Dialect::Liquid)
+    }
+
+    /// Whether a tag's named arguments are written `name: value`, rather than
+    /// `name=value`.
+    pub fn named_args_use_colon(self) -> bool {
+        matches!(self, Dialect::Liquid)
+    }
+
     /// How the dialect spells `elif`, which is `elsif` in Liquid.
     pub fn elif_tag(self) -> &'static str {
         if self.is_liquid() { "elsif" } else { "elif" }
