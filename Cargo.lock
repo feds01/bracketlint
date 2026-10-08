@@ -624,8 +624,6 @@ dependencies = [
  "index_vec",
  "itertools 0.15.0",
  "line-span",
- "num-derive",
- "num-traits",
  "once_cell",
  "parking_lot",
  "phf",
@@ -1511,17 +1509,6 @@ dependencies = [
  "cfg-if",
  "cfg_aliases",
  "libc",
-]
-
-[[package]]
-name = "num-derive"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e4e98dc3b890f6c23a0f9d3d491a2823d0dea0fa656302a13dd225fa924112a8"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 3.0.6",
 ]
 
 [[package]]
