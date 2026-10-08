@@ -7,11 +7,10 @@ pub mod token;
 
 use std::cell::Cell;
 
-use bl_ast::{ByteRange, SourceId, Span, SpannedSource};
+use bl_ast::{ByteRange, Dialect, Keyword, SourceId, Span, SpannedSource};
 use bl_reporting::DiagnosticsMut;
-use bl_workspace::Dialect;
 use diagnostics::{LexerDiagnostics, LexerError, LexerErrorKind};
-use token::{Delimiter, Keyword, NumberFlags, Token, TokenKind};
+use token::{Delimiter, NumberFlags, Token, TokenKind};
 
 /// Representing the end of stream, or the initial character that is set as
 /// 'prev' in a [Lexer] since there is no character before the start.
@@ -610,7 +609,7 @@ impl<'lex> Lexer<'lex> {
             return TokenKind::Keyword(Keyword::Liquid);
         }
 
-        if let Some(keyword) = Keyword::from_ident(name, self.dialect) {
+        if let Some(keyword) = self.dialect.keyword(name) {
             TokenKind::Keyword(keyword)
         } else {
             TokenKind::Ident

@@ -2,7 +2,7 @@
 
 use std::{collections::BTreeMap, fmt::Write};
 
-use bl_workspace::Dialect;
+use bl_ast::Dialect;
 use tabled::{Table, Tabled, settings::Style};
 
 use super::check::{CheckedSource, Outcome, Status};

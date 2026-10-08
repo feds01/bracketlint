@@ -3,16 +3,14 @@
 //! and information about a particular lint run. The [WorkspaceBuilder] is
 //! responsible for creating a [Workspace] instance.
 
-mod dialect;
 mod member;
 pub mod resolver;
 pub mod settings;
 
 use std::{collections::HashMap, path::PathBuf};
 
-use bl_ast::{HasSource, LineRanges, SourceId};
+use bl_ast::{Dialect, HasSource, LineRanges, SourceId};
 use bl_utils::stream::CompilerOutputStream;
-pub use dialect::Dialect;
 use index_vec::IndexVec;
 pub use member::Member;
 use member::MemberSourceMetadata;

@@ -624,13 +624,16 @@ dependencies = [
  "index_vec",
  "itertools 0.15.0",
  "line-span",
+ "num-derive",
  "num-traits",
  "once_cell",
  "parking_lot",
+ "phf",
  "replace_with",
  "schemars",
  "serde",
  "serde_json",
+ "strum",
  "thin-vec",
 ]
 
@@ -673,7 +676,6 @@ dependencies = [
  "biome_languages",
  "biome_rowan",
  "bl_ast",
- "bl_lexer",
  "bl_macros",
  "bl_reporting",
  "bl_workspace",
@@ -688,12 +690,7 @@ version = "0.1.0"
 dependencies = [
  "bl_ast",
  "bl_reporting",
- "bl_workspace",
  "derive_more",
- "num-derive",
- "num-traits",
- "phf",
- "strum_macros",
  "thin-vec",
 ]
 
@@ -752,7 +749,7 @@ dependencies = [
 name = "bl_testing_internal"
 version = "0.1.0"
 dependencies = [
- "bl_workspace",
+ "bl_ast",
  "bracketlint",
  "itertools 0.15.0",
  "quote",
@@ -776,6 +773,7 @@ dependencies = [
 name = "bl_tests"
 version = "0.1.0"
 dependencies = [
+ "bl_ast",
  "bl_fmt",
  "bl_lints",
  "bl_parse",
@@ -832,7 +830,6 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "strum",
 ]
 
 [[package]]

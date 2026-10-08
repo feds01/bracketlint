@@ -7,10 +7,9 @@ use std::{
 };
 
 use anyhow::Result;
+use bl_ast::Dialect;
 use bl_lints::settings::FixMode;
 use globset::{Glob, GlobSet, GlobSetBuilder};
-
-use crate::Dialect;
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
 pub enum FilePattern {

@@ -1,13 +1,15 @@
 //! Contains all of the parsing logic for the `bl` project.
 
-use bl_ast::{AstNode, AstVisitor, Document, LocalSpanMap, SourceId, Span, SpanMap, TempSourceMap};
+use bl_ast::{
+    AstNode, AstVisitor, Dialect, Document, LocalSpanMap, SourceId, Span, SpanMap, TempSourceMap,
+};
 use bl_ast_utils::{AstTreePrinter, TreeWriter, TreeWriterConfig};
 use bl_lexer::{Lexer, LexerMetadata, token::Token};
 use bl_reporting::{
     DiagnosticsMut, Report, Reports,
     inline::{InlineSnippet, note_on_span},
 };
-use bl_workspace::{Dialect, Member};
+use bl_workspace::Member;
 use diagnostics::ParserDiagnostics;
 use parser::Parser;
 

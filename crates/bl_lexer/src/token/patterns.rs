@@ -14,12 +14,12 @@ macro_rules! tok {
 }
 
 /// Expands to a pattern that matches a [Token](crate::token::Token) of the
-/// given [Keyword](crate::token::Keyword), e.g. `kw!(Raw)` matches `raw`.
+/// given [Keyword](bl_ast::Keyword), e.g. `kw!(Raw)` matches `raw`.
 #[macro_export]
 macro_rules! kw {
     ($keyword:ident) => {
         $crate::token::Token {
-            kind: $crate::token::TokenKind::Keyword($crate::token::Keyword::$keyword),
+            kind: $crate::token::TokenKind::Keyword(::bl_ast::Keyword::$keyword),
             ..
         }
     };
@@ -55,8 +55,7 @@ macro_rules! tree {
 mod tests {
     use std::path::PathBuf;
 
-    use bl_ast::{LineRanges, SourceId, SpannedSource};
-    use bl_workspace::Dialect;
+    use bl_ast::{Dialect, LineRanges, SourceId, SpannedSource};
 
     use crate::{Lexer, token::Token};
 

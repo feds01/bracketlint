@@ -17,6 +17,7 @@ regex = { workspace = true }
 lazy_static = "1.5.1"
 log = { workspace = true }
 
+bl_ast = { workspace = true }
 bl_fmt = { workspace = true }
 bl_lints = { workspace = true }
 bl_parse = { workspace = true }

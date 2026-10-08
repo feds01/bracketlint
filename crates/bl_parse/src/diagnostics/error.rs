@@ -1,7 +1,7 @@
 //! Any parser errors that the parser can emit and report.
 
-use bl_ast::Span;
-use bl_lexer::token::{Keyword, TokenKind};
+use bl_ast::{Keyword, Span};
+use bl_lexer::token::TokenKind;
 use bl_reporting::{ReportBuilder, Reports, help};
 use derive_more::Constructor;
 

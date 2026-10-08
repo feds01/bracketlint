@@ -8,12 +8,12 @@
 use std::cell::Cell;
 
 use bl_ast::{
-    self as ast, AstNode, AstNodes, ByteRange, Identifier, LocalSpanMap, SourceId, Span,
+    self as ast, AstNode, AstNodes, ByteRange, Identifier, Keyword, LocalSpanMap, SourceId, Span,
     SpannedSource, VarExpr,
 };
 use bl_lexer::{
     kw, tok,
-    token::{self, Delimiter, Keyword, NumberFlags, Token, TokenKind, cursor::TokenCursor},
+    token::{Delimiter, NumberFlags, Token, TokenKind, cursor::TokenCursor},
 };
 use bl_reporting::{
     HasDiagnosticsMut,
@@ -60,18 +60,18 @@ pub(crate) enum TagContext {
     Capture,
 }
 impl TagContext {
-    fn applies_to(&self, kwd: token::Keyword) -> bool {
+    fn applies_to(&self, kwd: Keyword) -> bool {
         match self {
-            TagContext::If => matches!(kwd, token::Keyword::Else | token::Keyword::Elif),
-            TagContext::Block => matches!(kwd, token::Keyword::EndBlock),
-            TagContext::With => matches!(kwd, token::Keyword::EndWith),
-            TagContext::Comment => matches!(kwd, token::Keyword::EndComment),
-            TagContext::Raw => matches!(kwd, token::Keyword::EndRaw),
+            TagContext::If => matches!(kwd, Keyword::Else | Keyword::Elif),
+            TagContext::Block => matches!(kwd, Keyword::EndBlock),
+            TagContext::With => matches!(kwd, Keyword::EndWith),
+            TagContext::Comment => matches!(kwd, Keyword::EndComment),
+            TagContext::Raw => matches!(kwd, Keyword::EndRaw),
             TagContext::For => {
-                matches!(kwd, token::Keyword::EndFor | token::Keyword::EndTableRow)
+                matches!(kwd, Keyword::EndFor | Keyword::EndTableRow)
             }
-            TagContext::Case => matches!(kwd, token::Keyword::When | token::Keyword::Else),
-            TagContext::Capture => matches!(kwd, token::Keyword::EndCapture),
+            TagContext::Case => matches!(kwd, Keyword::When | Keyword::Else),
+            TagContext::Capture => matches!(kwd, Keyword::EndCapture),
         }
     }
 }
@@ -612,41 +612,35 @@ impl<'s> Parser<'s> {
             TokenKind::Keyword(keyword) => match keyword {
                 // Key control flow components, once that imply a more complex structure
                 // of subsequent tags.
-                token::Keyword::For => {
+                Keyword::For => {
                     self.with_tag_context(TagContext::For, |g| g.parse_for_loop(ast::LoopKind::For))
                 }
-                token::Keyword::TableRow => self.with_tag_context(TagContext::For, |g| {
+                Keyword::TableRow => self.with_tag_context(TagContext::For, |g| {
                     g.parse_for_loop(ast::LoopKind::TableRow)
                 }),
 
-                token::Keyword::If | token::Keyword::Unless => {
+                Keyword::If | Keyword::Unless => {
                     self.with_tag_context(TagContext::If, |g| g.parse_if_block())
                 }
-                token::Keyword::Case => {
-                    self.with_tag_context(TagContext::Case, |g| g.parse_case_block())
-                }
-                token::Keyword::Capture => {
+                Keyword::Case => self.with_tag_context(TagContext::Case, |g| g.parse_case_block()),
+                Keyword::Capture => {
                     self.with_tag_context(TagContext::Capture, |g| g.parse_capture_block())
                 }
-                token::Keyword::Render => self.parse_render_statement(),
-                token::Keyword::Liquid => self.parse_liquid_tag(),
+                Keyword::Render => self.parse_render_statement(),
+                Keyword::Liquid => self.parse_liquid_tag(),
 
                 // Control flow tags, that are effectively standalone.
-                token::Keyword::Break => self.parse_break_statement(),
-                token::Keyword::Continue => self.parse_continue_statement(),
+                Keyword::Break => self.parse_break_statement(),
+                Keyword::Continue => self.parse_continue_statement(),
 
                 // Block tags, which have a structure that they must be terminated with an
                 // end tag, e.self. `{% block %} ... {% endblock %}`.
-                token::Keyword::With => {
-                    self.with_tag_context(TagContext::With, |g| g.parse_with_block())
-                }
-                token::Keyword::Block => {
+                Keyword::With => self.with_tag_context(TagContext::With, |g| g.parse_with_block()),
+                Keyword::Block => {
                     self.with_tag_context(TagContext::Block, |g| g.parse_block_statement())
                 }
-                token::Keyword::Raw => {
-                    self.with_tag_context(TagContext::Raw, |g| g.parse_raw_block())
-                }
-                token::Keyword::Comment => {
+                Keyword::Raw => self.with_tag_context(TagContext::Raw, |g| g.parse_raw_block()),
+                Keyword::Comment => {
                     self.with_tag_context(TagContext::Comment, |g| g.parse_comment_block())
                 }
 
@@ -657,10 +651,10 @@ impl<'s> Parser<'s> {
                 }
 
                 // Effectively, special functions that we keep track of.
-                token::Keyword::Extends => self.parse_extends_statement(),
-                token::Keyword::Include => self.parse_include_statement(),
-                token::Keyword::Load => self.parse_load_statement(),
-                token::Keyword::Import => self.parse_import_statement(),
+                Keyword::Extends => self.parse_extends_statement(),
+                Keyword::Include => self.parse_include_statement(),
+                Keyword::Load => self.parse_load_statement(),
+                Keyword::Import => self.parse_import_statement(),
                 _ => self.err_with_location(
                     ParseErrorKind::Tag,
                     ExpectedItem::Ident,
@@ -776,7 +770,7 @@ impl<'s> Parser<'s> {
                 self.skip_fast(token.kind); // `<lit>` Skip the literal token.
                 self.node_with_span(ast::Expr::Lit(ast::LitExpr { lit }), token.span)
             }
-            TokenKind::Tree(Delimiter::Paren, _) if self.options.dialect.is_liquid() => {
+            TokenKind::Tree(Delimiter::Paren, _) if self.options.dialect.has_ranges() => {
                 return self.parse_range(token);
             }
 
@@ -816,7 +810,7 @@ impl<'s> Parser<'s> {
     /// The Liquid literal that `token` is, if any, e.g. `nil`. In the other
     /// dialects, these are names like any other.
     fn liquid_literal(&self, token: Token) -> Option<ast::Lit> {
-        if !self.options.dialect.is_liquid() {
+        if !self.options.dialect.has_nil_and_empty_literals() {
             return None;
         }
 
@@ -909,7 +903,7 @@ impl<'s> Parser<'s> {
     fn parse_unary_expr(&mut self, token: Token) -> ParseResult<AstNode<ast::Expr>> {
         let op = self.node_with_span(
             match token.kind {
-                TokenKind::Keyword(token::Keyword::Not) => ast::UnaryOp::Not,
+                TokenKind::Keyword(Keyword::Not) => ast::UnaryOp::Not,
                 TokenKind::Minus => ast::UnaryOp::Neg,
                 _ => unreachable!(),
             },
@@ -1010,7 +1004,7 @@ impl<'s> Parser<'s> {
         }
 
         match &(token.unwrap()).kind {
-            TokenKind::Keyword(token::Keyword::Contains) => (Some(ast::BinOp::Contains), 1),
+            TokenKind::Keyword(Keyword::Contains) => (Some(ast::BinOp::Contains), 1),
             TokenKind::EqEq => (Some(ast::BinOp::Eq), 1),
             TokenKind::NotEq => (Some(ast::BinOp::NotEq), 1),
             TokenKind::Lt => (Some(ast::BinOp::Lt), 1),
@@ -1018,14 +1012,14 @@ impl<'s> Parser<'s> {
             TokenKind::Gt => (Some(ast::BinOp::Gt), 1),
             TokenKind::GtEq => (Some(ast::BinOp::GtEq), 1),
 
-            TokenKind::Keyword(token::Keyword::And) => (Some(ast::BinOp::And), 1),
-            TokenKind::Keyword(token::Keyword::Or) => (Some(ast::BinOp::Or), 1),
-            TokenKind::Keyword(token::Keyword::In) => (Some(ast::BinOp::In), 1),
-            TokenKind::Keyword(token::Keyword::Is) => match self.peek_second() {
+            TokenKind::Keyword(Keyword::And) => (Some(ast::BinOp::And), 1),
+            TokenKind::Keyword(Keyword::Or) => (Some(ast::BinOp::Or), 1),
+            TokenKind::Keyword(Keyword::In) => (Some(ast::BinOp::In), 1),
+            TokenKind::Keyword(Keyword::Is) => match self.peek_second() {
                 Some(kw!(Not)) => (Some(ast::BinOp::NotEq), 2),
                 _ => (Some(ast::BinOp::Is), 1),
             },
-            TokenKind::Keyword(token::Keyword::Not) => match self.peek_second() {
+            TokenKind::Keyword(Keyword::Not) => match self.peek_second() {
                 Some(kw!(In)) => (Some(ast::BinOp::NotEq), 2),
                 _ => (None, 0),
             },
@@ -1037,12 +1031,12 @@ impl<'s> Parser<'s> {
         let token = self.current_token();
 
         match token.kind {
-            TokenKind::Keyword(token::Keyword::False) => {
-                self.skip_fast(TokenKind::Keyword(token::Keyword::False)); // `<false>` Skip the false token.
+            TokenKind::Keyword(Keyword::False) => {
+                self.skip_fast(TokenKind::Keyword(Keyword::False)); // `<false>` Skip the false token.
                 Ok(ast::Lit::Bool(ast::BoolLit { value: false }))
             }
-            TokenKind::Keyword(token::Keyword::True) => {
-                self.skip_fast(TokenKind::Keyword(token::Keyword::True)); // `<true>` Skip the true token.
+            TokenKind::Keyword(Keyword::True) => {
+                self.skip_fast(TokenKind::Keyword(Keyword::True)); // `<true>` Skip the true token.
                 Ok(ast::Lit::Bool(ast::BoolLit { value: true }))
             }
             TokenKind::Str => {
@@ -1078,7 +1072,7 @@ impl<'s> Parser<'s> {
         // after `{% else %}` in the other dialects.
         let dialect = self.options.dialect;
         let empty = match kind {
-            ast::LoopKind::For => Keyword::from_ident(dialect.empty_loop_tag(), dialect),
+            ast::LoopKind::For => dialect.keyword(dialect.empty_loop_tag()),
             ast::LoopKind::TableRow => None,
         };
 
@@ -1088,12 +1082,11 @@ impl<'s> Parser<'s> {
                 g.parse_token(TokenKind::Keyword(opening))?;
                 let target = g.parse_for_target()?;
 
-                g.parse_token(TokenKind::Keyword(token::Keyword::In))?;
+                g.parse_token(TokenKind::Keyword(Keyword::In))?;
                 let iterator = g.parse_expr()?;
                 let (reverse_modifier, params) = g.parse_loop_modifiers()?;
 
-                let guard = if g.parse_token_fast(TokenKind::Keyword(token::Keyword::If)).is_some()
-                {
+                let guard = if g.parse_token_fast(TokenKind::Keyword(Keyword::If)).is_some() {
                     Some(g.parse_expr()?)
                 } else {
                     None
@@ -1155,8 +1148,8 @@ impl<'s> Parser<'s> {
         let start = self.current_pos();
 
         loop {
-            // Liquid can also separate the parameters with commas.
-            if self.options.dialect.is_liquid() && !params.is_empty() {
+            // The parameters can also be separated by commas.
+            if self.options.dialect.has_loop_params() && !params.is_empty() {
                 self.parse_token_fast(TokenKind::Comma);
             }
 
@@ -1170,7 +1163,7 @@ impl<'s> Parser<'s> {
                     );
                 }
                 (Some(Token { kind, span }), Some(tok!(Colon)))
-                    if self.options.dialect.is_liquid() && kind.is_ident_like() =>
+                    if self.options.dialect.has_loop_params() && kind.is_ident_like() =>
                 {
                     let name = self.parse_name()?;
                     self.skip_fast(TokenKind::Colon); // `:` Skip the colon token.
@@ -1461,14 +1454,14 @@ impl<'s> Parser<'s> {
 
     fn parse_break_statement(&mut self) -> ParseResult<AstNode<ast::Statement>> {
         self.in_tree(Delimiter::Percent, None, |g| {
-            g.parse_token(TokenKind::Keyword(token::Keyword::Break))?;
+            g.parse_token(TokenKind::Keyword(Keyword::Break))?;
             Ok(g.node_with_span(ast::Statement::Tag(ast::Tag::Break(ast::Break {})), g.range()))
         })
     }
 
     fn parse_continue_statement(&mut self) -> ParseResult<AstNode<ast::Statement>> {
         self.in_tree(Delimiter::Percent, None, |g| {
-            g.parse_token(TokenKind::Keyword(token::Keyword::Continue))?;
+            g.parse_token(TokenKind::Keyword(Keyword::Continue))?;
             Ok(g.node_with_span(
                 ast::Statement::Tag(ast::Tag::Continue(ast::Continue {})),
                 g.range(),
@@ -1481,16 +1474,16 @@ impl<'s> Parser<'s> {
 
         // Parse the header first, we should get `block <name>`.
         let (assignments, trim) = self.in_tag(Delimiter::Percent, |g| {
-            g.parse_token(TokenKind::Keyword(token::Keyword::With))?;
+            g.parse_token(TokenKind::Keyword(Keyword::With))?;
             g.parse_assignments()
         })?;
 
         // Now parse a bunch of general statements until we reach the end of the block.
         let (block_body, _, end_trim) = self.parse_body_until_block_footer(
             Keyword::EndWith,
-            |kind| matches!(kind, TokenKind::Keyword(token::Keyword::EndWith)),
+            |kind| matches!(kind, TokenKind::Keyword(Keyword::EndWith)),
             |g| {
-                g.skip_fast(TokenKind::Keyword(token::Keyword::EndWith)); // `<endwith>` Skip the end token.
+                g.skip_fast(TokenKind::Keyword(Keyword::EndWith)); // `<endwith>` Skip the end token.
                 let _ = g.parse_token_fast(TokenKind::Ident);
 
                 Ok(g.trim())
@@ -1513,7 +1506,7 @@ impl<'s> Parser<'s> {
 
         // Parse the header first, we should get `block <name>`.
         let (label, trim) = self.in_tag(Delimiter::Percent, |g| {
-            g.parse_token(TokenKind::Keyword(token::Keyword::Block))?;
+            g.parse_token(TokenKind::Keyword(Keyword::Block))?;
 
             // If the next token is a string literal, we still accept it but
             // we emit a warning since it technically not a legal block name.
@@ -1531,9 +1524,9 @@ impl<'s> Parser<'s> {
         // Now parse a bunch of general statements until we reach the end of the block.
         let (block_body, _, (end_label, end_trim)) = self.parse_body_until_block_footer(
             Keyword::EndBlock,
-            |kind| matches!(kind, TokenKind::Keyword(token::Keyword::EndBlock)),
+            |kind| matches!(kind, TokenKind::Keyword(Keyword::EndBlock)),
             |g| {
-                g.skip_fast(TokenKind::Keyword(token::Keyword::EndBlock)); // `<endblock>` Skip the endblock token.
+                g.skip_fast(TokenKind::Keyword(Keyword::EndBlock)); // `<endblock>` Skip the endblock token.
 
                 // @@Todo: check if the name matches the label, if the labels mismatch then
                 // we should generate an error.
@@ -1557,16 +1550,16 @@ impl<'s> Parser<'s> {
         let start = self.current_pos();
 
         self.in_tree(Delimiter::Percent, None, |g| {
-            g.parse_token(TokenKind::Keyword(token::Keyword::Raw))
+            g.parse_token(TokenKind::Keyword(Keyword::Raw))
         })?;
 
         // The lexer reads the contents of the block as text, so this only
         // finds the end of the block.
         let (block_body, _, _) = self.parse_body_until_block_footer(
             Keyword::EndRaw,
-            |kind| matches!(kind, TokenKind::Keyword(token::Keyword::EndRaw)),
+            |kind| matches!(kind, TokenKind::Keyword(Keyword::EndRaw)),
             |g| {
-                g.skip_fast(TokenKind::Keyword(token::Keyword::EndRaw)); // `<endraw>` Skip the endraw token.
+                g.skip_fast(TokenKind::Keyword(Keyword::EndRaw)); // `<endraw>` Skip the endraw token.
                 Ok(())
             },
         )?;
@@ -1587,7 +1580,7 @@ impl<'s> Parser<'s> {
                 let maybe_token = self.peek_raw(1).map(|tok| tok.kind);
                 if let Some(TokenKind::Keyword(Keyword::EndComment)) = maybe_token {
                     self.in_tree(Delimiter::Percent, None, |g| {
-                        g.parse_token(TokenKind::Keyword(token::Keyword::EndComment))?;
+                        g.parse_token(TokenKind::Keyword(Keyword::EndComment))?;
                         Ok(())
                     })?;
                     break;
@@ -1775,7 +1768,7 @@ impl<'s> Parser<'s> {
     /// Based on: https://www.w3schools.com/django/django_tags_extends.php
     fn parse_extends_statement(&mut self) -> ParseResult<AstNode<ast::Statement>> {
         self.in_tree(Delimiter::Percent, None, |g| {
-            g.parse_token(TokenKind::Keyword(token::Keyword::Extends))?;
+            g.parse_token(TokenKind::Keyword(Keyword::Extends))?;
             let template = g.parse_expr()?;
 
             Ok(g.node_with_span(
@@ -1795,13 +1788,13 @@ impl<'s> Parser<'s> {
     fn parse_include_statement(&mut self) -> ParseResult<AstNode<ast::Statement>> {
         // Parse the header first, we should get `block <name>`.
         self.in_tree(Delimiter::Percent, None, |g| {
-            g.parse_token(TokenKind::Keyword(token::Keyword::Include))?;
+            g.parse_token(TokenKind::Keyword(Keyword::Include))?;
             let template = g.parse_expr()?;
 
             // With comma separated arguments, the comma after the template
             // starts them rather than `with`, e.g. `{% include "card", product: product
             // %}`.
-            let context = if g.parse_token_fast(TokenKind::Keyword(token::Keyword::With)).is_some()
+            let context = if g.parse_token_fast(TokenKind::Keyword(Keyword::With)).is_some()
                 || g.options.dialect.requires_comma_separated_args()
             {
                 g.parse_args()?
@@ -1819,7 +1812,7 @@ impl<'s> Parser<'s> {
     fn parse_load_statement(&mut self) -> ParseResult<AstNode<ast::Statement>> {
         self.in_tree(Delimiter::Percent, None, |g| {
             let name = g.parse_name()?;
-            // g.parse_token(TokenKind::Keyword(token::Keyword::Load))?;
+            // g.parse_token(TokenKind::Keyword(Keyword::Load))?;
 
             // @@Cleanup: technically not fully correct since we should only support
             // identifiers, but we can validate this on `ast_expand`.
@@ -1841,10 +1834,10 @@ impl<'s> Parser<'s> {
     /// Reference: https://jinja.palletsprojects.com/en/stable/templates/#import
     fn parse_import_statement(&mut self) -> ParseResult<AstNode<ast::Statement>> {
         self.in_tree(Delimiter::Percent, None, |g| {
-            g.parse_token(TokenKind::Keyword(token::Keyword::Import))?;
+            g.parse_token(TokenKind::Keyword(Keyword::Import))?;
             let template = g.parse_string()?;
 
-            let names = if g.parse_token_fast(TokenKind::Keyword(token::Keyword::As)).is_some() {
+            let names = if g.parse_token_fast(TokenKind::Keyword(Keyword::As)).is_some() {
                 g.parse_names()?
             } else {
                 // This is effectively a dummy range, since we don't have an alias.

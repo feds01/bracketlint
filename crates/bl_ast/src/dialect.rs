@@ -5,9 +5,10 @@ use std::path::Path;
 use serde::Deserialize;
 use strum::{Display, EnumString, IntoStaticStr, VariantArray};
 
-/// The template language that a [crate::Member] is written in. It is either
-/// given with `--dialect`, or picked from the file extension, see
-/// [Dialect::from_path].
+use crate::keywords::{KEYWORDS, Keyword, LIQUID_KEYWORDS};
+
+/// The template language that a file is written in. It is either given with
+/// `--dialect`, or picked from the file extension, see [Dialect::from_path].
 ///
 /// The lowercase name of a dialect, e.g. `liquid`, is what `--dialect` accepts.
 #[derive(
@@ -115,6 +116,24 @@ impl Dialect {
         matches!(self, Dialect::Liquid)
     }
 
+    /// Whether a range of integers can be written `(1..n)`.
+    pub fn has_ranges(self) -> bool {
+        matches!(self, Dialect::Liquid)
+    }
+
+    /// Whether `nil`, `null`, `blank` and `empty` are literals, along with
+    /// `true` and `false`, e.g. `{% if items == empty %}`. The other dialects
+    /// read them as names like any other.
+    pub fn has_nil_and_empty_literals(self) -> bool {
+        matches!(self, Dialect::Liquid)
+    }
+
+    /// Whether a loop takes parameters after its iterator, which can be
+    /// separated by commas, e.g. `{% for item in items limit: 2, offset: 1 %}`.
+    pub fn has_loop_params(self) -> bool {
+        matches!(self, Dialect::Liquid)
+    }
+
     /// How the dialect spells `elif`, which is `elsif` in Liquid.
     pub fn elif_tag(self) -> &'static str {
         if self.is_liquid() { "elsif" } else { "elif" }
@@ -124,6 +143,20 @@ impl Dialect {
     /// loop over, which is `empty` in Django and `else` in the other dialects.
     pub fn empty_loop_tag(self) -> &'static str {
         if self.is_django() { "empty" } else { "else" }
+    }
+
+    /// The keyword that the identifier `name` is in the dialect, if any.
+    /// Liquid has keywords of its own, and spells `elif` as `elsif`.
+    pub fn keyword(self, name: &str) -> Option<Keyword> {
+        if name == self.elif_tag() {
+            return Some(Keyword::Elif);
+        }
+
+        match self {
+            Dialect::Liquid if name == "elif" => None,
+            Dialect::Liquid => LIQUID_KEYWORDS.get(name).or_else(|| KEYWORDS.get(name)).copied(),
+            _ => KEYWORDS.get(name).copied(),
+        }
     }
 
     /// Check if its currently Django dialect.
@@ -161,5 +194,20 @@ mod test_super {
 
         assert_eq!(Dialect::Liquid.name(), "liquid");
         assert!("nunjucks".parse::<Dialect>().is_err());
+    }
+
+    #[test]
+    fn test_keyword() {
+        assert_eq!(Dialect::Django.keyword("for"), Some(Keyword::For));
+        assert_eq!(Dialect::Liquid.keyword("for"), Some(Keyword::For));
+        assert_eq!(Dialect::Twig.keyword("user"), None);
+
+        assert_eq!(Dialect::Jinja.keyword("elif"), Some(Keyword::Elif));
+        assert_eq!(Dialect::Jinja.keyword("elsif"), None);
+        assert_eq!(Dialect::Liquid.keyword("elsif"), Some(Keyword::Elif));
+        assert_eq!(Dialect::Liquid.keyword("elif"), None);
+
+        assert_eq!(Dialect::Liquid.keyword("unless"), Some(Keyword::Unless));
+        assert_eq!(Dialect::Django.keyword("unless"), None);
     }
 }
