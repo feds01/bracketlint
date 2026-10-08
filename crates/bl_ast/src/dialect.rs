@@ -145,6 +145,20 @@ impl Dialect {
         matches!(self, Dialect::Liquid)
     }
 
+    /// Whether `{{ }}` takes binary operators, as a tag's condition does, e.g.
+    /// `{{ a == b }}`. Jinja's [`Parser.subparse`] and Twig's
+    /// [`Parser::subparse`] parse it as any expression. Django's
+    /// [`FilterExpression`] and Liquid's [`Variable#strict_parse`] read a
+    /// single value with its filters.
+    ///
+    /// [`Parser.subparse`]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L1019-L1022
+    /// [`Parser::subparse`]: https://github.com/twigphp/Twig/blob/v3.30.0/src/Parser.php#L187-L190
+    /// [`FilterExpression`]: https://github.com/django/django/blob/6.1.2/django/template/base.py#L739-L752
+    /// [`Variable#strict_parse`]: https://github.com/Shopify/liquid/blob/v5.13.0/lib/liquid/variable.rb#L66-L79
+    pub fn variable_supports_operators(self) -> bool {
+        matches!(self, Dialect::Jinja | Dialect::Twig)
+    }
+
     /// Whether a tag's arguments are separated by commas, e.g.
     /// `{% cycle "a", "b" %}` or `{% include "card", product: product %}`.
     ///

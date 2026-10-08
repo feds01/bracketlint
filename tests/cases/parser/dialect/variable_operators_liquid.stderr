@@ -1,0 +1,15 @@
+error: unexpectedly encountered the keyword `is`
+ --> $DIR/variable_operators_liquid.html:1:6
+  |
+1 | {{ x is not defined }}
+  |      --
+error: unexpectedly encountered a `==`
+ --> $DIR/variable_operators_liquid.html:2:6
+  |
+2 | {{ a == b }}
+  |      --
+error: unexpectedly encountered the keyword `and`
+ --> $DIR/variable_operators_liquid.html:3:6
+  |
+3 | {{ a and b }}
+  |      ---

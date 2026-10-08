@@ -1,0 +1,4 @@
+<p>{{ x is not defined }}</p>
+<p>{{ a==b }} {{ a and not b }}</p>
+<p>{{ first|title ~ " " ~ last }} {{ n*2+1 }}</p>
+

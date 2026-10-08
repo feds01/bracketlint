@@ -681,9 +681,16 @@ impl<'s> Parser<'s> {
     fn parse_variable_block(&mut self) -> ParseResult<AstNode<ast::Statement>> {
         let token = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
         let (expr, trim) = self.in_tag(Delimiter::Brace, |g| {
-            let (subject, subject_span) = g.track_span(|g| g.parse_expr())?;
+            let (subject, subject_span) = g.track_span(|g| {
+                if g.options.dialect.variable_supports_operators() {
+                    g.parse_compound_expr(0)
+                } else {
+                    g.parse_expr()
+                }
+            })?;
 
-            // If the subject is an identifier, we ha
+            // A name that is followed by anything other than an operator, e.g.
+            // `{{ x "a" b=c }}`, is called with the rest as its arguments.
             if !g.exhausted() && subject.body.is_var() {
                 // This might be a call expression, try and parse the arguments
                 let args = g.parse_args()?;
