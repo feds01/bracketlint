@@ -45,11 +45,11 @@ test-ui *filter:
 update-snapshots *filter:
     REGENERATE_OUTPUT=true cargo test -p bl_tests -- --skip ensure_regenerate_output_is_disabled "$@"
 
-# Check real-world templates in every dialect against tests/corpus/baseline.txt, and print a summary. `just test` runs this too
+# Check real-world templates in every dialect against tests/corpus, and print its report. `just test` runs this too
 corpus:
     cargo test -p bracketlint --test corpus -- --nocapture
 
-# Re-record tests/corpus/baseline.txt from how the real-world templates do now
+# Re-record tests/corpus/baselines and report.md from how the real-world templates do now
 corpus-update:
     REGENERATE_OUTPUT=true cargo test -p bracketlint --test corpus -- --nocapture
 

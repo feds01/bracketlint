@@ -63,6 +63,7 @@ strum = { version = "0.28", features = ["derive"] }
 strum_macros = "0.28"
 syn = { version = "3.0", features = ["extra-traits", "full"] }
 thin-vec = "0.2.20"
+toml = "1.1"
 wild = { version = "2" }
 
 [profile.release]

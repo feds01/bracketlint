@@ -1,8 +1,8 @@
 //! Checks bracketlint against real-world templates in each dialect.
 //!
-//! The templates come from the [SOURCES] below, which are downloaded into
-//! `target/corpus`. Each template gets the first of these statuses that
-//! applies, from worst to best:
+//! The templates come from the sources in `tests/corpus/sources.toml`, which
+//! are downloaded into `target/corpus`. Each template gets the first of these
+//! statuses that applies, from worst to best:
 //!
 //! - `parse-error`: `bracketlint check` reports an error.
 //! - `fmt-error`: `bracketlint fmt` reports an error.
@@ -11,10 +11,11 @@
 //! - `unstable`: formatting the formatted template changes it again.
 //! - `ok`: none of the above.
 //!
-//! `tests/corpus/baseline.txt` records the status of every template, and the
-//! test fails if any template's status differs from it, like a snapshot. Run
-//! the test with `REGENERATE_OUTPUT=true` (`just corpus-update`) to record the
-//! new statuses, so that support for each dialect only grows.
+//! `tests/corpus/baselines` records the status of every template of each
+//! source, and `tests/corpus/report.md` sums them up. Like a snapshot, the test
+//! fails if either differs from how the templates do now. Run the test with
+//! `REGENERATE_OUTPUT=true` (`just corpus-update`) to record them again, so
+//! that support for each dialect only grows.
 
 use std::{
     collections::BTreeMap,
@@ -26,107 +27,25 @@ use std::{
     thread,
 };
 
+use bl_utils::text::strip_ansi;
+use serde::Deserialize;
+
 /// A repository of templates at a pinned tag, of which only `paths` are
 /// downloaded, and only files with `extension` are checked in `dialect`.
+#[derive(Deserialize)]
 struct Source {
-    name: &'static str,
-    dialect: &'static str,
-    repo: &'static str,
-    tag: &'static str,
-    paths: &'static [&'static str],
-    extension: &'static str,
+    name: String,
+    dialect: String,
+    repo: String,
+    tag: String,
+    paths: Vec<String>,
+    extension: String,
 }
 
-const SOURCES: &[Source] = &[
-    Source {
-        name: "django",
-        dialect: "django",
-        repo: "https://github.com/django/django.git",
-        tag: "6.1.2",
-        paths: &[
-            "django/contrib/admin/templates",
-            "django/contrib/admindocs/templates",
-            "django/forms/templates",
-            "django/views/templates",
-        ],
-        extension: "html",
-    },
-    Source {
-        name: "sphinx",
-        dialect: "jinja",
-        repo: "https://github.com/sphinx-doc/sphinx.git",
-        tag: "v9.1.0",
-        paths: &["sphinx/themes/basic"],
-        extension: "html",
-    },
-    // Only the HTML templates, since the LaTeX ones use other delimiters.
-    Source {
-        name: "nbconvert",
-        dialect: "jinja",
-        repo: "https://github.com/jupyter/nbconvert.git",
-        tag: "v7.17.1",
-        paths: &[
-            "share/templates/base",
-            "share/templates/basic",
-            "share/templates/classic",
-            "share/templates/lab",
-            "share/templates/reveal",
-        ],
-        extension: "j2",
-    },
-    Source {
-        name: "symfony",
-        dialect: "twig",
-        repo: "https://github.com/symfony/symfony.git",
-        tag: "v8.1.8",
-        paths: &[
-            "src/Symfony/Bridge/Twig/Resources/views",
-            "src/Symfony/Bundle/WebProfilerBundle/Resources/views",
-        ],
-        extension: "twig",
-    },
-    Source {
-        name: "symfony-demo",
-        dialect: "twig",
-        repo: "https://github.com/symfony/demo.git",
-        tag: "v3.1.0",
-        paths: &["templates"],
-        extension: "twig",
-    },
-    // Nunjucks is close to Jinja, and has no dialect of its own yet.
-    Source {
-        name: "govuk-frontend",
-        dialect: "jinja",
-        repo: "https://github.com/alphagov/govuk-frontend.git",
-        tag: "v6.5.1",
-        paths: &["packages/govuk-frontend/src/govuk"],
-        extension: "njk",
-    },
-    Source {
-        name: "eleventy-base-blog",
-        dialect: "jinja",
-        repo: "https://github.com/11ty/eleventy-base-blog.git",
-        tag: "v9.0.0",
-        paths: &["_includes", "content"],
-        extension: "njk",
-    },
-    Source {
-        name: "dawn",
-        dialect: "liquid",
-        repo: "https://github.com/Shopify/dawn.git",
-        tag: "v16.0.0",
-        paths: &["layout", "sections", "snippets", "blocks"],
-        extension: "liquid",
-    },
-    Source {
-        name: "minima",
-        dialect: "liquid",
-        repo: "https://github.com/jekyll/minima.git",
-        tag: "v2.5.2",
-        paths: &["_layouts", "_includes"],
-        extension: "html",
-    },
-];
+#[derive(Deserialize)]
+struct Sources {
+    source: Vec<Source>,
+}
 
 /// How a template does, from worst to best.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -159,18 +78,31 @@ impl Status {
 
 /// How a template does, with the first error that bracketlint reported.
 struct Outcome {
-    dialect: &'static str,
     status: Status,
     error: Option<String>,
 }
 
-fn root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+/// How each template of a source does, by its path.
+type Outcomes = BTreeMap<String, Outcome>;
+
+fn corpus_dir() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/corpus")
+}
+
+fn baselines_dir() -> PathBuf {
+    corpus_dir().join("baselines")
+}
+
+fn read_sources() -> Vec<Source> {
+    let text = fs::read_to_string(corpus_dir().join("sources.toml")).unwrap();
+    toml::from_str::<Sources>(&text).expect("couldn't read tests/corpus/sources.toml").source
 }
 
 /// Download the paths of `source` at its tag, unless they already are.
 fn fetch(source: &Source) -> PathBuf {
-    let target = root().join("target/corpus").join(format!("{}@{}", source.name, source.tag));
+    let target = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../target/corpus")
+        .join(format!("{}@{}", source.name, source.tag));
     if target.exists() {
         return target;
     }
@@ -203,11 +135,14 @@ fn fetch(source: &Source) -> PathBuf {
         "--filter=blob:none",
         "--sparse",
         "--branch",
-        source.tag,
-        source.repo,
+        &source.tag,
+        &source.repo,
         partial_path,
     ]);
-    git(&[&["-C", partial_path, "sparse-checkout", "set", "--no-cone"], source.paths].concat());
+
+    let mut sparse_checkout = vec!["-C", partial_path, "sparse-checkout", "set", "--no-cone"];
+    sparse_checkout.extend(source.paths.iter().map(String::as_str));
+    git(&sparse_checkout);
 
     fs::rename(&partial, &target).unwrap();
     target
@@ -227,28 +162,12 @@ fn templates(source: &Source, checkout: &Path) -> Vec<PathBuf> {
     }
 
     let mut files = vec![];
-    for path in source.paths {
-        walk(&checkout.join(path), source.extension, &mut files);
+    for path in &source.paths {
+        walk(&checkout.join(path), &source.extension, &mut files);
     }
 
     files.sort();
     files.into_iter().map(|file| file.strip_prefix(checkout).unwrap().to_path_buf()).collect()
-}
-
-/// Remove the ANSI escape codes that colour bracketlint's output.
-fn strip_ansi(text: &str) -> String {
-    let mut stripped = String::with_capacity(text.len());
-    let mut chars = text.chars();
-
-    while let Some(c) = chars.next() {
-        if c == '\x1b' {
-            chars.by_ref().find(|&c| c == 'm');
-        } else {
-            stripped.push(c);
-        }
-    }
-
-    stripped
 }
 
 /// Run bracketlint, returning the errors that it reports.
@@ -294,10 +213,10 @@ fn tags(text: &str) -> Vec<String> {
 }
 
 /// How the template at `file` does in `dialect`.
-fn check(dialect: &str, file: &Path) -> (Status, Option<String>) {
+fn check(dialect: &str, file: &Path) -> Outcome {
     let path = file.to_str().unwrap();
     if let Some(error) = bracketlint(&["check", "--dialect", dialect, path]).into_iter().next() {
-        return (Status::ParseError, Some(error));
+        return Outcome { status: Status::ParseError, error: Some(error) };
     }
 
     let scratch = tempfile::tempdir().unwrap();
@@ -307,7 +226,7 @@ fn check(dialect: &str, file: &Path) -> (Status, Option<String>) {
 
     let format = || bracketlint(&["fmt", "--fix", "--dialect", dialect, copy_path]);
     if let Some(error) = format().into_iter().next() {
-        return (Status::FmtError, Some(error));
+        return Outcome { status: Status::FmtError, error: Some(error) };
     }
 
     let source = fs::read_to_string(file).unwrap();
@@ -317,26 +236,31 @@ fn check(dialect: &str, file: &Path) -> (Status, Option<String>) {
         let changed = before.iter().zip(&after).find(|(old, new)| old != new);
         let error =
             changed.map_or("a tag was added or removed".to_string(), |(old, _)| old.clone());
-        return (Status::ChangedTags, Some(error));
+        return Outcome { status: Status::ChangedTags, error: Some(error) };
     }
 
     format();
     if fs::read_to_string(&copy).unwrap() != formatted {
-        return (Status::Unstable, None);
+        return Outcome { status: Status::Unstable, error: None };
     }
 
-    (Status::Ok, None)
+    Outcome { status: Status::Ok, error: None }
 }
 
-fn baseline_path() -> PathBuf {
-    root().join("tests/corpus/baseline.txt")
+/// The baseline of `outcomes`, i.e. the status of each template.
+fn baseline(outcomes: &Outcomes) -> String {
+    let mut text = String::new();
+    for (path, outcome) in outcomes {
+        writeln!(text, "{:<13} {path}", outcome.status.name()).unwrap();
+    }
+    text
 }
 
-fn read_baseline() -> BTreeMap<String, Status> {
-    let text = fs::read_to_string(baseline_path()).unwrap_or_default();
+fn read_baseline(source: &str) -> BTreeMap<String, Status> {
+    let path = baselines_dir().join(format!("{source}.txt"));
+    let text = fs::read_to_string(path).unwrap_or_default();
 
     text.lines()
-        .filter(|line| !line.is_empty() && !line.starts_with('#'))
         .map(|line| {
             let (status, path) = line.split_once(' ').unwrap();
             (path.trim().to_string(), Status::from_name(status).unwrap())
@@ -344,51 +268,62 @@ fn read_baseline() -> BTreeMap<String, Status> {
         .collect()
 }
 
-fn write_baseline(outcomes: &BTreeMap<String, Outcome>) {
-    let mut text = String::from(
-        "# The status of each template in the corpus, see crates/bl/tests/corpus.rs.\n",
-    );
-    for (path, outcome) in outcomes {
-        writeln!(text, "{:<13} {path}", outcome.status.name()).unwrap();
-    }
+/// A row of a report table: the number of templates, how many pass, and how
+/// many have each other status.
+fn row(outcomes: &[&Outcome]) -> String {
+    let count = |status| outcomes.iter().filter(|outcome| outcome.status == status).count();
+    let (total, ok) = (outcomes.len(), count(Status::Ok));
 
-    fs::write(baseline_path(), text).unwrap();
+    let mut row = format!("{total} | {ok} ({}%)", (ok * 100).checked_div(total).unwrap_or(0));
+    for status in [Status::ParseError, Status::FmtError, Status::ChangedTags, Status::Unstable] {
+        write!(row, " | {}", count(status)).unwrap();
+    }
+    row
 }
 
-/// A table of the statuses in each dialect, and its most common errors.
-fn summary(outcomes: &BTreeMap<String, Outcome>) -> String {
-    let mut counts: BTreeMap<&str, BTreeMap<Status, usize>> = BTreeMap::new();
-    let mut errors: BTreeMap<&str, BTreeMap<&str, usize>> = BTreeMap::new();
+/// A report of how many templates of each dialect and each source pass, and the
+/// most common errors in each dialect.
+fn report(sources: &[Source], results: &BTreeMap<String, Outcomes>) -> String {
+    let mut by_dialect: BTreeMap<&str, Vec<&Outcome>> = BTreeMap::new();
+    for source in sources {
+        by_dialect.entry(&source.dialect).or_default().extend(results[&source.name].values());
+    }
 
-    for outcome in outcomes.values() {
-        *counts.entry(outcome.dialect).or_default().entry(outcome.status).or_default() += 1;
+    let mut text = String::from(
+        "# Corpus report\n\nHow bracketlint does on the real-world templates of each source in \
+         `sources.toml`. A template passes if it parses, formats without errors, keeps its tags \
+         and formats the same way twice. `just corpus-update` records this report again.\n\n",
+    );
 
-        if let (Status::ParseError | Status::FmtError, Some(error)) =
-            (outcome.status, &outcome.error)
-        {
-            *errors.entry(outcome.dialect).or_default().entry(error).or_default() += 1;
+    let statuses = "Parse errors | Format errors | Changed tags | Unstable";
+    writeln!(text, "| Dialect | Templates | Passing | {statuses} |").unwrap();
+    writeln!(text, "|---|--:|--:|--:|--:|--:|--:|").unwrap();
+    for (dialect, outcomes) in &by_dialect {
+        writeln!(text, "| {dialect} | {} |", row(outcomes)).unwrap();
+    }
+
+    writeln!(text, "\n| Source | Dialect | Templates | Passing | {statuses} |").unwrap();
+    writeln!(text, "|---|---|--:|--:|--:|--:|--:|--:|").unwrap();
+    for source in sources {
+        let outcomes: Vec<_> = results[&source.name].values().collect();
+        writeln!(text, "| {} | {} | {} |", source.name, source.dialect, row(&outcomes)).unwrap();
+    }
+
+    write!(text, "\n## Most common errors\n").unwrap();
+    for (dialect, outcomes) in &by_dialect {
+        let mut errors: BTreeMap<&str, usize> = BTreeMap::new();
+        for outcome in outcomes {
+            if let Some(error) = &outcome.error {
+                *errors.entry(error).or_default() += 1;
+            }
         }
-    }
 
-    let mut text = format!("{:<8} {:>5}", "dialect", "files");
-    for status in Status::ALL {
-        write!(text, "  {:>12}", status.name()).unwrap();
-    }
+        let mut errors: Vec<_> = errors.into_iter().collect();
+        errors.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
 
-    for (dialect, counts) in &counts {
-        write!(text, "\n{dialect:<8} {:>5}", counts.values().sum::<usize>()).unwrap();
-        for status in Status::ALL {
-            write!(text, "  {:>12}", counts.get(&status).unwrap_or(&0)).unwrap();
-        }
-    }
-
-    for (dialect, errors) in &errors {
-        let mut errors: Vec<_> = errors.iter().collect();
-        errors.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
-
-        write!(text, "\n\nMost common errors in {dialect}:").unwrap();
-        for (error, count) in errors.into_iter().take(8) {
-            write!(text, "\n  {count:>4}  {error}").unwrap();
+        write!(text, "\n### {dialect}\n\n| Templates | First error |\n|--:|---|\n").unwrap();
+        for (error, count) in errors.into_iter().take(10) {
+            writeln!(text, "| {count} | {} |", error.replace('|', "\\|")).unwrap();
         }
     }
 
@@ -397,76 +332,89 @@ fn summary(outcomes: &BTreeMap<String, Outcome>) -> String {
 
 #[test]
 fn corpus() {
-    // Every template in the corpus, as its source and path.
+    let sources = read_sources();
+
+    // Every template in the corpus, with its source.
     let mut jobs = vec![];
-    for source in SOURCES {
+    for source in &sources {
         let checkout = fetch(source);
         for path in templates(source, &checkout) {
-            jobs.push((
-                source,
-                checkout.join(&path),
-                format!("{}/{}", source.name, path.display()),
-            ));
+            jobs.push((source, checkout.join(&path), path.display().to_string()));
         }
     }
 
     // Check the templates in parallel, since each runs bracketlint three times.
     let next = AtomicUsize::new(0);
     let workers = thread::available_parallelism().map_or(4, |count| count.get());
-    let outcomes: BTreeMap<String, Outcome> = thread::scope(|scope| {
+    let mut results: BTreeMap<String, Outcomes> =
+        sources.iter().map(|source| (source.name.clone(), Outcomes::new())).collect();
+
+    thread::scope(|scope| {
         let handles: Vec<_> = (0..workers)
             .map(|_| {
                 scope.spawn(|| {
                     let mut outcomes = vec![];
-                    while let Some((source, file, key)) =
+                    while let Some((source, file, path)) =
                         jobs.get(next.fetch_add(1, Ordering::Relaxed))
                     {
-                        let (status, error) = check(source.dialect, file);
-                        outcomes.push((
-                            key.clone(),
-                            Outcome { dialect: source.dialect, status, error },
-                        ));
+                        outcomes.push((source, path, check(&source.dialect, file)));
                     }
                     outcomes
                 })
             })
             .collect();
 
-        handles.into_iter().flat_map(|handle| handle.join().unwrap()).collect()
+        for handle in handles {
+            for (source, path, outcome) in handle.join().unwrap() {
+                results.get_mut(&source.name).unwrap().insert(path.clone(), outcome);
+            }
+        }
     });
 
-    let summary = summary(&outcomes);
-    println!("{summary}");
+    let report = report(&sources, &results);
+    println!("{report}");
 
     if std::env::var("REGENERATE_OUTPUT").is_ok_and(|value| value == "true") {
-        write_baseline(&outcomes);
+        let _ = fs::remove_dir_all(baselines_dir());
+        fs::create_dir_all(baselines_dir()).unwrap();
+        for (source, outcomes) in &results {
+            fs::write(baselines_dir().join(format!("{source}.txt")), baseline(outcomes)).unwrap();
+        }
+
+        fs::write(corpus_dir().join("report.md"), &report).unwrap();
         return;
     }
 
-    // Every template whose status differs from the baseline.
-    let baseline = read_baseline();
+    // Every template whose status differs from its baseline.
     let mut changes = vec![];
-    for (path, outcome) in &outcomes {
-        match baseline.get(path) {
-            Some(&before) if before == outcome.status => {}
-            Some(&before) => changes.push(format!(
-                "{path}: {} -> {}{}",
-                before.name(),
-                outcome.status.name(),
-                if outcome.status < before { " (worse)" } else { "" }
-            )),
-            None => changes.push(format!("{path}: new, {}", outcome.status.name())),
+    for (source, outcomes) in &results {
+        let baseline = read_baseline(source);
+        for (path, outcome) in outcomes {
+            match baseline.get(path) {
+                Some(&before) if before == outcome.status => {}
+                Some(&before) => changes.push(format!(
+                    "{source}/{path}: {} -> {}{}",
+                    before.name(),
+                    outcome.status.name(),
+                    if outcome.status < before { " (worse)" } else { "" }
+                )),
+                None => changes.push(format!("{source}/{path}: new, {}", outcome.status.name())),
+            }
+        }
+
+        for path in baseline.keys().filter(|path| !outcomes.contains_key(*path)) {
+            changes.push(format!("{source}/{path}: no longer in the corpus"));
         }
     }
-    for path in baseline.keys().filter(|path| !outcomes.contains_key(*path)) {
-        changes.push(format!("{path}: no longer in the corpus"));
+
+    let recorded = fs::read_to_string(corpus_dir().join("report.md")).unwrap_or_default();
+    if changes.is_empty() && recorded != report {
+        changes.push("tests/corpus/report.md: its errors changed".to_string());
     }
 
     assert!(
         changes.is_empty(),
-        "{summary}\n\n{} templates differ from tests/corpus/baseline.txt, record them with `just \
-         corpus-update`:\n{}",
-        changes.len(),
+        "tests/corpus is out of date, record it with `just corpus-update`:\n{}",
         changes.join("\n")
     );
 }

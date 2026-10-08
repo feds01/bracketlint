@@ -25,4 +25,6 @@ wild = { workspace = true}
 once_cell = { workspace = true }
 
 [dev-dependencies]
+serde = { workspace = true }
 tempfile = "3"
+toml = { workspace = true }

@@ -1,0 +1,78 @@
+# The real-world templates that the corpus test checks bracketlint against,
+# see crates/bl/tests/corpus.rs. Each source is a repository at a pinned tag,
+# of which only `paths` are downloaded, and only the files with `extension`
+# are checked, in `dialect`.
+
+[[source]]
+name = "django"
+dialect = "django"
+repo = "https://github.com/django/django.git"
+tag = "6.1.2"
+paths = ["django/contrib/admin/templates", "django/contrib/admindocs/templates", "django/forms/templates", "django/views/templates"]
+extension = "html"
+
+[[source]]
+name = "sphinx"
+dialect = "jinja"
+repo = "https://github.com/sphinx-doc/sphinx.git"
+tag = "v9.1.0"
+paths = ["sphinx/themes/basic"]
+extension = "html"
+
+# Only the HTML templates, since the LaTeX ones use other delimiters.
+[[source]]
+name = "nbconvert"
+dialect = "jinja"
+repo = "https://github.com/jupyter/nbconvert.git"
+tag = "v7.17.1"
+paths = ["share/templates/base", "share/templates/basic", "share/templates/classic", "share/templates/lab", "share/templates/reveal"]
+extension = "j2"
+
+[[source]]
+name = "symfony"
+dialect = "twig"
+repo = "https://github.com/symfony/symfony.git"
+tag = "v8.1.8"
+paths = ["src/Symfony/Bridge/Twig/Resources/views", "src/Symfony/Bundle/WebProfilerBundle/Resources/views"]
+extension = "twig"
+
+[[source]]
+name = "symfony-demo"
+dialect = "twig"
+repo = "https://github.com/symfony/demo.git"
+tag = "v3.1.0"
+paths = ["templates"]
+extension = "twig"
+
+# Nunjucks is close to Jinja, and has no dialect of its own yet.
+[[source]]
+name = "govuk-frontend"
+dialect = "jinja"
+repo = "https://github.com/alphagov/govuk-frontend.git"
+tag = "v6.5.1"
+paths = ["packages/govuk-frontend/src/govuk"]
+extension = "njk"
+
+[[source]]
+name = "eleventy-base-blog"
+dialect = "jinja"
+repo = "https://github.com/11ty/eleventy-base-blog.git"
+tag = "v9.0.0"
+paths = ["_includes", "content"]
+extension = "njk"
+
+[[source]]
+name = "dawn"
+dialect = "liquid"
+repo = "https://github.com/Shopify/dawn.git"
+tag = "v16.0.0"
+paths = ["layout", "sections", "snippets", "blocks"]
+extension = "liquid"
+
+[[source]]
+name = "minima"
+dialect = "liquid"
+repo = "https://github.com/jekyll/minima.git"
+tag = "v2.5.2"
+paths = ["_layouts", "_includes"]
+extension = "html"

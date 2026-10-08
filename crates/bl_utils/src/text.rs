@@ -33,3 +33,31 @@ macro_rules! impl_show_non_printing {
 }
 
 impl_show_non_printing!(('\x07', "␇"), ('\x08', "␈"), ('\x1b', "␛"), ('\x7f', "␡"));
+
+/// Remove the ANSI escape codes that colour text, e.g. bracketlint's
+/// diagnostics, i.e. every sequence from `\x1b` up to the `m` that ends it.
+pub fn strip_ansi(text: &str) -> String {
+    let mut stripped = String::with_capacity(text.len());
+    let mut chars = text.chars();
+
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            chars.by_ref().find(|&c| c == 'm');
+        } else {
+            stripped.push(c);
+        }
+    }
+
+    stripped
+}
+
+#[cfg(test)]
+mod test_super {
+    use super::*;
+
+    #[test]
+    fn test_strip_ansi() {
+        assert_eq!(strip_ansi("\x1b[1m\x1b[91merror\x1b[0m: oops"), "error: oops");
+        assert_eq!(strip_ansi("plain"), "plain");
+    }
+}
