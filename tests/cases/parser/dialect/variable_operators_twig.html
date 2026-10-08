@@ -1,0 +1,10 @@
+// run=pass, stage=check, dialect=twig
+
+{{ x is not defined }}
+{% if x is not defined %}{% endif %}
+{{ a == b }}
+{% if a == b %}{% endif %}
+{{ a and not b }}
+{% if a and not b %}{% endif %}
+{{ not a == b }}
+{% if not a == b %}{% endif %}

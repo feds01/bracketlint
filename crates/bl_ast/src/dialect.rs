@@ -107,6 +107,13 @@ impl Dialect {
         matches!(self, Dialect::Liquid)
     }
 
+    /// Whether `{{ }}` takes binary operators, as a tag's condition does, e.g.
+    /// `{{ a == b }}`. A Django variable and a Liquid output are a single
+    /// value with its filters.
+    pub fn variable_supports_operators(self) -> bool {
+        matches!(self, Dialect::Jinja | Dialect::Twig)
+    }
+
     /// Whether a tag's arguments are separated by commas, e.g.
     /// `{% cycle "a", "b" %}` or `{% include "card", product: product %}`.
     pub fn requires_comma_separated_args(self) -> bool {

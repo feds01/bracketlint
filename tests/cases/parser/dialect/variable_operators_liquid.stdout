@@ -1,0 +1,21 @@
+info: parsed module '$DIR/variable_operators_liquid.html' as liquid:
+body
+├─inline
+│ └─call_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "x"
+│   └─args
+├─inline
+│ └─call_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "a"
+│   └─args
+└─inline
+  └─call_expr
+    ├─subject
+    │ └─var_expr
+    │   └─name "a"
+    └─args
+

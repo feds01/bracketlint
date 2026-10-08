@@ -1,0 +1,109 @@
+info: parsed module '$DIR/variable_operators_jinja.html' as jinja:
+body
+├─inline
+│ └─bin_expr
+│   ├─lhs
+│   │ └─var_expr
+│   │   └─name "x"
+│   ├─operator `is not`
+│   └─rhs
+│     └─var_expr
+│       └─name "defined"
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─var_expr
+│     │   │   └─name "x"
+│     │   ├─operator `is not`
+│     │   └─rhs
+│     │     └─var_expr
+│     │       └─name "defined"
+│     └─clause_body
+│       └─body
+├─inline
+│ └─bin_expr
+│   ├─lhs
+│   │ └─var_expr
+│   │   └─name "a"
+│   ├─operator `==`
+│   └─rhs
+│     └─var_expr
+│       └─name "b"
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─var_expr
+│     │   │   └─name "a"
+│     │   ├─operator `==`
+│     │   └─rhs
+│     │     └─var_expr
+│     │       └─name "b"
+│     └─clause_body
+│       └─body
+├─inline
+│ └─bin_expr
+│   ├─lhs
+│   │ └─var_expr
+│   │   └─name "a"
+│   ├─operator `and`
+│   └─rhs
+│     └─unary_expr
+│       ├─unary operator `not`
+│       └─var_expr
+│         └─name "b"
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─var_expr
+│     │   │   └─name "a"
+│     │   ├─operator `and`
+│     │   └─rhs
+│     │     └─unary_expr
+│     │       ├─unary operator `not`
+│     │       └─var_expr
+│     │         └─name "b"
+│     └─clause_body
+│       └─body
+├─inline
+│ └─bin_expr
+│   ├─lhs
+│   │ └─bin_expr
+│   │   ├─lhs
+│   │   │ └─filtered_expr
+│   │   │   ├─subject
+│   │   │   │ └─var_expr
+│   │   │   │   └─name "first"
+│   │   │   └─filter
+│   │   │     ├─name "title"
+│   │   │     └─args
+│   │   ├─operator `~`
+│   │   └─rhs
+│   │     └─lit_expr
+│   │       └─str_lit " "
+│   ├─operator `~`
+│   └─rhs
+│     └─var_expr
+│       └─name "last"
+└─inline
+  └─call_expr
+    ├─subject
+    │ └─var_expr
+    │   └─name "x"
+    └─args
+      ├─arg
+      │ └─lit_expr
+      │   └─str_lit "a"
+      └─arg
+        ├─name "b"
+        └─var_expr
+          └─name "c"
+
