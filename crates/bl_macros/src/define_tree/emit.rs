@@ -559,7 +559,7 @@ fn emit_walk_node_field(
                 if nodes_mut {
                     Ok(Some(quote! {
                         visitor.#visit_child_function_name(
-                            super::#node_ref_name::new(#field_path, id)
+                            super::#node_ref_name::new(#field_path, range)
                         )?
                     }))
                 } else {
@@ -628,7 +628,7 @@ fn emit_walker_enum_function(
         nodes_mut,
         self_mut,
         quote! {
-           let id = node.id();
+           let range = node.range();
            Ok(match #ref_or_mut *node {
                #(#cases),*
            })
@@ -675,7 +675,7 @@ fn emit_walker_struct_function(
         nodes_mut,
         self_mut,
         quote! {
-            let id = node.id();
+            let range = node.range();
             Ok(#node_name {
                 #(#walk_fields),*
             })

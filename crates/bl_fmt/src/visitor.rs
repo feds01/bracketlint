@@ -1,5 +1,5 @@
 use bl_ast::{
-    AstVisitorMutSelf, ByteRange, Dialect, SourceId, Span, SpannedSource,
+    AstVisitorMutSelf, ByteRange, Dialect, SourceId, SpannedSource,
     ast_visitor_mut_self_default_impl, walk_mut_self,
 };
 use bl_reporting::inline::{InlineSnippet, note_on_span};
@@ -147,11 +147,11 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         self.buffer.push_str(hunk);
     }
 
-    /// Push the source at `span` exactly as it is written. This is used for
+    /// Push the source at `range` exactly as it is written. This is used for
     /// anything the formatter can't rebuild from the tree without losing part
     /// of it, e.g. a tag that the parser doesn't know.
-    fn push_source(&mut self, span: bl_ast::Span) {
-        let source = self.ctx.source.hunk(span.range);
+    fn push_source(&mut self, range: ByteRange) {
+        let source = self.ctx.source.hunk(range);
         self.push_hunk(source);
     }
 
@@ -229,7 +229,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
             (bl_ast::Statement::Tag(tag), _) => {
                 let keyword = match tag {
                     bl_ast::Tag::Generic(generic) => {
-                        let name = self.ctx.source.hunk(generic.name.ast_ref().span().range);
+                        let name = self.ctx.source.hunk(generic.name.ast_ref().range());
                         self.ctx.dialect.keyword(name).is_some()
                     }
                     _ => false,
@@ -237,7 +237,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
 
                 // A tag that ends a line in the source ends it here too, e.g. an
                 // `{% include %}` on a line of its own.
-                let ends_line = self.whitespace_after(statement.span().range).contains('\n');
+                let ends_line = self.whitespace_after(statement.range()).contains('\n');
 
                 if (keyword || ends_line) && !self.at_line_start() {
                     self.end_line();
@@ -246,7 +246,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
                 Ok(())
             }
             (bl_ast::Statement::Inline(_), _) => {
-                let span = statement.id().span().range;
+                let span = statement.range();
                 let line_end = self.ctx.source.line_ranges.line_end(span.end());
 
                 // Check if the next line is the end of the line, otherwise the
@@ -312,8 +312,8 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             | bl_ast::Tag::Capture(_)
             | bl_ast::Tag::Liquid(_) => {
                 // The tag starts a line when the source starts one with it.
-                let span = node.span();
-                let whitespace = self.whitespace_before(span.range.start());
+                let range = node.range();
+                let whitespace = self.whitespace_before(range.start());
                 if whitespace.contains('\n') && !self.at_line_start() {
                     self.end_line();
                 }
@@ -323,16 +323,16 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
                 // Any other tag at the start of a line is indented.
                 if self.at_line_start() {
                     match whitespace.rfind('\n') {
-                        Some(newline) if self.ctx.source.hunk(span.range).contains('\n') => {
+                        Some(newline) if self.ctx.source.hunk(range).contains('\n') => {
                             self.push_hunk(&whitespace[newline + 1..]);
                         }
                         _ => self.add_indent(),
                     }
                 } else {
-                    self.space_from_previous(span.range.start());
+                    self.space_from_previous(range.start());
                 }
 
-                self.push_source(span);
+                self.push_source(range);
                 Ok(())
             }
         }
@@ -362,7 +362,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
 
         match end_label {
             Some(end_label) => {
-                let end_label = self.ctx.source.hunk(end_label.ast_ref().span().range);
+                let end_label = self.ctx.source.hunk(end_label.ast_ref().range());
                 self.push_tag_line(&format!("endblock {end_label}"), trim.end)
             }
             None => self.push_tag_line("endblock", trim.end),
@@ -382,7 +382,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             this.push_hunk("with");
             if !assignments.is_empty() {
                 this.push_hunk(" ");
-                this.push_source(assignments.span());
+                this.push_source(assignments.range());
             }
 
             Ok(())
@@ -424,7 +424,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         self.within_tag(TagKind::Block, trim.start, |this| {
             this.push_hunk(opening);
             this.push_hunk(" ");
-            this.push_source(target.ast_ref().span());
+            this.push_source(target.ast_ref().range());
             this.push_hunk(" in ");
             this.visit_expr(iterator.ast_ref())?;
 
@@ -432,12 +432,10 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             // and `limit: 2` in Liquid, which come before the guard.
             let modifiers = reverse_modifier
                 .iter()
-                .map(|name| name.ast_ref().span())
-                .chain((!params.is_empty()).then(|| params.span()))
-                .reduce(|span, other| {
-                    let start = span.range.start().min(other.range.start());
-                    let end = span.range.end().max(other.range.end());
-                    Span::new(ByteRange::new(start, end), span.id)
+                .map(|name| name.ast_ref().range())
+                .chain((!params.is_empty()).then(|| params.range()))
+                .reduce(|range, other| {
+                    ByteRange::new(range.start().min(other.start()), range.end().max(other.end()))
                 });
 
             if let Some(modifiers) = modifiers {
@@ -573,7 +571,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         self.add_indent();
         self.within_tag(TagKind::Block, *trim, |this| {
             this.push_hunk("when ");
-            this.push_source(values.span());
+            this.push_source(values.range());
             Ok(())
         })?;
         self.end_line();
@@ -609,7 +607,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         &mut self,
         node: bl_ast::AstNodeRef<bl_ast::Text>,
     ) -> Result<Self::TextRet, Self::Error> {
-        let text = self.ctx.source.hunk(node.span().range);
+        let text = self.ctx.source.hunk(node.range());
 
         // We need to check which language engine to use for the formatting.
         let (result, state) = match self.ctx.state.language {
@@ -645,7 +643,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             }
         }
 
-        let start = node.span().range.start() + (text.len() - text.trim_start().len());
+        let start = node.range().start() + (text.len() - text.trim_start().len());
         self.space_from_previous(start);
 
         // The last line is left open so that a following inline tag can
@@ -679,7 +677,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
     ) -> Result<Self::CommentRet, Self::Error> {
         // The span of the comment includes its delimiters, which are either
         // `{# ... #}` or `{% comment %} ... {% endcomment %}`.
-        self.push_source(node.span());
+        self.push_source(node.range());
         self.end_line();
 
         Ok(())
@@ -693,7 +691,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
     ) -> Result<Self::InlineRet, Self::Error> {
         let bl_ast::Inline { expr, trim } = node.body();
 
-        self.space_from_previous(node.span().range.start());
+        self.space_from_previous(node.range().start());
         self.within_tag(TagKind::Inline, *trim, |this| {
             this.visit_expr(expr.ast_ref())?;
             Ok(())
@@ -723,7 +721,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         &mut self,
         node: bl_ast::AstNodeRef<bl_ast::Name>,
     ) -> Result<Self::NameRet, Self::Error> {
-        self.push_source(node.span());
+        self.push_source(node.range());
         Ok(())
     }
 
@@ -735,7 +733,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         &mut self,
         node: bl_ast::AstNodeRef<bl_ast::Expr>,
     ) -> Result<Self::ExprRet, Self::Error> {
-        self.push_source(node.span());
+        self.push_source(node.range());
         Ok(())
     }
 }

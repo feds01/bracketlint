@@ -13,8 +13,6 @@ derive_more = { workspace = true }
 index_vec = { workspace = true }
 itertools = { workspace = true }
 line-span = { workspace = true }
-once_cell = { workspace = true }
-parking_lot = { workspace = true }
 replace_with = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true }

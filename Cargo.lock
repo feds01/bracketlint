@@ -624,8 +624,6 @@ dependencies = [
  "index_vec",
  "itertools 0.15.0",
  "line-span",
- "once_cell",
- "parking_lot",
  "replace_with",
  "schemars",
  "serde",
