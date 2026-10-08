@@ -462,18 +462,21 @@ define_tree! {
         /// `is`
         Is,
         /// `is not`
-        IsNot
+        IsNot,
+        /// `contains`, in Liquid
+        Contains,
     }
 
     impl BinOp {
-        /// Compute the precedence for an operator
+        /// Compute the precedence for an operator. `not` sits between `and`
+        /// and the comparisons, see [UnaryOp::prefix_binding_power].
         pub fn infix_binding_power(&self) -> (u8, u8) {
             match self {
                 BinOp::Or => (2, 3),
                 BinOp::And => (4, 5),
-                BinOp::In | BinOp::NotIn => (6, 7),
-                BinOp::Eq | BinOp::NotEq | BinOp::Is | BinOp::IsNot => (6, 5),
-                BinOp::Gt | BinOp::GtEq | BinOp::Lt | BinOp::LtEq => (7, 8),
+                BinOp::In | BinOp::NotIn => (8, 9),
+                BinOp::Eq | BinOp::NotEq | BinOp::Is | BinOp::IsNot => (8, 7),
+                BinOp::Gt | BinOp::GtEq | BinOp::Lt | BinOp::LtEq | BinOp::Contains => (9, 10),
             }
         }
     }
@@ -493,6 +496,7 @@ define_tree! {
                 BinOp::In => write!(f, "in"),
                 BinOp::Is => write!(f, "is"),
                 BinOp::IsNot => write!(f, "is not"),
+                BinOp::Contains => write!(f, "contains"),
             }
         }
     }
@@ -505,6 +509,18 @@ define_tree! {
         Not,
         /// -
         Neg,
+    }
+
+    impl UnaryOp {
+        /// The precedence of the operator's operand. `not` applies to a whole
+        /// comparison, so `not a == b` is `not (a == b)`, but not to `and` and
+        /// `or`, which bind looser. `-` binds tighter than any binary operator.
+        pub fn prefix_binding_power(&self) -> u8 {
+            match self {
+                UnaryOp::Not => 6,
+                UnaryOp::Neg => u8::MAX,
+            }
+        }
     }
 
     impl fmt::Display for UnaryOp {
@@ -539,6 +555,29 @@ define_tree! {
     pub struct StrLit {
     }
 
+    /// Liquid's `nil`, which can also be written `null`.
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct NilLit {
+    }
+
+    /// Liquid's `empty` or `blank`, which values are only compared to, e.g.
+    /// `x == empty`.
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct EmptyLit {
+        pub kind: EmptyKind,
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub enum EmptyKind {
+        /// `empty`, which an empty string, array or hash is equal to.
+        Empty,
+        /// `blank`, which `empty` values and strings of only whitespace are
+        /// equal to.
+        Blank,
+    }
+
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub enum Lit {
@@ -546,6 +585,8 @@ define_tree! {
         Float(FloatLit),
         Int(IntLit),
         Str(StrLit),
+        Nil(NilLit),
+        Empty(EmptyLit),
     }
 
     #[derive(Clone, Debug, PartialEq)]
@@ -660,10 +701,19 @@ define_tree! {
         pub index: Child!(Expr),
     }
 
+    /// A range of integers, i.e. `(1..n)` in Liquid.
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct RangeExpr {
+        pub start: Child!(Expr),
+        pub end: Child!(Expr),
+    }
+
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub enum Expr {
         Unary(UnaryExpr),
+        Range(RangeExpr),
         Lit(LitExpr),
         Array(ArrayExpr),
         Bin(BinExpr),

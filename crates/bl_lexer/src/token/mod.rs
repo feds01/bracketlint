@@ -90,6 +90,9 @@ pub enum TokenKind {
     /// Dot, `.`
     Dot,
 
+    /// Two dots, `..`, as in a Liquid range like `(1..5)`
+    DotDot,
+
     /// Assignment, `=`
     Eq,
 
@@ -138,9 +141,7 @@ pub enum TokenKind {
     /// A string literal.
     ///
     /// This is a token that represents a string literal, e.g. `"hello world"`.
-    ///
-    /// N.B. String literals don't support escaping, everything within the
-    /// string is considered verbatim.
+    /// A backslash escapes the character after it, e.g. `"say \"hi\""`.
     Str,
 
     /// Effectively a hunk of text within the source that isn't tokenised from
@@ -273,6 +274,7 @@ impl fmt::Display for TokenKind {
             TokenKind::Percent => write!(f, "%"),
             TokenKind::Exclamation => write!(f, "!"),
             TokenKind::Dot => write!(f, "."),
+            TokenKind::DotDot => write!(f, ".."),
             TokenKind::Colon => write!(f, ":"),
             TokenKind::Pound => write!(f, "#"),
             TokenKind::Comma => write!(f, ","),

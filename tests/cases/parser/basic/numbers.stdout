@@ -1,0 +1,22 @@
+info: parsed module '$DIR/numbers.html' as django:
+body
+├─text
+├─inline
+│ └─lit_expr
+│   └─float_lit 1.5
+├─inline
+│ └─lit_expr
+│   └─float_lit 2e3
+├─inline
+│ └─access_expr
+│   ├─subject
+│   │ └─access_expr
+│   │   ├─subject
+│   │   │ └─var_expr
+│   │   │   └─name "items"
+│   │   └─field
+│   │     └─name "0"
+│   └─field
+│     └─name "1"
+└─text
+

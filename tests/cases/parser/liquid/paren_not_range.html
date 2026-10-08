@@ -1,0 +1,3 @@
+// run=fail, stage=check, dialect=liquid
+
+{% if (product.available or product.preorder) %}<button>Buy</button>{% endif %}

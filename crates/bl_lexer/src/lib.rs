@@ -282,7 +282,13 @@ impl<'lex> Lexer<'lex> {
                 },
                 ':' => TokenKind::Colon,
                 ',' => TokenKind::Comma,
-                '.' => TokenKind::Dot,
+                '.' => match self.peek() {
+                    '.' => {
+                        self.skip_ascii();
+                        TokenKind::DotDot
+                    }
+                    _ => TokenKind::Dot,
+                },
                 '=' => match self.peek() {
                     '=' => {
                         self.skip_ascii();
@@ -431,7 +437,9 @@ impl<'lex> Lexer<'lex> {
         self.eat_while_and_slice(move |c| c.is_ascii_digit());
 
         match self.peek() {
-            '.' if !is_ident_start(self.peek_second()) => {
+            // A fraction, but not the `..` of a range like `1..5`, or the next
+            // index in an access like `items.0.1`.
+            '.' if self.peek_second().is_ascii_digit() && !self.after_dot() => {
                 self.skip_ascii();
                 self.eat_while_and_slice(move |c| c.is_ascii_digit());
                 self.eat_float_lit(start)
@@ -442,9 +450,11 @@ impl<'lex> Lexer<'lex> {
         }
     }
 
+    /// Lex the rest of a float literal, after its fraction or right before its
+    /// exponent, i.e. the optional exponent.
     fn eat_float_lit(&mut self, start: usize) -> TokenKind {
         if !matches!(self.peek(), 'e' | 'E') {
-            return TokenKind::Number(NumberFlags::Int);
+            return TokenKind::Number(NumberFlags::Float);
         }
 
         self.skip_ascii(); // consume the exponent
@@ -511,13 +521,10 @@ impl<'lex> Lexer<'lex> {
                     closed = true;
                     break;
                 }
-                // '\\' => match self.escaped_char(false) {
-                //     Ok(ch) => continue,
-                //     Err(err) => {
-                //         self.add_error(err);
-                //         return TokenKind::Err;
-                //     }
-                // },
+                // A backslash escapes the character after it, e.g. `\"`.
+                '\\' => {
+                    self.next();
+                }
                 _c => continue,
             }
         }
@@ -550,11 +557,17 @@ impl<'lex> Lexer<'lex> {
 
         let name = &self.spanned.source[start..self.offset.get()];
 
-        if let Ok(keyword) = Keyword::try_from(name) {
+        if let Some(keyword) = Keyword::lookup(name, self.dialect) {
             TokenKind::Keyword(keyword)
         } else {
             TokenKind::Ident
         }
+    }
+
+    /// Whether the last token is a `.`, so that a number after it is the index
+    /// in an access like `items.0`.
+    fn after_dot(&self) -> bool {
+        matches!(self.tokens.last(), Some(Token { kind: TokenKind::Dot, .. }))
     }
 
     /// Lex the contents of a `{% raw %}` block as text, up to its

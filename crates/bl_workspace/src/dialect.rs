@@ -72,10 +72,23 @@ impl Dialect {
         }
     }
 
+    /// Whether a filter takes a list of arguments, which can be positional or
+    /// keyword, e.g. `f: a, b, key: c`. The other dialects take a single
+    /// argument, e.g. `f:a`.
+    pub fn filter_supports_arg_list(self) -> bool {
+        matches!(self, Dialect::Liquid)
+    }
+
     /// Check if its currently Django dialect.
     #[inline]
     pub fn is_django(self) -> bool {
         self == Dialect::Django
+    }
+
+    /// Check if its currently Liquid dialect.
+    #[inline]
+    pub fn is_liquid(self) -> bool {
+        self == Dialect::Liquid
     }
 }
 

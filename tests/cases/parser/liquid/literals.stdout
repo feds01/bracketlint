@@ -16,8 +16,8 @@ body
 │     │   │   │     └─name "available"
 │     │   │   ├─operator `==`
 │     │   │   └─rhs
-│     │   │     └─var_expr
-│     │   │       └─name "true"
+│     │   │     └─lit_expr
+│     │   │       └─bool_lit true
 │     │   ├─operator `and`
 │     │   └─rhs
 │     │     └─bin_expr
@@ -30,8 +30,8 @@ body
 │     │       │     └─name "discount"
 │     │       ├─operator `!=`
 │     │       └─rhs
-│     │         └─var_expr
-│     │           └─name "nil"
+│     │         └─lit_expr
+│     │           └─nil_lit nil
 │     └─clause_body
 │       └─body
 │         └─text
@@ -51,8 +51,8 @@ body
       │   │   │     └─name "description"
       │   │   ├─operator `==`
       │   │   └─rhs
-      │   │     └─var_expr
-      │   │       └─name "blank"
+      │   │     └─lit_expr
+      │   │       └─empty_lit blank
       │   ├─operator `or`
       │   └─rhs
       │     └─bin_expr
@@ -65,8 +65,8 @@ body
       │       │     └─name "tags"
       │       ├─operator `==`
       │       └─rhs
-      │         └─var_expr
-      │           └─name "empty"
+      │         └─lit_expr
+      │           └─empty_lit empty
       └─clause_body
         └─body
           └─text

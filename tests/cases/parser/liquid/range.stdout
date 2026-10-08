@@ -1,0 +1,43 @@
+info: parsed module '$DIR/range.html' as liquid:
+body
+├─for
+│ ├─target
+│ │ └─name "i"
+│ ├─iterator
+│ │ └─range_expr
+│ │   ├─start
+│ │   │ └─lit_expr
+│ │   │   └─int_lit 1
+│ │   └─end
+│ │     └─lit_expr
+│ │       └─int_lit 5
+│ └─loop_body
+│   └─body
+│     └─inline
+│       └─var_expr
+│         └─name "i"
+└─for
+  ├─target
+  │ └─name "i"
+  ├─iterator
+  │ └─range_expr
+  │   ├─start
+  │   │ └─lit_expr
+  │   │   └─int_lit 1
+  │   └─end
+  │     └─access_expr
+  │       ├─subject
+  │       │ └─access_expr
+  │       │   ├─subject
+  │       │   │ └─var_expr
+  │       │   │   └─name "collection"
+  │       │   └─field
+  │       │     └─name "products"
+  │       └─field
+  │         └─name "size"
+  └─loop_body
+    └─body
+      └─inline
+        └─var_expr
+          └─name "i"
+

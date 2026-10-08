@@ -1,4 +1,4 @@
-// run=fail, stage=check, dialect=liquid
+// run=pass, stage=check, dialect=liquid
 
 <p>{{ product.title | slice: 0, 10 }}</p>
 <p>{{ product.subtitle | default: "None", allow_false: true }}</p>

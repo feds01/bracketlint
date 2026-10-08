@@ -1,0 +1,22 @@
+info: parsed module '$DIR/contains.html' as liquid:
+body
+└─if
+  └─clauses
+    └─if_clause
+      ├─condition
+      │ └─bin_expr
+      │   ├─lhs
+      │   │ └─access_expr
+      │   │   ├─subject
+      │   │   │ └─var_expr
+      │   │   │   └─name "product"
+      │   │   └─field
+      │   │     └─name "title"
+      │   ├─operator `contains`
+      │   └─rhs
+      │     └─lit_expr
+      │       └─str_lit "Pack"
+      └─clause_body
+        └─body
+          └─text
+

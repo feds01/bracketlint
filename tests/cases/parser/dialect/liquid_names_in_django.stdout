@@ -1,0 +1,14 @@
+info: parsed module '$DIR/liquid_names_in_django.html' as django:
+body
+├─text
+├─inline
+│ └─var_expr
+│   └─name "contains"
+├─inline
+│ └─var_expr
+│   └─name "nil"
+├─inline
+│ └─var_expr
+│   └─name "blank"
+└─text
+

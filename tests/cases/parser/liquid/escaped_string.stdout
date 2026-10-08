@@ -1,0 +1,16 @@
+info: parsed module '$DIR/escaped_string.html' as liquid:
+body
+├─text
+├─inline
+│ └─filtered_expr
+│   ├─subject
+│   │ └─lit_expr
+│   │   └─str_lit "Say \"hello\""
+│   └─filter
+│     ├─name "append"
+│     └─args
+│       └─arg
+│         └─lit_expr
+│           └─str_lit "!"
+└─text
+
