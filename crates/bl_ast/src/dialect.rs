@@ -108,8 +108,9 @@ impl Dialect {
     }
 
     /// Whether `{{ }}` takes binary operators, as a tag's condition does, e.g.
-    /// `{{ a == b }}`. A Django variable and a Liquid output are a single
-    /// value with its filters.
+    /// `{{ a == b }}`. Jinja and Twig parse it as any expression, in
+    /// `Parser.subparse` and `Parser::subparse`. Django's `FilterExpression`
+    /// and Liquid's `Variable` read a single value with its filters.
     pub fn variable_supports_operators(self) -> bool {
         matches!(self, Dialect::Jinja | Dialect::Twig)
     }
