@@ -435,7 +435,8 @@ define_tree! {
         root_module: bl_ast::ast,
     }}
 
-    /// All logic operators
+    /// All logic operators. How tightly each one binds depends on the dialect,
+    /// see `Dialect::infix_binding_power` in `bl_workspace`.
     #[derive(Copy, Clone, Debug, PartialEq)]
     #[node]
     pub enum BinOp {
@@ -467,20 +468,6 @@ define_tree! {
         Contains,
     }
 
-    impl BinOp {
-        /// Compute the precedence for an operator. `not` sits between `and`
-        /// and the comparisons, see [UnaryOp::prefix_binding_power].
-        pub fn infix_binding_power(&self) -> (u8, u8) {
-            match self {
-                BinOp::Or => (2, 3),
-                BinOp::And => (4, 5),
-                BinOp::In | BinOp::NotIn => (8, 9),
-                BinOp::Eq | BinOp::NotEq | BinOp::Is | BinOp::IsNot => (8, 7),
-                BinOp::Gt | BinOp::GtEq | BinOp::Lt | BinOp::LtEq | BinOp::Contains => (9, 10),
-            }
-        }
-    }
-
     impl fmt::Display for BinOp {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             match self {
@@ -501,7 +488,8 @@ define_tree! {
         }
     }
 
-    /// Unary operators
+    /// Unary operators. How tightly each one binds depends on the dialect, see
+    /// `Dialect::prefix_binding_power` in `bl_workspace`.
     #[derive(Copy, Clone, Debug, PartialEq)]
     #[node]
     pub enum UnaryOp {
@@ -509,18 +497,6 @@ define_tree! {
         Not,
         /// -
         Neg,
-    }
-
-    impl UnaryOp {
-        /// The precedence of the operator's operand. `not` applies to a whole
-        /// comparison, so `not a == b` is `not (a == b)`, but not to `and` and
-        /// `or`, which bind looser. `-` binds tighter than any binary operator.
-        pub fn prefix_binding_power(&self) -> u8 {
-            match self {
-                UnaryOp::Not => 6,
-                UnaryOp::Neg => u8::MAX,
-            }
-        }
     }
 
     impl fmt::Display for UnaryOp {
@@ -601,6 +577,8 @@ define_tree! {
         children: Children!(Expr),
     }
 
+    /// A binary operation, e.g. `a == b`. Jinja chains comparisons, so in
+    /// Jinja `(a == b) > c` means `a == b and b > c`.
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct BinExpr {
