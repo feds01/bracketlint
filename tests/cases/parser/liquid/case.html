@@ -1,0 +1,12 @@
+// run=pass, stage=check, dialect=liquid
+
+{% case product.type %}
+{% when "shirt" %}
+<span>Apparel</span>
+{% when "mug", "glass" %}
+<span>Kitchen</span>
+{% when "book" or "magazine" %}
+<span>Reading</span>
+{% else %}
+<span>Other</span>
+{% endcase %}

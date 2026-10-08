@@ -46,7 +46,8 @@ pub fn fmt_module(query: FormatQuery) -> FormatQueryResult {
     // document.
     let buffer = String::with_capacity(spanned.len());
     let engine = configured_formatter();
-    let mut formatter = visitor::Formatter::new(engine, options, source, spanned, buffer);
+    let mut formatter =
+        visitor::Formatter::new(engine, options, source, spanned, member.dialect, buffer);
 
     match formatter.visit_document(document.ast_ref()) {
         Ok(_) => FormatQueryResult { buffer: formatter.into_buffer(), diagnostics: Reports::new() },

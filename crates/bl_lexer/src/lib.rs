@@ -557,7 +557,7 @@ impl<'lex> Lexer<'lex> {
 
         let name = &self.spanned.source[start..self.offset.get()];
 
-        if let Some(keyword) = Keyword::lookup(name, self.dialect) {
+        if let Some(keyword) = Keyword::from_ident(name, self.dialect) {
             TokenKind::Keyword(keyword)
         } else {
             TokenKind::Ident

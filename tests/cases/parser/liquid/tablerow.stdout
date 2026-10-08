@@ -1,0 +1,29 @@
+info: parsed module '$DIR/tablerow.html' as liquid:
+body
+├─text
+├─tablerow
+│ ├─target
+│ │ └─name "product"
+│ ├─iterator
+│ │ └─access_expr
+│ │   ├─subject
+│ │   │ └─var_expr
+│ │   │   └─name "collection"
+│ │   └─field
+│ │     └─name "products"
+│ ├─params
+│ │ └─arg
+│ │   ├─name "cols"
+│ │   └─lit_expr
+│ │     └─int_lit 2
+│ └─loop_body
+│   └─body
+│     └─inline
+│       └─access_expr
+│         ├─subject
+│         │ └─var_expr
+│         │   └─name "product"
+│         └─field
+│           └─name "title"
+└─text
+

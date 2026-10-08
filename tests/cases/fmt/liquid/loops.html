@@ -1,0 +1,14 @@
+// run=pass, stage=fmt, dialect=liquid
+
+<ul>
+{% for product in collection.products limit: 4 reversed offset: 2 %}
+<li>{{ product.title }}</li>
+{% else %}
+<li>No products.</li>
+{% endfor %}
+</ul>
+<table>
+{% tablerow product in collection.products cols: 2 %}
+{{ product.title }}
+{% endtablerow %}
+</table>

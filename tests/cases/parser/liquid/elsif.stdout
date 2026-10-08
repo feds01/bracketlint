@@ -1,0 +1,42 @@
+info: parsed module '$DIR/elsif.html' as liquid:
+body
+└─if
+  ├─clauses
+  │ ├─if_clause
+  │ │ ├─condition
+  │ │ │ └─bin_expr
+  │ │ │   ├─lhs
+  │ │ │   │ └─access_expr
+  │ │ │   │   ├─subject
+  │ │ │   │   │ └─var_expr
+  │ │ │   │   │   └─name "product"
+  │ │ │   │   └─field
+  │ │ │   │     └─name "price"
+  │ │ │   ├─operator `>`
+  │ │ │   └─rhs
+  │ │ │     └─lit_expr
+  │ │ │       └─int_lit 100
+  │ │ └─clause_body
+  │ │   └─body
+  │ │     └─text
+  │ └─elif_clause
+  │   ├─condition
+  │   │ └─bin_expr
+  │   │   ├─lhs
+  │   │   │ └─access_expr
+  │   │   │   ├─subject
+  │   │   │   │ └─var_expr
+  │   │   │   │   └─name "product"
+  │   │   │   └─field
+  │   │   │     └─name "price"
+  │   │   ├─operator `>`
+  │   │   └─rhs
+  │   │     └─lit_expr
+  │   │       └─int_lit 20
+  │   └─clause_body
+  │     └─body
+  │       └─text
+  └─otherwise
+    └─body
+      └─text
+

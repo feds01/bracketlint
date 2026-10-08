@@ -1,4 +1,4 @@
-error: expected a closing tag
+error: expected a closing `{% endif %}` tag
  --> $DIR/unclosed_if.html:4:8
   |
 4 | </div>

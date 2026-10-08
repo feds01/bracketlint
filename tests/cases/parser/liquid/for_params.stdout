@@ -10,6 +10,15 @@ body
   │   │   └─name "collection"
   │   └─field
   │     └─name "products"
+  ├─params
+  │ ├─arg
+  │ │ ├─name "limit"
+  │ │ └─lit_expr
+  │ │   └─int_lit 4
+  │ └─arg
+  │   ├─name "offset"
+  │   └─lit_expr
+  │     └─int_lit 2
   └─loop_body
     └─body
       ├─text

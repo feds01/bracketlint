@@ -900,6 +900,9 @@ define_tree! {
     pub enum ClauseKind {
         If,
         Elif,
+        /// The opening clause of a Liquid `unless` block, which renders when
+        /// its condition is false.
+        Unless,
     }
 
     #[derive(Debug, PartialEq, Clone)]
@@ -918,7 +921,8 @@ define_tree! {
     }
 
     /// An `if` block consisting of the condition, block and an optional else clause
-    /// e.g. `{% if x %} ...  {% else %}  y {% endif %}`
+    /// e.g. `{% if x %} ...  {% else %}  y {% endif %}`. A Liquid `unless` block
+    /// is one too, whose first clause is [ClauseKind::Unless].
     #[derive(Debug, PartialEq, Clone)]
     #[node]
     pub struct If {
@@ -931,20 +935,70 @@ define_tree! {
         pub end_trim: TrimMarker,
     }
 
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub enum LoopKind {
+        For,
+        /// A Liquid `tablerow` loop, which renders a table row per item.
+        TableRow,
+    }
+
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct For {
+        pub kind: LoopKind,
         pub target: Child!(ForTarget),
         pub iterator: Child!(Expr),
         pub guard: OptionalChild!(Expr),
         pub reverse_modifier: OptionalChild!(Name),
+
+        /// The parameters of a Liquid loop, e.g. `limit: 2` or `cols: 3`.
+        pub params: Children!(Arg),
         pub loop_body: Child!(Body),
+
+        /// The body after `{% empty %}`, or `{% else %}` outside Django, which
+        /// renders when there is nothing to loop over.
         pub loop_empty: OptionalChild!(Body),
 
         /// The whitespace control of the opening, `{% empty %}` and closing
         /// tags.
         pub trim: TrimTag,
         pub empty_trim: TrimMarker,
+    }
+
+    /// A Liquid `case` block, which renders the first `when` clause with a value
+    /// equal to its subject, or else its `else` clause.
+    ///
+    /// ```liquid
+    /// {% case product.type %}
+    ///     {% when "shirt", "hat" %} Apparel
+    ///     {% else %} Other
+    /// {% endcase %}
+    /// ```
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct Case {
+        pub subject: Child!(Expr),
+
+        /// Anything between `{% case %}` and the first `{% when %}`, which
+        /// Liquid doesn't render.
+        pub leading: Child!(Body),
+        pub branches: Children!(When),
+        pub otherwise: OptionalChild!(Body),
+
+        /// The whitespace control of the `{% case %}`, `{% else %}` and
+        /// `{% endcase %}` tags.
+        pub trim: TrimTag,
+        pub else_trim: TrimMarker,
+    }
+
+    /// A `{% when %}` clause of a [`Case`] block, whose values are separated by
+    /// `,` or `or`.
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct When {
+        pub values: Children!(Expr),
+        pub clause_body: Child!(Body),
+        pub trim: TrimMarker,
     }
 
     /// The target of a [`For`] loop, which can be a simple variable or a variable
@@ -1033,6 +1087,9 @@ define_tree! {
         /// The `{% for item in items %}` tag
         For(For),
 
+        /// The Liquid `{% case subject %}` tag
+        Case(Case),
+
         /// The `{% continue %}` tag
         Continue(Continue),
 
@@ -1065,6 +1122,7 @@ define_tree! {
                 Tag::Import(_) => "import",
                 Tag::If(_) => "if",
                 Tag::For(_) => "for",
+                Tag::Case(_) => "case",
                 Tag::Continue(_) => "continue",
                 Tag::Break(_) => "break",
                 Tag::Raw(_) => "raw",

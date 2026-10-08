@@ -1,0 +1,31 @@
+info: parsed module '$DIR/for_params_commas.html' as liquid:
+body
+└─for
+  ├─target
+  │ └─name "product"
+  ├─iterator
+  │ └─access_expr
+  │   ├─subject
+  │   │ └─var_expr
+  │   │   └─name "collection"
+  │   └─field
+  │     └─name "products"
+  ├─params
+  │ ├─arg
+  │ │ ├─name "limit"
+  │ │ └─lit_expr
+  │ │   └─int_lit 2
+  │ └─arg
+  │   ├─name "offset"
+  │   └─var_expr
+  │     └─name "continue"
+  └─loop_body
+    └─body
+      └─inline
+        └─access_expr
+          ├─subject
+          │ └─var_expr
+          │   └─name "product"
+          └─field
+            └─name "title"
+

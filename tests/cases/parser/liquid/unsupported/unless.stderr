@@ -1,7 +1,0 @@
-error: expected a tag, however received the keyword `else`
- --> $DIR/unless.html:3:4
-  |
-3 | {% else %}
-  |    ----
-  |
-  = info: expected a `identifier`

@@ -1,0 +1,12 @@
+error: unexpectedly encountered the keyword `elif`
+ --> $DIR/unless_misplaced_clauses.html:1:30
+  |
+1 | {% unless a %}A{% else %}B{% elsif c %}C{% endunless %}
+  |                              -----
+error: expected a tag, however received the keyword `endunless`
+ --> $DIR/unless_misplaced_clauses.html:1:44
+  |
+1 | {% unless a %}A{% else %}B{% elsif c %}C{% endunless %}
+  |                                            ---------
+  |
+  = info: expected a `identifier`

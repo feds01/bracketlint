@@ -1,0 +1,9 @@
+// run=pass, stage=fmt, dialect=jinja
+
+<ul>
+{% for item in items %}
+<li>{{ item }}</li>
+{%- else -%}
+<li>None</li>
+{% endfor %}
+</ul>

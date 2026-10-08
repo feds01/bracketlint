@@ -29,9 +29,14 @@ impl AstVisitor for AstTreePrinter<'_> {
         node: ast::AstNodeRef<ast::IfClause>,
     ) -> Result<Self::IfClauseRet, Self::Error> {
         let walk::IfClause { condition, clause_body } = walk::walk_if_clause(self, node)?;
+        let label = match node.body().kind {
+            ast::ClauseKind::If => "if_clause",
+            ast::ClauseKind::Elif => "elif_clause",
+            ast::ClauseKind::Unless => "unless_clause",
+        };
 
         Ok(TreeNode::branch(
-            "if_clause",
+            label,
             vec![
                 TreeNode::branch("condition", vec![condition]),
                 TreeNode::branch("clause_body", vec![clause_body]),
@@ -403,14 +408,19 @@ impl AstVisitor for AstTreePrinter<'_> {
     type ForRet = TreeNode;
 
     fn visit_for(&self, node: ast::AstNodeRef<ast::For>) -> Result<Self::ForRet, Self::Error> {
-        let walk::For { target, iterator, guard, loop_body, loop_empty, reverse_modifier } =
+        let walk::For { target, iterator, guard, loop_body, loop_empty, reverse_modifier, params } =
             walk::walk_for(self, node)?;
 
         let mut children = vec![
             TreeNode::branch("target", vec![target]),
             TreeNode::branch("iterator", vec![iterator]),
-            TreeNode::branch("loop_body", vec![loop_body]),
         ];
+
+        if !params.is_empty() {
+            children.push(TreeNode::branch("params", params));
+        }
+
+        children.push(TreeNode::branch("loop_body", vec![loop_body]));
 
         if let Some(loop_empty) = loop_empty {
             children.push(TreeNode::branch("loop_empty", vec![loop_empty]));
@@ -424,7 +434,44 @@ impl AstVisitor for AstTreePrinter<'_> {
             children.push(TreeNode::branch("guard", vec![guard]));
         }
 
-        Ok(TreeNode::branch("for", children))
+        let label = match node.body().kind {
+            ast::LoopKind::For => "for",
+            ast::LoopKind::TableRow => "tablerow",
+        };
+
+        Ok(TreeNode::branch(label, children))
+    }
+
+    type CaseRet = TreeNode;
+
+    fn visit_case(&self, node: ast::AstNodeRef<ast::Case>) -> Result<Self::CaseRet, Self::Error> {
+        let walk::Case { subject, leading, branches, otherwise } = walk::walk_case(self, node)?;
+
+        let mut children = vec![
+            TreeNode::branch("subject", vec![subject]),
+            TreeNode::branch("leading", vec![leading]),
+            TreeNode::branch("branches", branches),
+        ];
+
+        if let Some(otherwise) = otherwise {
+            children.push(TreeNode::branch("otherwise", vec![otherwise]));
+        }
+
+        Ok(TreeNode::branch("case", children))
+    }
+
+    type WhenRet = TreeNode;
+
+    fn visit_when(&self, node: ast::AstNodeRef<ast::When>) -> Result<Self::WhenRet, Self::Error> {
+        let walk::When { values, clause_body } = walk::walk_when(self, node)?;
+
+        Ok(TreeNode::branch(
+            "when",
+            vec![
+                TreeNode::branch("values", values),
+                TreeNode::branch("clause_body", vec![clause_body]),
+            ],
+        ))
     }
 
     type AssignmentRet = TreeNode;
