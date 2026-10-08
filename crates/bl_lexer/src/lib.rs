@@ -798,57 +798,45 @@ mod tests {
 
     use bl_ast::{Dialect, LineRanges, SourceId, SpannedSource};
 
-    use crate::{
-        Lexer,
-        token::{Delimiter, NumberFlags, TokenKind},
-    };
+    use crate::{Lexer, tok, token::Token, tree};
 
-    /// The kinds of the tokens that `source` lexes to in `dialect`.
-    fn kinds(source: &str, dialect: Dialect) -> Vec<TokenKind> {
+    /// The tokens that `source` lexes to in `dialect`.
+    pub(crate) fn lex(source: &str, dialect: Dialect) -> Vec<Token> {
         let path = PathBuf::new();
         let line_ranges = LineRanges::new_from_str(source);
         let spanned = SpannedSource::new(source, &path, &line_ranges);
 
-        let tokens = Lexer::new(spanned, SourceId::default(), dialect).tokenise().tokens;
-        tokens.into_iter().map(|token| token.kind).collect()
-    }
-
-    /// The kinds of the tokens of a tag with `delimiter` and `inner` inside it.
-    fn tag(delimiter: Delimiter, inner: &[TokenKind]) -> Vec<TokenKind> {
-        let mut kinds = vec![TokenKind::Tree(delimiter, inner.len() as u32)];
-        kinds.extend_from_slice(inner);
-        kinds
+        Lexer::new(spanned, SourceId::default(), dialect).tokenise().tokens
     }
 
     #[test]
     fn doubled_operators_are_one_token() {
-        assert_eq!(
-            kinds("{% a ** b * c // d / e %}", Dialect::Jinja),
-            tag(
-                Delimiter::Percent,
-                &[
-                    TokenKind::Ident,
-                    TokenKind::StarStar,
-                    TokenKind::Ident,
-                    TokenKind::Star,
-                    TokenKind::Ident,
-                    TokenKind::SlashSlash,
-                    TokenKind::Ident,
-                    TokenKind::Slash,
-                    TokenKind::Ident,
+        assert!(matches!(
+            lex("{% a ** b * c // d / e %}", Dialect::Jinja)[..],
+            tree!(
+                Percent,
+                [
+                    tok!(Ident),
+                    tok!(StarStar),
+                    tok!(Ident),
+                    tok!(Star),
+                    tok!(Ident),
+                    tok!(SlashSlash),
+                    tok!(Ident),
+                    tok!(Slash),
+                    tok!(Ident),
                 ]
             )
-        );
+        ));
     }
 
     #[test]
     fn percent_only_closes_a_tag_before_a_brace() {
         for source in ["{% a % 2 %}", "{% a%2%}"] {
-            assert_eq!(
-                kinds(source, Dialect::Jinja),
-                tag(
-                    Delimiter::Percent,
-                    &[TokenKind::Ident, TokenKind::Percent, TokenKind::Number(NumberFlags::Int)]
+            assert!(
+                matches!(
+                    lex(source, Dialect::Jinja)[..],
+                    tree!(Percent, [tok!(Ident), tok!(Percent), tok!(Number(_))])
                 ),
                 "{source}"
             );
@@ -857,65 +845,90 @@ mod tests {
 
     #[test]
     fn operators_inside_a_tag_with_trim_markers() {
-        let cases = [
-            (Dialect::Twig, "{{~ a ~ b ~}}", Delimiter::Brace, TokenKind::Tilde),
-            (Dialect::Twig, "{%~ a~b~%}", Delimiter::Percent, TokenKind::Tilde),
-            (Dialect::Twig, "{{- a ~ b -}}", Delimiter::Brace, TokenKind::Tilde),
-            (Dialect::Jinja, "{{- a ~ b -}}", Delimiter::Brace, TokenKind::Tilde),
-            (Dialect::Jinja, "{%- a - b-%}", Delimiter::Percent, TokenKind::Minus),
-            (Dialect::Jinja, "{%+ a + b +%}", Delimiter::Percent, TokenKind::Plus),
-            (Dialect::Liquid, "{%- a - b -%}", Delimiter::Percent, TokenKind::Minus),
-        ];
-
-        for (dialect, source, delimiter, op) in cases {
-            assert_eq!(
-                kinds(source, dialect),
-                tag(delimiter, &[TokenKind::Ident, op, TokenKind::Ident]),
+        for (dialect, source) in [
+            (Dialect::Twig, "{{~ a ~ b ~}}"),
+            (Dialect::Twig, "{{- a ~ b -}}"),
+            (Dialect::Jinja, "{{- a ~ b -}}"),
+        ] {
+            assert!(
+                matches!(
+                    lex(source, dialect)[..],
+                    tree!(Brace, [tok!(Ident), tok!(Tilde), tok!(Ident)])
+                ),
                 "{source} in {dialect}"
             );
         }
+
+        assert!(matches!(
+            lex("{%~ a~b~%}", Dialect::Twig)[..],
+            tree!(Percent, [tok!(Ident), tok!(Tilde), tok!(Ident)])
+        ));
+
+        for (dialect, source) in
+            [(Dialect::Jinja, "{%- a - b-%}"), (Dialect::Liquid, "{%- a - b -%}")]
+        {
+            assert!(
+                matches!(
+                    lex(source, dialect)[..],
+                    tree!(Percent, [tok!(Ident), tok!(Minus), tok!(Ident)])
+                ),
+                "{source} in {dialect}"
+            );
+        }
+
+        assert!(matches!(
+            lex("{%+ a + b +%}", Dialect::Jinja)[..],
+            tree!(Percent, [tok!(Ident), tok!(Plus), tok!(Ident)])
+        ));
     }
 
     #[test]
     fn minus_before_a_digit_subtracts_after_an_operand() {
-        let number = TokenKind::Number(NumberFlags::Int);
-
         for dialect in [Dialect::Jinja, Dialect::Twig] {
-            assert_eq!(
-                kinds("{% a -1 %}", dialect),
-                tag(Delimiter::Percent, &[TokenKind::Ident, TokenKind::Minus, number])
+            assert!(
+                matches!(
+                    lex("{% a -1 %}", dialect)[..],
+                    tree!(Percent, [tok!(Ident), tok!(Minus), tok!(Number(_))])
+                ),
+                "{dialect}"
             );
-            assert_eq!(
-                kinds("{% 10-1 %}", dialect),
-                tag(Delimiter::Percent, &[number, TokenKind::Minus, number])
+            assert!(
+                matches!(
+                    lex("{% 10-1 %}", dialect)[..],
+                    tree!(Percent, [tok!(Number(_)), tok!(Minus), tok!(Number(_))])
+                ),
+                "{dialect}"
             );
         }
 
         // After an operator or a delimiter, `-1` is a negative number.
-        assert_eq!(
-            kinds("{% a - -1 %}", Dialect::Jinja),
-            tag(Delimiter::Percent, &[TokenKind::Ident, TokenKind::Minus, number])
-        );
-        assert_eq!(
-            kinds("{% (-1) %}", Dialect::Jinja),
-            tag(Delimiter::Percent, &[TokenKind::Tree(Delimiter::Paren, 1), number])
-        );
+        assert!(matches!(
+            lex("{% a - -1 %}", Dialect::Jinja)[..],
+            tree!(Percent, [tok!(Ident), tok!(Minus), tok!(Number(_))])
+        ));
+        assert!(matches!(
+            lex("{% (-1) %}", Dialect::Jinja)[..],
+            tree!(Percent, [tok!(Tree(crate::token::Delimiter::Paren, 1)), tok!(Number(_))])
+        ));
 
         // Django and Liquid have no binary `-`.
         for dialect in [Dialect::Django, Dialect::Liquid] {
-            assert_eq!(
-                kinds("{% a -1 %}", dialect),
-                tag(Delimiter::Percent, &[TokenKind::Ident, number])
+            assert!(
+                matches!(
+                    lex("{% a -1 %}", dialect)[..],
+                    tree!(Percent, [tok!(Ident), tok!(Number(_))])
+                ),
+                "{dialect}"
             );
         }
     }
 
     #[test]
     fn tilde_is_only_a_trim_marker_in_twig() {
-        assert_eq!(kinds("{{ a ~}}", Dialect::Twig), tag(Delimiter::Brace, &[TokenKind::Ident]));
-        assert_eq!(
-            kinds("{{ a ~}}", Dialect::Jinja),
-            tag(Delimiter::Brace, &[TokenKind::Ident, TokenKind::Tilde])
-        );
+        assert!(matches!(lex("{{ a ~}}", Dialect::Twig)[..], tree!(Brace, [tok!(Ident)])));
+        assert!(matches!(
+            lex("{{ a ~}}", Dialect::Jinja)[..],
+            tree!(Brace, [tok!(Ident), tok!(Tilde)])
+        ));
     }
 }

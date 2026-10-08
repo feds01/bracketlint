@@ -165,8 +165,10 @@ impl Dialect {
     /// How tightly the binary operator `op` binds, as the binding powers of
     /// its left and right side, or `None` if the dialect has no such operator.
     /// An operator with a higher binding power groups first, so `a or b and c`
-    /// is `a or (b and c)`. Only Jinja and Twig have arithmetic and `~`, and
-    /// only Liquid has `contains`.
+    /// is `a or (b and c)`.
+    ///
+    /// Each dialect follows its own engine, see the comment on each arm. Only
+    /// Jinja and Twig have arithmetic and `~`, and only Liquid has `contains`.
     pub fn infix_binding_power(self, op: BinOp) -> Option<(u8, u8)> {
         let power = match self {
             // Django's own precedences, from `smartif.py`. `in` and `not in`
@@ -270,10 +272,12 @@ impl Dialect {
     /// How tightly the prefix operator `op` binds: its operand takes every
     /// binary operator whose left binding power is at least this, see
     /// [Dialect::infix_binding_power]. `-` binds tighter than any binary
-    /// operator, including `**`, so `-a ** b` is `(-a) ** b`. `not` binds
-    /// tighter than `and` and `or`, and in Twig also tighter than the
-    /// comparisons, `+`, `-` and `~`, so `not a == b` is `(not a) == b` there
-    /// and `not (a == b)` in the other dialects.
+    /// operator, including `**`, so `-a ** b` is `(-a) ** b`.
+    ///
+    /// `not` binds tighter than `and` and `or` in every dialect. In Twig it
+    /// also binds tighter than the comparisons, `+`, `-` and `~`, so
+    /// `not a == b` is `(not a) == b` there and `not (a == b)` in the other
+    /// dialects.
     pub fn prefix_binding_power(self, op: UnaryOp) -> u8 {
         match op {
             UnaryOp::Neg => u8::MAX,
