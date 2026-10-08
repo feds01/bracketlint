@@ -332,6 +332,23 @@ impl<'lex> Lexer<'lex> {
                     _ => TokenKind::Minus,
                 },
                 '+' => TokenKind::Plus,
+                '*' => match self.peek() {
+                    '*' => {
+                        self.skip_ascii();
+                        TokenKind::StarStar
+                    }
+                    _ => TokenKind::Star,
+                },
+                '/' => match self.peek() {
+                    '/' => {
+                        self.skip_ascii();
+                        TokenKind::SlashSlash
+                    }
+                    _ => TokenKind::Slash,
+                },
+                // `~` is also Twig's whitespace control marker, which the arm
+                // for markers above takes when it is next to the delimiter.
+                '~' => TokenKind::Tilde,
                 c @ ('\'' | '"') => self.string(c),
                 c => TokenKind::Unexpected(c),
             }
@@ -760,4 +777,98 @@ fn is_ident_start(c: char) -> bool {
 /// True if `c` is valid as a non-first character of an identifier.
 pub(crate) fn is_id_continue(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == '_' || c == '-'
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use bl_ast::{Dialect, LineRanges, SourceId, SpannedSource};
+
+    use crate::{
+        Lexer,
+        token::{Delimiter, NumberFlags, TokenKind},
+    };
+
+    /// The kinds of the tokens that `source` lexes to in `dialect`.
+    fn kinds(source: &str, dialect: Dialect) -> Vec<TokenKind> {
+        let path = PathBuf::new();
+        let line_ranges = LineRanges::new_from_str(source);
+        let spanned = SpannedSource::new(source, &path, &line_ranges);
+
+        let tokens = Lexer::new(spanned, SourceId::default(), dialect).tokenise().tokens;
+        tokens.into_iter().map(|token| token.kind).collect()
+    }
+
+    /// The kinds of the tokens of a tag with `delimiter` and `inner` inside it.
+    fn tag(delimiter: Delimiter, inner: &[TokenKind]) -> Vec<TokenKind> {
+        let mut kinds = vec![TokenKind::Tree(delimiter, inner.len() as u32)];
+        kinds.extend_from_slice(inner);
+        kinds
+    }
+
+    #[test]
+    fn doubled_operators_are_one_token() {
+        assert_eq!(
+            kinds("{% a ** b * c // d / e %}", Dialect::Jinja),
+            tag(
+                Delimiter::Percent,
+                &[
+                    TokenKind::Ident,
+                    TokenKind::StarStar,
+                    TokenKind::Ident,
+                    TokenKind::Star,
+                    TokenKind::Ident,
+                    TokenKind::SlashSlash,
+                    TokenKind::Ident,
+                    TokenKind::Slash,
+                    TokenKind::Ident,
+                ]
+            )
+        );
+    }
+
+    #[test]
+    fn percent_only_closes_a_tag_before_a_brace() {
+        for source in ["{% a % 2 %}", "{% a%2%}"] {
+            assert_eq!(
+                kinds(source, Dialect::Jinja),
+                tag(
+                    Delimiter::Percent,
+                    &[TokenKind::Ident, TokenKind::Percent, TokenKind::Number(NumberFlags::Int)]
+                ),
+                "{source}"
+            );
+        }
+    }
+
+    #[test]
+    fn operators_inside_a_tag_with_trim_markers() {
+        let cases = [
+            (Dialect::Twig, "{{~ a ~ b ~}}", Delimiter::Brace, TokenKind::Tilde),
+            (Dialect::Twig, "{%~ a~b~%}", Delimiter::Percent, TokenKind::Tilde),
+            (Dialect::Twig, "{{- a ~ b -}}", Delimiter::Brace, TokenKind::Tilde),
+            (Dialect::Jinja, "{{- a ~ b -}}", Delimiter::Brace, TokenKind::Tilde),
+            (Dialect::Jinja, "{%- a - b-%}", Delimiter::Percent, TokenKind::Minus),
+            (Dialect::Jinja, "{%+ a + b +%}", Delimiter::Percent, TokenKind::Plus),
+            (Dialect::Liquid, "{%- a - b -%}", Delimiter::Percent, TokenKind::Minus),
+        ];
+
+        for (dialect, source, delimiter, op) in cases {
+            assert_eq!(
+                kinds(source, dialect),
+                tag(delimiter, &[TokenKind::Ident, op, TokenKind::Ident]),
+                "{source} in {dialect}"
+            );
+        }
+    }
+
+    #[test]
+    fn tilde_is_only_a_trim_marker_in_twig() {
+        assert_eq!(kinds("{{ a ~}}", Dialect::Twig), tag(Delimiter::Brace, &[TokenKind::Ident]));
+        assert_eq!(
+            kinds("{{ a ~}}", Dialect::Jinja),
+            tag(Delimiter::Brace, &[TokenKind::Ident, TokenKind::Tilde])
+        );
+    }
 }
