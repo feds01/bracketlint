@@ -65,7 +65,7 @@ corpus-compare ref="main":
     cat target/corpus/comparison.md
     exit "${status:-0}"
 
-# Run the lexer and parser benchmarks, extra args go to divan, e.g. `just bench django`
+# Run the lexer, parser and formatter benchmarks, extra args go to divan, e.g. `just bench django`
 bench *args:
     cargo bench -p bl_benchmark -- "$@"
 

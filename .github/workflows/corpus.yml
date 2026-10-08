@@ -11,7 +11,6 @@ on:
       - "crates/**"
       - "!crates/bl/**"
       - "!crates/bl_benchmark/**"
-      - "!crates/bl_benches/**"
       - "tests/corpus/**"
       - "tests/lib.rs"
       - "tests/Cargo.toml"
