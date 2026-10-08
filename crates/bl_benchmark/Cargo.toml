@@ -1,0 +1,32 @@
+[package]
+name = "bl_benchmark"
+version = "0.1.0"
+authors = { workspace = true }
+edition = { workspace = true }
+publish = false
+
+[lib]
+bench = false
+doctest = false
+
+[lints.rust]
+# Set by `cargo codspeed` when it builds the benchmarks
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(codspeed)"] }
+
+[[bench]]
+name = "lexer"
+harness = false
+
+[[bench]]
+name = "parser"
+harness = false
+
+[dependencies]
+bl_ast = { workspace = true }
+bl_workspace = { workspace = true }
+
+[dev-dependencies]
+divan = { package = "codspeed-divan-compat", version = "5.0.2" }
+
+bl_lexer = { workspace = true }
+bl_parse = { workspace = true }
