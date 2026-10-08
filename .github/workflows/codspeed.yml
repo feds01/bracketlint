@@ -1,0 +1,47 @@
+name: CodSpeed
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Lets CodSpeed backfill results for earlier commits
+  workflow_dispatch:
+
+jobs:
+  benchmarks:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write # to authenticate with CodSpeed through OpenID Connect
+
+    env:
+      CARGO_TERM_COLOR: always
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v7
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly
+
+      - name: Dependency caching
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-codspeed
+        uses: taiki-e/install-action@v2
+        with:
+          # Keep in step with `codspeed-divan-compat` in Cargo.toml
+          tool: cargo-codspeed@5.0.2
+
+      - name: Build the benchmarks
+        run: cargo codspeed build -p bl_benchmark
+
+      - name: Run the benchmarks
+        uses: CodSpeedHQ/action@v5
+        with:
+          mode: simulation
+          run: cargo codspeed run -p bl_benchmark

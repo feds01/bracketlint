@@ -49,6 +49,10 @@ update-snapshots *filter:
 corpus:
     cargo test -p bl_tests -- corpus --nocapture
 
+# Run the lexer and parser benchmarks, extra args go to divan, e.g. `just bench django`
+bench *args:
+    cargo bench -p bl_benchmark -- "$@"
+
 # Run clippy, denying warnings
 clippy:
     cargo clippy --workspace --all-targets -- -D warnings

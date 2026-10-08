@@ -34,7 +34,7 @@ jobs:
         run: "cargo test --all --verbose"
 
       - name: Run clippy
-        run: "cargo clippy --all -- -D warnings"
+        run: "cargo clippy --all --all-targets -- -D warnings"
 
       - name: Check formatting
         run: "cargo fmt --all -- --check"

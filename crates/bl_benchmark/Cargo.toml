@@ -1,0 +1,28 @@
+[package]
+name = "bl_benchmark"
+version = "0.1.0"
+authors = { workspace = true }
+edition = { workspace = true }
+publish = false
+
+[lib]
+bench = false
+doctest = false
+
+[[bench]]
+name = "lexer"
+harness = false
+
+[[bench]]
+name = "parser"
+harness = false
+
+[dependencies]
+bl_ast = { workspace = true }
+bl_workspace = { workspace = true }
+
+[dev-dependencies]
+divan = { workspace = true }
+
+bl_lexer = { workspace = true }
+bl_parse = { workspace = true }
