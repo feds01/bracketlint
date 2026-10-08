@@ -37,5 +37,6 @@ clap = { workspace = true}
 rusty-fork = "0.3"
 serde = { workspace = true }
 strum = { workspace = true }
+tabled = "0.22"
 tempfile = "3"
 toml = { workspace = true }

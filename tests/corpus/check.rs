@@ -11,13 +11,13 @@ use bl_fmt::{FormatQuery, FormatQueryResult, FormatterOptions, fmt_module};
 use bl_parse::{ParseQuery, ParseQueryResult, parse_source};
 use bl_reporting::Reports;
 use bl_workspace::{Dialect, WorkspaceMembers};
-use strum::{EnumString, IntoStaticStr};
+use strum::IntoStaticStr;
 
 use super::source::Source;
 
 /// How a template does, from worst to best. A template gets the first status
 /// that applies to it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, EnumString, IntoStaticStr)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, IntoStaticStr)]
 #[strum(serialize_all = "kebab-case")]
 pub enum Status {
     /// Parsing it reports an error.
@@ -74,6 +74,14 @@ impl<'a> CheckedSource<'a> {
             .collect();
 
         CheckedSource { source, outcomes }
+    }
+
+    /// The baseline of the source: the status of each template, a line each.
+    pub fn baseline(&self) -> String {
+        let line = |(path, outcome): (&String, &Outcome)| {
+            format!("{:<13} {path}\n", outcome.status.name())
+        };
+        self.outcomes.iter().map(line).collect()
     }
 }
 

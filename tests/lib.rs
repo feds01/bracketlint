@@ -1,7 +1,7 @@
 #![feature(test)]
 extern crate test;
 
-/// Checks of real-world templates in each dialect, see `corpus/report.md`
+/// Checks of real-world templates in each dialect, see `corpus/sources.toml`
 mod corpus;
 
 /// Modules to do with UI tests and running them
@@ -26,6 +26,35 @@ pub(crate) const ANSI_RE: &str =
 
 lazy_static! {
     pub static ref ANSI_REGEX: Regex = Regex::new(ANSI_RE).unwrap();
+}
+
+/// Check that `actual` matches the snapshot at `path`, which is written instead
+/// if [`REGENERATE_OUTPUT`] is set or there is none yet. An empty snapshot is
+/// the same as none, so it isn't written, and is removed when re-generating.
+#[cfg(test)]
+pub(crate) fn assert_snapshot(path: &Path, actual: &str) -> std::io::Result<()> {
+    if *REGENERATE_OUTPUT || !path.exists() {
+        if !actual.is_empty() {
+            fs::write(path, actual)?;
+        } else if path.exists() {
+            fs::remove_file(path)?;
+        }
+    }
+
+    let expected = match fs::read_to_string(path) {
+        Ok(expected) => expected.replace("\r\n", "\n"),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(err) => panic!("couldn't open `{}`: {err:?}", path.display()),
+    };
+
+    pretty_assertions::assert_str_eq!(
+        expected,
+        actual,
+        "\n`{}` is out of date, re-generate it with `just update-snapshots`\n",
+        path.display()
+    );
+
+    Ok(())
 }
 
 /// Stub function for cargo to treat this as a library.

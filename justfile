@@ -41,7 +41,7 @@ test *args:
 test-ui *filter:
     cargo test -p bl_tests -- "$@"
 
-# Re-generate the `.stderr`/`.stdout` snapshots in tests/cases, and the baselines and report in tests/corpus, from current output
+# Re-generate the `.stderr`/`.stdout` snapshots in tests/cases, and the baselines in tests/corpus, from current output
 update-snapshots *filter:
     REGENERATE_OUTPUT=true cargo test -p bl_tests -- --skip ensure_regenerate_output_is_disabled "$@"
 
