@@ -48,7 +48,7 @@ jobs:
       - name: Install cargo-codspeed
         uses: taiki-e/install-action@v2
         with:
-          # Keep in step with `codspeed-divan-compat` in Cargo.toml
+          # Keep in step with `codspeed-divan-compat` in crates/bl_benchmark/Cargo.toml
           tool: cargo-codspeed@5.0.2
 
       - name: Build the benchmarks

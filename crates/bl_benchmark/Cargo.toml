@@ -26,7 +26,7 @@ bl_ast = { workspace = true }
 bl_workspace = { workspace = true }
 
 [dev-dependencies]
-divan = { workspace = true }
+divan = { package = "codspeed-divan-compat", version = "5.0.2" }
 
 bl_lexer = { workspace = true }
 bl_parse = { workspace = true }

@@ -42,10 +42,8 @@ $ just test              # run all tests
 $ just update-snapshots  # re-generate the UI test snapshots in tests/cases, and how the real-world templates in tests/corpus do
 $ just corpus            # print how the real-world templates in tests/corpus do
 $ just ci                # run tests, clippy and the formatting check, like CI does
-$ just bench             # run the lexer and parser benchmarks
+$ just bench             # run benchmarks
 ```
-
-The benchmarks in [`crates/bl_benchmark`](./crates/bl_benchmark) use [divan](https://github.com/nvzqz/divan). In CI, [CodSpeed](https://codspeed.io) also runs them on every pull request that changes the code they build, and reports changes in time and memory against `main`.
 
 ### Releasing
 
