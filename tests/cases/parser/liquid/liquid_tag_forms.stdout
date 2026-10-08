@@ -1,0 +1,27 @@
+info: parsed module '$DIR/liquid_tag_forms.html' as liquid:
+body
+├─liquid
+│ └─body
+├─liquid
+│ └─body
+│   └─generic_tag
+│     ├─name "assign"
+│     └─args
+│       └─arg
+│         ├─name "total"
+│         └─lit_expr
+│           └─int_lit 1
+├─comment
+├─comment
+├─text
+├─inline
+│ └─var_expr
+│   └─name "liquid"
+├─text
+└─generic_tag
+  ├─name "liquid-tag"
+  └─args
+    └─arg
+      └─var_expr
+        └─name "foo"
+

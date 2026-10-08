@@ -1,6 +1,6 @@
 <div>
 {% comment %}Not rendered{% endcomment %}
 
-        <p>{{ product.title }}</p>
-        </div>
+    <p>{{ product.title }}</p>
+    </div>
 

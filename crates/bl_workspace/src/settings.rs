@@ -69,6 +69,7 @@ pub(crate) static EXCLUDE: &[FilePattern] = &[
 pub(crate) static INCLUDE: &[FilePattern] = &[
     FilePattern::Builtin("*.html"),
     FilePattern::Builtin("*.jinja"),
+    FilePattern::Builtin("*.liquid"),
     FilePattern::Builtin("*.twig"),
 ];
 
@@ -196,6 +197,17 @@ impl Default for Settings {
 #[cfg(test)]
 mod test_super {
     use super::*;
+
+    #[test]
+    fn test_include() {
+        let settings = FileResolverSettings::new();
+
+        for path in ["index.html", "base.jinja", "product.liquid", "layout.twig"] {
+            assert!(settings.include.is_match(path), "{path} isn't included");
+        }
+
+        assert!(!settings.include.is_match("main.rs"));
+    }
 
     #[test]
     fn test_dialect_for() {

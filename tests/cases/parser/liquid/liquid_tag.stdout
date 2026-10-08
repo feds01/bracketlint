@@ -1,0 +1,36 @@
+info: parsed module '$DIR/liquid_tag.html' as liquid:
+body
+└─liquid
+  └─body
+    ├─generic_tag
+    │ ├─name "assign"
+    │ └─args
+    │   └─arg
+    │     ├─name "total"
+    │     └─access_expr
+    │       ├─subject
+    │       │ └─var_expr
+    │       │   └─name "cart"
+    │       └─field
+    │         └─name "total_price"
+    └─if
+      └─clauses
+        └─if_clause
+          ├─condition
+          │ └─bin_expr
+          │   ├─lhs
+          │   │ └─var_expr
+          │   │   └─name "total"
+          │   ├─operator `>`
+          │   └─rhs
+          │     └─lit_expr
+          │       └─int_lit 100
+          └─clause_body
+            └─body
+              └─generic_tag
+                ├─name "echo"
+                └─args
+                  └─arg
+                    └─lit_expr
+                      └─str_lit "Free shipping"
+

@@ -245,7 +245,6 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
             (bl_ast::Statement::Comment(_), _) => {
                 // If the statement is a comment, we need to check if
                 // the next line is the end of the line.
-                self.ctx.increment_indent();
                 self.push_hunk("\n");
 
                 // Additional logic can be added here that uses next_statement if needed
@@ -294,7 +293,8 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             | bl_ast::Tag::Render(_)
             // The body of a Liquid `capture` is rendered into a string, so its
             // whitespace matters, just like a `raw` block's.
-            | bl_ast::Tag::Capture(_) => {
+            | bl_ast::Tag::Capture(_)
+            | bl_ast::Tag::Liquid(_) => {
                 self.space_from_previous(node.span().range.start());
                 self.push_source(node.span());
                 Ok(())

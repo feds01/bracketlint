@@ -23,6 +23,10 @@ pub enum Delimiter {
 
     /// Bracket, `[` or `]`
     Bracket,
+
+    /// A line of a Liquid `{% liquid %}` tag, which is a tag without
+    /// delimiters. It holds the line's tokens, up to the end of the line.
+    Line,
 }
 
 impl Delimiter {
@@ -33,6 +37,7 @@ impl Delimiter {
             Delimiter::Percent => "{%",
             Delimiter::Brace => "{{",
             Delimiter::Bracket => "[",
+            Delimiter::Line => "",
         }
     }
 
@@ -43,6 +48,7 @@ impl Delimiter {
             Delimiter::Percent => "%}",
             Delimiter::Brace => "}}",
             Delimiter::Bracket => "]",
+            Delimiter::Line => "",
         }
     }
 
@@ -53,7 +59,14 @@ impl Delimiter {
             Delimiter::Paren | Delimiter::Bracket => 1,
             // `{%`, `%}`, `{{`, `}}`
             Delimiter::Percent | Delimiter::Brace => 2,
+            Delimiter::Line => 0,
         }
+    }
+
+    /// Whether a tree with this delimiter is a tag, i.e. a `{% %}` tree or a
+    /// line of a `liquid` tag.
+    pub const fn is_tag(&self) -> bool {
+        matches!(self, Delimiter::Percent | Delimiter::Line)
     }
 }
 
@@ -191,9 +204,9 @@ impl TokenKind {
         matches!(self, TokenKind::Tree(_, _))
     }
 
-    /// Check if a token is a tree token.
-    pub fn is_percent_tree(&self) -> bool {
-        matches!(self, TokenKind::Tree(Delimiter::Percent, _))
+    /// Check if a token is the tree of a tag, see [Delimiter::is_tag].
+    pub fn is_tag_tree(&self) -> bool {
+        matches!(self, TokenKind::Tree(delimiter, _) if delimiter.is_tag())
     }
 
     pub fn is_soft_keyword(&self) -> bool {

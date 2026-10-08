@@ -242,6 +242,16 @@ pub enum Keyword {
     /// {% render "product-card", product: product %}
     /// ```
     Render,
+    /// `liquid` - Begins a Liquid tag that holds a tag on each of its lines.
+    /// The lexer only makes this keyword at the start of the tag, so that
+    /// `liquid` is still a name elsewhere
+    /// ```liquid
+    /// {% liquid
+    ///   assign total = cart.total_price
+    ///   echo total
+    /// %}
+    /// ```
+    Liquid,
 }
 impl Keyword {
     pub fn identifier_like(&self) -> bool {

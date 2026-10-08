@@ -1,0 +1,8 @@
+// run=pass, stage=check, dialect=liquid
+
+{% liquid %}
+{%- liquid assign total = 1 -%}
+{%# a comment without a space %}
+{%- # a trimmed comment -%}
+<p>{{ liquid }}</p>
+{% liquid-tag foo %}

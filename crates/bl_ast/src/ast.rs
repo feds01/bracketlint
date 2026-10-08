@@ -819,6 +819,20 @@ define_tree! {
         pub trim: TrimTag,
     }
 
+    /// A Liquid `liquid` tag, which holds a tag on each of its lines, i.e.
+    ///
+    /// ```liquid
+    /// {% liquid
+    ///   assign total = cart.total_price
+    ///   echo total
+    /// %}
+    /// ```
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct LiquidTag {
+        pub block_body: Child!(Body),
+    }
+
     /// Extend the current template with the contents of another file.
     #[derive(Clone, Debug, PartialEq)]
     #[node]
@@ -1140,6 +1154,9 @@ define_tree! {
         /// The Liquid `{% capture name %}` tag, ending with `{% endcapture %}`
         Capture(Capture),
 
+        /// The Liquid `{% liquid %}` tag, with a tag on each of its lines
+        Liquid(LiquidTag),
+
         /// The `{% continue %}` tag
         Continue(Continue),
 
@@ -1175,6 +1192,7 @@ define_tree! {
                 Tag::Case(_) => "case",
                 Tag::Render(_) => "render",
                 Tag::Capture(_) => "capture",
+                Tag::Liquid(_) => "liquid",
                 Tag::Continue(_) => "continue",
                 Tag::Break(_) => "break",
                 Tag::Raw(_) => "raw",
@@ -1182,7 +1200,7 @@ define_tree! {
         }
 
         pub fn is_inline(&self) -> bool {
-            matches!(self, Tag::Unprocessable(_) | Tag::Assignment(_) | Tag::Continue(_) | Tag::Break(_) | Tag::Generic(_) | Tag::Render(_) | Tag::Capture(_) )
+            matches!(self, Tag::Unprocessable(_) | Tag::Assignment(_) | Tag::Continue(_) | Tag::Break(_) | Tag::Generic(_) | Tag::Render(_) | Tag::Capture(_) | Tag::Liquid(_) )
         }
 
     }

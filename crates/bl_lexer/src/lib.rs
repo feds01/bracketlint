@@ -57,6 +57,10 @@ pub struct Lexer<'lex> {
     /// Location of the lexer in the current stream.
     offset: Cell<usize>,
 
+    /// The offset that the lexer stops at, which is the end of the source,
+    /// except while it lexes a line of a Liquid `{% liquid %}` tag.
+    end: Cell<usize>,
+
     /// The ID of the member that the lexer is processing, useful for error
     /// reporting.
     pub id: SourceId,
@@ -86,6 +90,7 @@ impl<'lex> Lexer<'lex> {
             has_fatal_error: false,
             tree: Cell::new(None),
             offset: Cell::new(0),
+            end: Cell::new(spanned.source.len()),
         }
     }
 
@@ -151,13 +156,15 @@ impl<'lex> Lexer<'lex> {
         // ##Safety: We rely that the byte offset is correctly computed when stepping
         // over the characters in the iterator.
         unsafe {
-            std::str::from_utf8_unchecked(self.spanned.source.as_bytes().get_unchecked(offset..))
+            std::str::from_utf8_unchecked(
+                self.spanned.source.as_bytes().get_unchecked(offset..self.end.get()),
+            )
         }
     }
 
     /// Checks if there is nothing more to consume.
     fn is_eof(&self) -> bool {
-        self.spanned.source.len() == self.offset.get()
+        self.end.get() == self.offset.get()
     }
 
     /// Returns amount of already consumed symbols.
@@ -207,11 +214,10 @@ impl<'lex> Lexer<'lex> {
         let offset = self.offset.get();
 
         let on_tree = |this: &mut Self, delimiter: Delimiter| {
+            // The length and the span of the tree are set once it closes.
             let tree = this.tokens.len();
-            this.tokens.push(Token::new(
-                TokenKind::Tree(delimiter, 0),
-                ByteRange::new(offset, this.len_consumed()),
-            ));
+            this.tokens
+                .push(Token::new(TokenKind::Tree(delimiter, 0), ByteRange::singleton(offset)));
             this.eat_token_tree(delimiter);
 
             if this.has_fatal_error {
@@ -235,6 +241,22 @@ impl<'lex> Lexer<'lex> {
             // Immediately try to index the next token...
             this.advance_token()
         };
+
+        // Each line of a `liquid` tag is a tag without delimiters, or a comment
+        // if it starts with `#`.
+        if let Some(info) = self.tree.get()
+            && self.at_liquid_line(info)
+        {
+            if self.peek() != '#' {
+                return on_tree(self, Delimiter::Line);
+            }
+
+            self.offset.set(self.line_end());
+            return Some(Token::new(
+                TokenKind::Comment,
+                ByteRange::new(offset, self.len_consumed()),
+            ));
+        }
 
         let kind = if let Some(mut info) = self.tree.get() {
             match self.next()? {
@@ -327,6 +349,7 @@ impl<'lex> Lexer<'lex> {
                     // 2. We have a function block, which is `{% ... %}`
                     // 3. We have a comment block, which is `{# ... #}`
                     match self.peek() {
+                        '%' if self.at_inline_comment() => self.inline_comment(),
                         c @ ('%' | '{') => {
                             self.skip_ascii();
 
@@ -368,6 +391,13 @@ impl<'lex> Lexer<'lex> {
             self.skip_ascii();
         }
 
+        // A line of a `liquid` tag has no closing delimiter, and ends at the end
+        // of the line instead.
+        let end = self.end.get();
+        if delimiter == Delimiter::Line {
+            self.end.set(self.line_end());
+        }
+
         // we need to reset self.prev here as it might be polluted with previous token
         // trees
         let tree = Cell::new(Some(TreeInfo { start: self.tokens.len(), delimiter: None }));
@@ -378,6 +408,19 @@ impl<'lex> Lexer<'lex> {
         while !self.is_eof() {
             match self.advance_token() {
                 Some(token) => self.tokens.push(token),
+                // A closing delimiter in a line closes nothing, e.g. the `)` in
+                // `echo total)`, and the rest of the line is still lexed.
+                None if delimiter == Delimiter::Line => {
+                    let Some(TreeInfo { delimiter: Some(closer), start }) = self.tree.get() else {
+                        break;
+                    };
+
+                    let span =
+                        ByteRange::new(self.offset.get() - closer.width(), self.len_consumed());
+                    let kind = self.emit_error(LexerErrorKind::UnexpectedClose(closer), span);
+                    self.tokens.push(Token::new(kind, span));
+                    self.tree.set(Some(TreeInfo { start, delimiter: None }));
+                }
                 None => break,
             }
         }
@@ -388,6 +431,7 @@ impl<'lex> Lexer<'lex> {
         // everyone should refer to `tree`, not `self.tree` since this is now
         // the old one.
         self.tree.swap(&tree);
+        self.end.set(end);
 
         // If there is a fatal error, then we need to abort
         if self.has_fatal_error {
@@ -395,7 +439,11 @@ impl<'lex> Lexer<'lex> {
         }
 
         match tree.get() {
-            Some(TreeInfo { delimiter: Some(d), start, .. }) if d == delimiter => {
+            // A line closes at its end, rather than at a delimiter.
+            Some(TreeInfo { delimiter: closer, start })
+                if closer == Some(delimiter)
+                    || (closer.is_none() && delimiter == Delimiter::Line) =>
+            {
                 // Update the tree token with the length of the tree.
                 self.tokens[start - 1] = Token::new(
                     TokenKind::Tree(delimiter, (self.tokens.len() - start) as u32),
@@ -406,10 +454,13 @@ impl<'lex> Lexer<'lex> {
                 // a dummy token to denote the end of the tree.
                 TokenKind::RightDelim(delimiter)
             }
-            _ => {
-                // backtrack a single token, so that if other trees exist, they can
-                // still be properly handled.
-                self.offset.set(self.offset.get() - 1);
+            tree => {
+                // Step back over a closing delimiter of another tree, so that tree can
+                // still close, e.g. the `]` in `items[f(0]` closes the `[` tree. There is
+                // nothing to step back over at the end of the source.
+                if matches!(tree, Some(TreeInfo { delimiter: Some(_), .. })) {
+                    self.offset.set(self.offset.get() - 1);
+                }
 
                 self.emit_error(
                     LexerErrorKind::Unclosed(delimiter),
@@ -557,10 +608,98 @@ impl<'lex> Lexer<'lex> {
 
         let name = &self.spanned.source[start..self.offset.get()];
 
+        // `liquid` is only a keyword as the name of a tag, so that it is still a
+        // name elsewhere, e.g. in `{{ liquid }}`.
+        if name == "liquid" && self.dialect.has_liquid_tag() && self.at_tag_name() {
+            return TokenKind::Keyword(Keyword::Liquid);
+        }
+
         if let Some(keyword) = Keyword::from_ident(name, self.dialect) {
             TokenKind::Keyword(keyword)
         } else {
             TokenKind::Ident
+        }
+    }
+
+    /// The contents of the `{% %}` tag that starts at the next `%`, after its
+    /// whitespace control marker and whitespace.
+    fn tag_contents(&self) -> &str {
+        let slice = unsafe { self.as_slice() };
+        self.strip_trim_marker(&slice[1..]).trim_start()
+    }
+
+    /// `text` without the whitespace control marker that it starts with, if
+    /// it has one.
+    fn strip_trim_marker<'s>(&self, text: &'s str) -> &'s str {
+        text.strip_prefix(self.dialect.trim_markers()).unwrap_or(text)
+    }
+
+    /// Whether the `{% %}` tag that starts at the next `%` is an inline
+    /// comment, e.g. `{% # note %}`.
+    fn at_inline_comment(&self) -> bool {
+        self.dialect.has_inline_comments() && self.tag_contents().starts_with('#')
+    }
+
+    /// Whether the token being lexed is the first in a `{% %}` tree, i.e. the
+    /// name of the tag.
+    fn at_tag_name(&self) -> bool {
+        self.tree.get().is_some_and(|info| {
+            info.start == self.tokens.len()
+                && matches!(
+                    self.tokens[info.start - 1].kind,
+                    TokenKind::Tree(Delimiter::Percent, _)
+                )
+        })
+    }
+
+    /// Whether a line of a `liquid` tag starts here, i.e. the tree is a `{% %}`
+    /// tree whose first token is `liquid`, and its `%}` isn't next.
+    fn at_liquid_line(&self, info: TreeInfo) -> bool {
+        matches!(
+            self.tokens[info.start - 1..],
+            [
+                Token { kind: TokenKind::Tree(Delimiter::Percent, _), .. },
+                Token { kind: TokenKind::Keyword(Keyword::Liquid), .. },
+                ..
+            ]
+        ) && !self.is_eof()
+            && !self.strip_trim_marker(unsafe { self.as_slice() }).starts_with("%}")
+    }
+
+    /// The end of the line of a `liquid` tag that starts here. It ends at its
+    /// newline, or at the `%}` of the tag and its whitespace control marker,
+    /// without the whitespace before it.
+    fn line_end(&self) -> usize {
+        let rest = unsafe { self.as_slice() };
+        let line = &rest[..rest.find('\n').unwrap_or(rest.len())];
+        let line = match line.find("%}") {
+            Some(close) => {
+                line[..close].strip_suffix(self.dialect.trim_markers()).unwrap_or(&line[..close])
+            }
+            None => line,
+        };
+
+        self.offset.get() + line.trim_end().len()
+    }
+
+    /// Lex a Liquid inline comment, i.e. `{% # note %}`, from its `%` up to its
+    /// `%}`.
+    fn inline_comment(&mut self) -> TokenKind {
+        let start = self.offset.get() - 1;
+        let slice = unsafe { self.as_slice() };
+
+        match slice[1..].find("%}") {
+            Some(index) => {
+                self.offset.update(|x| x + index + 3);
+                TokenKind::Comment
+            }
+            None => {
+                self.offset.set(self.end.get());
+                self.emit_error(
+                    LexerErrorKind::Unclosed(Delimiter::Percent),
+                    ByteRange::singleton(start),
+                )
+            }
         }
     }
 

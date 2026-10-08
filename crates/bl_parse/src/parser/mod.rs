@@ -87,11 +87,19 @@ pub struct ParseFrame<'s> {
     /// An optional tag context that can be used to determine parsing
     /// behaviour.
     tag_context: Option<TagContext>,
+
+    /// The delimiter of the tree that the frame is in, if any.
+    delimiter: Option<Delimiter>,
 }
 
 impl<'s> ParseFrame<'s> {
     pub fn from_stream(stream: &'s [Token], span: ByteRange) -> Self {
-        Self { error: Cell::new(false), cursor: TokenCursor::new(stream, span), tag_context: None }
+        Self {
+            error: Cell::new(false),
+            cursor: TokenCursor::new(stream, span),
+            tag_context: None,
+            delimiter: None,
+        }
     }
 
     /// Skip `n` number of tokens.
@@ -341,10 +349,12 @@ impl<'s> Parser<'s> {
         start: usize,
         len: usize,
         parent_span: ByteRange,
+        delimiter: Delimiter,
         mut g: impl FnMut(&mut Self) -> T,
     ) -> T {
-        let new_frame =
+        let mut new_frame =
             ParseFrame::from_stream(&self.frame.stream()[start..(start + len)], parent_span);
+        new_frame.delimiter = Some(delimiter);
         let old_frame = std::mem::replace(&mut self.frame, new_frame);
         let result = g(self);
 
@@ -422,13 +432,16 @@ impl<'s> Parser<'s> {
         g: impl FnMut(&mut Self) -> ParseResult<T>,
     ) -> ParseResult<T> {
         match self.peek() {
-            Some(Token { kind: TokenKind::Tree(inner, len), span }) if *inner == delimiter => {
+            // A line of a `liquid` tag is a tag, like a `{% %}` tree.
+            Some(Token { kind: TokenKind::Tree(inner, len), span })
+                if *inner == delimiter || (inner.is_tag() && delimiter.is_tag()) =>
+            {
                 // The start of the tree is the actual `Tree` token, and then we slice
                 // from it up to the specified `len` of the tree.
                 let start = self.position() + 1;
 
                 self.skip_token(); // We want to update our position, when we return to this generator.
-                self.new_frame(start, *len as usize, *span, g)
+                self.new_frame(start, *len as usize, *span, *inner, g)
             }
             token => self.err_with_location(
                 error.unwrap_or(ParseErrorKind::UnExpected),
@@ -441,18 +454,14 @@ impl<'s> Parser<'s> {
 
     /// The whitespace control markers of the tag that the current frame is in,
     /// e.g. the `-`s in `{%- if x -%}`. The lexer leaves the markers out of
-    /// the tag's tokens, so they are read from its source, right inside the
-    /// tag's two character delimiters.
+    /// the tag's tokens, so they are read from its source, see [tag_trim]. A
+    /// line of a `liquid` tag has no delimiters, and so no markers.
     pub(crate) fn trim(&self) -> ast::TrimMarker {
-        let tag = self._source.hunk(self.range());
-        let inner = tag.get(2..tag.len().saturating_sub(2)).unwrap_or_default();
-        let marker =
-            |c: Option<char>| c.filter(|c| self.options.dialect.trim_markers().contains(c));
-
-        ast::TrimMarker {
-            left: marker(inner.chars().next()),
-            right: marker(inner.chars().next_back()),
+        if self.frame.delimiter == Some(Delimiter::Line) {
+            return ast::TrimMarker::default();
         }
+
+        tag_trim(self._source.hunk(self.range()), self.options.dialect.trim_markers())
     }
 
     /// Run `g` in the tag that is the next token, like [Parser::in_tree], and
@@ -533,7 +542,7 @@ impl<'s> Parser<'s> {
                 Ok(self.node_with_span(ast::Statement::text(), token.span))
             }
             // For parsing `{% ... %}` blocks.
-            TokenKind::Tree(Delimiter::Percent, _) => return self.parse_tag(),
+            TokenKind::Tree(delimiter, _) if delimiter.is_tag() => return self.parse_tag(),
             // For parsing `{{ ... }}` blocks.
             TokenKind::Tree(Delimiter::Brace, _) => self.parse_variable_block(),
             TokenKind::Comment => self.parse_comment(),
@@ -559,7 +568,7 @@ impl<'s> Parser<'s> {
         // The last token must be a percent tree, but we ensure this since
         // we pass the responsibility of consuming the header token to then child
         // functions.
-        debug_assert!(self.peek().is_some_and(|tok| tok.kind.is_percent_tree()));
+        debug_assert!(self.peek().is_some_and(|tok| tok.kind.is_tag_tree()));
 
         let token = self.peek_raw(1).copied().ok_or_else(|| self.make_unexpected_eof())?;
         let statement = match token.kind {
@@ -619,6 +628,7 @@ impl<'s> Parser<'s> {
                     self.with_tag_context(TagContext::Capture, |g| g.parse_capture_block())
                 }
                 token::Keyword::Render => self.parse_render_statement(),
+                token::Keyword::Liquid => self.parse_liquid_tag(),
 
                 // Control flow tags, that are effectively standalone.
                 token::Keyword::Break => self.parse_break_statement(),
@@ -1237,7 +1247,7 @@ impl<'s> Parser<'s> {
         let mut contents = thin_vec![];
 
         while let Some(token) = self.peek() {
-            if token.kind.is_percent_tree()
+            if token.kind.is_tag_tree()
                 && let Some(TokenKind::Keyword(kwd)) = self.peek_raw(1).map(|t| t.kind)
                 && stop(kwd)
             {
@@ -1269,8 +1279,9 @@ impl<'s> Parser<'s> {
         };
 
         while let Some(token) = self.peek() {
-            // Every clause body ends at the next `{% %}` tag of this block.
-            if !matches!(token.kind, TokenKind::Tree(Delimiter::Percent, len) if len > 0) {
+            // Every clause body ends at the next tag of this block.
+            if !matches!(token.kind, TokenKind::Tree(delimiter, len) if delimiter.is_tag() && len > 0)
+            {
                 break;
             }
 
@@ -1364,8 +1375,9 @@ impl<'s> Parser<'s> {
         let branches_start = self.current_pos();
 
         while let Some(token) = self.peek() {
-            // Every clause body ends at the next `{% %}` tag of this block.
-            if !matches!(token.kind, TokenKind::Tree(Delimiter::Percent, len) if len > 0) {
+            // Every clause body ends at the next tag of this block.
+            if !matches!(token.kind, TokenKind::Tree(delimiter, len) if delimiter.is_tag() && len > 0)
+            {
                 break;
             }
 
@@ -1574,7 +1586,7 @@ impl<'s> Parser<'s> {
         while let Some(token) = self.peek() {
             // If it's a percent tree (and of length 1), then we can check if it's the end
             // of the block.
-            if let TokenKind::Tree(Delimiter::Percent, _) = token.kind {
+            if token.kind.is_tag_tree() {
                 let maybe_token = self.peek_raw(1).map(|tok| tok.kind);
                 if let Some(TokenKind::Keyword(Keyword::EndComment)) = maybe_token {
                     self.in_tree(Delimiter::Percent, None, |g| {
@@ -1608,7 +1620,7 @@ impl<'s> Parser<'s> {
         while let Some(token) = self.peek() {
             // If it's a percent tree (and of length 1), then we can check if it's the end
             // of the block.
-            if let TokenKind::Tree(Delimiter::Percent, _) = token.kind {
+            if token.kind.is_tag_tree() {
                 let maybe_token = self.peek_raw(1);
                 if let Some(inner) = maybe_token
                     && peek_fn(inner.kind)
@@ -1706,6 +1718,24 @@ impl<'s> Parser<'s> {
                 g.range(),
             ))
         })
+    }
+
+    /// Parse a Liquid `{% liquid %}` tag. The lexer gives each of its lines a
+    /// `{% %}` tree, so the lines are parsed like any other tags, up to the
+    /// tree for its `%}`.
+    fn parse_liquid_tag(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+        let start = self.current_pos();
+
+        // The lines of the tag are tags of their own, up to the end of the tag.
+        let block_body = self.in_tree(Delimiter::Percent, None, |g| {
+            g.parse_token(TokenKind::Keyword(Keyword::Liquid))?;
+            g.parse_body_until(|_| false)
+        })?;
+
+        Ok(self.node_with_joined_span(
+            ast::Statement::Tag(ast::Tag::Liquid(ast::LiquidTag { block_body })),
+            start,
+        ))
     }
 
     /// Parse a Liquid `capture` block, i.e.
@@ -2008,5 +2038,30 @@ impl<'s> Parser<'s> {
 
     fn exhausted(&self) -> bool {
         self.cursor.position() == self.cursor.len()
+    }
+}
+
+/// The whitespace control markers of `tag`, which are any of `markers` right
+/// inside its two character delimiters.
+fn tag_trim(tag: &str, markers: &[char]) -> ast::TrimMarker {
+    let inner = tag.get(2..tag.len().saturating_sub(2)).unwrap_or_default();
+    let marker = |c: Option<char>| c.filter(|c| markers.contains(c));
+
+    ast::TrimMarker { left: marker(inner.chars().next()), right: marker(inner.chars().next_back()) }
+}
+
+#[cfg(test)]
+mod test_super {
+    use super::*;
+
+    #[test]
+    fn test_tag_trim() {
+        let both = ast::TrimMarker { left: Some('-'), right: Some('-') };
+        assert_eq!(tag_trim("{%- if x -%}", &['-']), both);
+        assert_eq!(tag_trim("{{- x }}", &['-']).left, Some('-'));
+        assert_eq!(tag_trim("{% if x %}", &['-']), ast::TrimMarker::default());
+
+        // Django has no markers.
+        assert_eq!(tag_trim("{%- if x -%}", &[]), ast::TrimMarker::default());
     }
 }

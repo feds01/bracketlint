@@ -1,0 +1,7 @@
+error: expected a closing `{% endif %}` tag
+ --> $DIR/liquid_tag_unclosed_block.html:3:16
+  |
+3 |       echo "Free"
+  |  ________________-
+4 | | %}
+  | |_-

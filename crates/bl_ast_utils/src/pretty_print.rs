@@ -491,6 +491,16 @@ impl AstVisitor for AstTreePrinter<'_> {
         Ok(TreeNode::branch("capture", vec![name, block_body]))
     }
 
+    type LiquidTagRet = TreeNode;
+
+    fn visit_liquid_tag(
+        &self,
+        node: ast::AstNodeRef<ast::LiquidTag>,
+    ) -> Result<Self::LiquidTagRet, Self::Error> {
+        let walk::LiquidTag { block_body } = walk::walk_liquid_tag(self, node)?;
+        Ok(TreeNode::branch("liquid", vec![block_body]))
+    }
+
     type WhenRet = TreeNode;
 
     fn visit_when(&self, node: ast::AstNodeRef<ast::When>) -> Result<Self::WhenRet, Self::Error> {

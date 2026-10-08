@@ -72,6 +72,18 @@ impl Dialect {
         matches!(self, Dialect::Jinja | Dialect::Liquid)
     }
 
+    /// Whether a `{% %}` tag that starts with `#` is a comment, e.g.
+    /// `{% # note %}`.
+    pub fn has_inline_comments(self) -> bool {
+        matches!(self, Dialect::Liquid)
+    }
+
+    /// Whether the `{% liquid %}` tag exists, which holds a tag on each of its
+    /// lines, without their delimiters.
+    pub fn has_liquid_tag(self) -> bool {
+        matches!(self, Dialect::Liquid)
+    }
+
     /// The markers that control the whitespace around a tag when they are
     /// written next to its delimiters, e.g. the `-` in `{%- if x -%}`. Django
     /// has none.
