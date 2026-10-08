@@ -1,4 +1,6 @@
-<div>{% capture greeting %}
+<div>
+{% capture greeting %}
 <span>Hello {{ customer.first_name }}</span>
-{% endcapture %}</div>
+{% endcapture %}
+    </div>
 

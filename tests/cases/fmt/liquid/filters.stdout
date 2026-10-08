@@ -1,3 +1,4 @@
-{% assign heading = collection.title | upcase %}<h2>{{ heading | escape }}</h2>
+{% assign heading = collection.title | upcase %}
+<h2>{{ heading | escape }}</h2>
 <p>{{ product.title | append: " - Sale" }}</p>
 

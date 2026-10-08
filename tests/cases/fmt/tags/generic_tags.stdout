@@ -1,4 +1,7 @@
 {% load static %}
 <link rel="stylesheet" href="{% static "css/site.css" %}">
-<form method="post">{% csrf_token %}{% include "form_fields.html" %}</form>
+<form method="post">
+{% csrf_token %}
+{% include "form_fields.html" %}
+</form>
 

@@ -1,5 +1,6 @@
 <div>
 {% raw %}
 <p>{{ message }}</p>
-{% endraw %}</div>
+{% endraw %}
+    </div>
 

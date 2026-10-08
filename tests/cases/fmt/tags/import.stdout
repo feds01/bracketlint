@@ -1,2 +1,3 @@
-{% import "forms.html" as forms %}<form>{{ forms.name }}</form>
+{% import "forms.html" as forms %}
+<form>{{ forms.name }}</form>
 

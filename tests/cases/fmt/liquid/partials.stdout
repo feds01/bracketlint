@@ -1,3 +1,5 @@
 <main>
-{% include "breadcrumbs" %}{% render "product-card", product: product %}</main>
+    {% include "breadcrumbs" %}
+    {% render "product-card", product: product %}
+    </main>
 

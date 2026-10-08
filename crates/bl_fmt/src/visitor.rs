@@ -112,15 +112,24 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         self.buffer.is_empty() || self.buffer.ends_with('\n')
     }
 
+    /// The whitespace in the source right before `start`.
+    fn whitespace_before(&self, start: usize) -> &'fmt str {
+        let before = &self.ctx.source.source[..start];
+        &before[before.trim_end().len()..]
+    }
+
+    /// The whitespace in the source right after `range`.
+    fn whitespace_after(&self, range: ByteRange) -> &'fmt str {
+        let after = &self.ctx.source.source[range.end() + 1..];
+        &after[..after.len() - after.trim_start().len()]
+    }
+
     /// Separate an item that continues the current line from what precedes
     /// it with a single space, when the source has one. The lexer skips
     /// whitespace and the engines trim it, which would otherwise turn
     /// `{{ a }}, {{ b }}` into `{{ a }},{{ b }}` and change the output.
     fn space_from_previous(&mut self, start: usize) {
-        let before = &self.ctx.source.source[..start];
-        let whitespace = &before[before.trim_end().len()..];
-
-        if is_inline_space(whitespace)
+        if is_inline_space(self.whitespace_before(start))
             && !self.at_line_start()
             && !self.buffer.ends_with(char::is_whitespace)
         {
@@ -219,12 +228,20 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
             }
 
             (bl_ast::Statement::Tag(tag), _) => {
-                if let bl_ast::Tag::Generic(generic) = tag {
-                    let name = self.ctx.source.hunk(generic.name.ast_ref().span().range);
-
-                    if bl_lexer::token::Keyword::from_ident(name, self.ctx.dialect).is_some() {
-                        self.end_line();
+                let keyword = match tag {
+                    bl_ast::Tag::Generic(generic) => {
+                        let name = self.ctx.source.hunk(generic.name.ast_ref().span().range);
+                        bl_lexer::token::Keyword::from_ident(name, self.ctx.dialect).is_some()
                     }
+                    _ => false,
+                };
+
+                // A tag that ends a line in the source ends it here too, e.g. an
+                // `{% include %}` on a line of its own.
+                let ends_line = self.whitespace_after(statement.span().range).contains('\n');
+
+                if (keyword || ends_line) && !self.at_line_start() {
+                    self.end_line();
                 }
 
                 Ok(())
@@ -295,8 +312,28 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             // whitespace matters, just like a `raw` block's.
             | bl_ast::Tag::Capture(_)
             | bl_ast::Tag::Liquid(_) => {
-                self.space_from_previous(node.span().range.start());
-                self.push_source(node.span());
+                // The tag starts a line when the source starts one with it.
+                let span = node.span();
+                let whitespace = self.whitespace_before(span.range.start());
+                if whitespace.contains('\n') && !self.at_line_start() {
+                    self.end_line();
+                }
+
+                // A tag that spans several lines keeps its column, so that its other
+                // lines, which are kept as they are written, still line up with it.
+                // Any other tag at the start of a line is indented.
+                if self.at_line_start() {
+                    match whitespace.rfind('\n') {
+                        Some(newline) if self.ctx.source.hunk(span.range).contains('\n') => {
+                            self.push_hunk(&whitespace[newline + 1..]);
+                        }
+                        _ => self.add_indent(),
+                    }
+                } else {
+                    self.space_from_previous(span.range.start());
+                }
+
+                self.push_source(span);
                 Ok(())
             }
         }
