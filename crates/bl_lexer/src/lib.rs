@@ -17,6 +17,11 @@ use token::{Delimiter, Keyword, NumberFlags, Token, TokenKind};
 /// 'prev' in a [Lexer] since there is no character before the start.
 const EOF_CHAR: char = '\0';
 
+/// The number of source bytes per token that the [Lexer] reserves space for
+/// up front, so that the tokens rarely need to grow. Half of real-world
+/// templates have more than 13 bytes per token, and the densest about 4.
+const BYTES_PER_TOKEN: usize = 8;
+
 /// Information about a tree that is being lexed by the [Lexer]. Includes
 /// information about the start of the lexer (in the token buffer), and if the
 /// lexer consumed a delimiter token.
@@ -88,7 +93,7 @@ impl<'lex> Lexer<'lex> {
             dialect,
             spanned,
             diagnostics: LexerDiagnostics::default(),
-            tokens: Vec::new(),
+            tokens: Vec::with_capacity(spanned.source.len() / BYTES_PER_TOKEN),
             has_fatal_error: false,
             tree: Cell::new(None),
             offset: Cell::new(0),
