@@ -756,7 +756,9 @@ dependencies = [
 name = "bl_tests"
 version = "0.1.0"
 dependencies = [
+ "bl_fmt",
  "bl_lints",
+ "bl_parse",
  "bl_reporting",
  "bl_testing_internal",
  "bl_testing_macros",
@@ -769,7 +771,10 @@ dependencies = [
  "pretty_assertions",
  "regex",
  "rusty-fork",
+ "serde",
+ "strum",
  "tempfile",
+ "toml",
 ]
 
 [[package]]
@@ -832,9 +837,6 @@ dependencies = [
  "colored",
  "log",
  "once_cell",
- "serde",
- "tempfile",
- "toml",
  "wild",
 ]
 

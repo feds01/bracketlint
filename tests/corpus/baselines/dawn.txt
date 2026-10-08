@@ -84,4 +84,4 @@ ok            snippets/share-button.liquid
 ok            snippets/social-icons.liquid
 unstable      snippets/swatch-input.liquid
 fmt-error     snippets/swatch.liquid
-ok            snippets/unit-price.liquid
+parse-error   snippets/unit-price.liquid

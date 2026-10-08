@@ -17,7 +17,9 @@ regex = { workspace = true }
 lazy_static = "1.5.1"
 log = { workspace = true }
 
+bl_fmt = { workspace = true }
 bl_lints = { workspace = true }
+bl_parse = { workspace = true }
 bl_reporting = { workspace = true }
 bl_utils = { workspace = true }
 bl_workspace = { workspace = true }
@@ -33,4 +35,7 @@ dist = false
 [dev-dependencies]
 clap = { workspace = true}
 rusty-fork = "0.3"
+serde = { workspace = true }
+strum = { workspace = true }
 tempfile = "3"
+toml = { workspace = true }

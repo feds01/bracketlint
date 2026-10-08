@@ -1,6 +1,9 @@
 #![feature(test)]
 extern crate test;
 
+/// Checks of real-world templates in each dialect, see `corpus/report.md`
+mod corpus;
+
 /// Modules to do with UI tests and running them
 mod runner;
 
