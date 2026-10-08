@@ -1,0 +1,13 @@
+// run=pass, stage=check, dialect=django
+
+{% if a == b > c %}{% endif %}
+{% if a == b == c %}{% endif %}
+{% if a in b == c %}{% endif %}
+{% if a == b in c %}{% endif %}
+{% if a is defined == b %}{% endif %}
+{% if a == b is defined %}{% endif %}
+{% if not a == b %}{% endif %}
+{% if not a is defined %}{% endif %}
+{% if not a in b %}{% endif %}
+{% if a is not defined == b %}{% endif %}
+{% if a not in b == c %}{% endif %}
