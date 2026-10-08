@@ -334,26 +334,8 @@ impl<'lex> Lexer<'lex> {
                     // 2. We have a function block, which is `{% ... %}`
                     // 3. We have a comment block, which is `{# ... #}`
                     match self.peek() {
-                        // A Liquid tag that starts with `#` is a comment, e.g.
-                        // `{% # note %}`.
-                        '%' if self.dialect.is_liquid()
-                            && self.liquid_tag_starts_with(|tag| tag.starts_with('#')) =>
-                        {
-                            self.inline_comment()
-                        }
-                        '%' if self.dialect.is_liquid()
-                            && self.liquid_tag_starts_with(|tag| {
-                                // `liquid` is the whole name, e.g. not `liquid-tag`.
-                                tag.strip_prefix("liquid").is_some_and(|rest| {
-                                    let markers = self.dialect.trim_markers();
-                                    rest.starts_with(char::is_whitespace)
-                                        || rest
-                                            .strip_prefix(markers)
-                                            .unwrap_or(rest)
-                                            .starts_with("%}")
-                                })
-                            }) =>
-                        {
+                        '%' if self.at_inline_comment() => self.inline_comment(),
+                        '%' if self.at_liquid_tag() => {
                             self.liquid_tag(offset);
                             return self.advance_token();
                         }
@@ -598,13 +580,33 @@ impl<'lex> Lexer<'lex> {
         }
     }
 
-    /// Whether the contents of the `{% %}` tag that starts at the next `%`
-    /// satisfy `f`, after its whitespace control marker and whitespace.
-    fn liquid_tag_starts_with(&self, f: impl FnOnce(&str) -> bool) -> bool {
+    /// The contents of the `{% %}` tag that starts at the next `%`, after its
+    /// whitespace control marker and whitespace.
+    fn tag_contents(&self) -> &str {
         let slice = unsafe { self.as_slice() };
-        let tag = &slice[1..];
-        let tag = tag.strip_prefix(self.dialect.trim_markers()).unwrap_or(tag);
-        f(tag.trim_start())
+        self.strip_trim_marker(&slice[1..]).trim_start()
+    }
+
+    /// `text` without the whitespace control marker that it starts with, if
+    /// it has one.
+    fn strip_trim_marker<'s>(&self, text: &'s str) -> &'s str {
+        text.strip_prefix(self.dialect.trim_markers()).unwrap_or(text)
+    }
+
+    /// Whether the `{% %}` tag that starts at the next `%` is an inline
+    /// comment, e.g. `{% # note %}`.
+    fn at_inline_comment(&self) -> bool {
+        self.dialect.has_inline_comments() && self.tag_contents().starts_with('#')
+    }
+
+    /// Whether the `{% %}` tag that starts at the next `%` is a `liquid` tag.
+    /// `liquid` has to be the whole name, e.g. `{% liquid-tag %}` is not one.
+    fn at_liquid_tag(&self) -> bool {
+        self.dialect.has_liquid_tag()
+            && self.tag_contents().strip_prefix("liquid").is_some_and(|rest| {
+                rest.starts_with(char::is_whitespace)
+                    || self.strip_trim_marker(rest).starts_with("%}")
+            })
     }
 
     /// Lex a Liquid inline comment, i.e. `{% # note %}`, from its `%` up to its
@@ -644,40 +646,34 @@ impl<'lex> Lexer<'lex> {
 
         let word = self.offset.get();
         self.offset.set(word + "liquid".len());
-        self.tokens.push(Token::new(
-            TokenKind::Tree(Delimiter::Percent, 1),
-            ByteRange::new(start, self.len_consumed()),
-        ));
-        self.tokens.push(Token::new(
-            TokenKind::Keyword(Keyword::Liquid),
-            ByteRange::new(word, self.len_consumed()),
-        ));
+        let consumed = self.len_consumed();
+        self.push_tag(
+            ByteRange::new(start, consumed),
+            ByteRange::new(word, consumed),
+            Keyword::Liquid,
+        );
 
-        // The lines end at the first `%}`, and the whitespace control marker
-        // before it.
+        // The lines end at the first `%}`, before its whitespace control marker.
         let body = self.offset.get();
         let close = source[body..].find("%}").map(|index| body + index);
-        let content_end = match close {
-            Some(close)
-                if close > body && self.is_trim_marker(source.as_bytes()[close - 1] as char) =>
-            {
-                close - 1
-            }
-            Some(close) => close,
-            None => source.len(),
-        };
+        let lines = &source[body..close.unwrap_or(source.len())];
+        let lines = lines.strip_suffix(self.dialect.trim_markers()).unwrap_or(lines);
 
         let mut line_start = body;
-        for line in source[body..content_end].split('\n') {
-            let tag_start = line_start + (line.len() - line.trim_start().len());
-            let tag_end = line_start + line.trim_end().len();
+        for line in lines.split('\n') {
+            let tag = line.trim();
 
-            // A line that starts with `#` is a comment.
-            if tag_start < tag_end && source[tag_start..].starts_with('#') {
-                self.tokens
-                    .push(Token::new(TokenKind::Comment, ByteRange::new(tag_start, tag_end - 1)));
-            } else if tag_start < tag_end {
-                self.liquid_line(tag_start, tag_end);
+            if !tag.is_empty() {
+                let tag_start = line_start + (line.len() - line.trim_start().len());
+                let tag_end = tag_start + tag.len();
+
+                // A line that starts with `#` is a comment.
+                if tag.starts_with('#') {
+                    let span = ByteRange::new(tag_start, tag_end - 1);
+                    self.tokens.push(Token::new(TokenKind::Comment, span));
+                } else {
+                    self.liquid_line(tag_start, tag_end);
+                }
             }
 
             line_start += line.len() + 1;
@@ -686,9 +682,8 @@ impl<'lex> Lexer<'lex> {
         // The closing `%}`, with its whitespace control marker.
         match close {
             Some(close) => {
-                let span = ByteRange::new(content_end, close + 1);
-                self.tokens.push(Token::new(TokenKind::Tree(Delimiter::Percent, 1), span));
-                self.tokens.push(Token::new(TokenKind::Keyword(Keyword::EndLiquid), span));
+                let span = ByteRange::new(body + lines.len(), close + 1);
+                self.push_tag(span, span, Keyword::EndLiquid);
                 self.offset.set(close + 2);
             }
             None => {
@@ -699,6 +694,13 @@ impl<'lex> Lexer<'lex> {
                 );
             }
         }
+    }
+
+    /// Push a `{% %}` tree at `tree` that holds only `keyword`, at `span`.
+    /// These are the opening and closing trees of a `{% liquid %}` tag.
+    fn push_tag(&mut self, tree: ByteRange, span: ByteRange, keyword: Keyword) {
+        self.tokens.push(Token::new(TokenKind::Tree(Delimiter::Percent, 1), tree));
+        self.tokens.push(Token::new(TokenKind::Keyword(keyword), span));
     }
 
     /// Lex a line of a Liquid `{% liquid %}` tag, from `start` up to `end`, as

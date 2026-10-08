@@ -209,6 +209,10 @@ impl TokenKind {
             TokenKind::Str => "a string literal".to_string(),
             TokenKind::Number(_) => "a number".to_string(),
             TokenKind::Text => "text".to_string(),
+            // The lexer makes these for the `{% liquid` and `%}` of a `liquid`
+            // tag, so they aren't written as keywords.
+            TokenKind::Keyword(Keyword::Liquid) => "the start of the `liquid` tag".to_string(),
+            TokenKind::Keyword(Keyword::EndLiquid) => "the end of the `liquid` tag".to_string(),
             TokenKind::Keyword(kwd) => format!("the keyword `{kwd}`"),
             TokenKind::Ident => "an identifier".to_string(),
             kind => format!("a `{kind}`"),

@@ -1,4 +1,4 @@
-error: expected a tag, however received the keyword `endliquid`
+error: expected a tag, however received the end of the `liquid` tag
  --> $DIR/liquid_tag_unclosed_block.html:4:1
   |
 4 | %}
