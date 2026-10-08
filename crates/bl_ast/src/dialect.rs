@@ -137,6 +137,13 @@ impl Dialect {
         matches!(self, Dialect::Liquid)
     }
 
+    /// Whether an assignment can be written `value as name`, e.g.
+    /// `{% with business.employees.count as total %}`, as well as
+    /// `name=value`.
+    pub fn has_as_assignments(self) -> bool {
+        matches!(self, Dialect::Django)
+    }
+
     /// How the dialect spells `elif`, which is `elsif` in Liquid.
     pub fn elif_tag(self) -> &'static str {
         if self.is_liquid() { "elsif" } else { "elif" }

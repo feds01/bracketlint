@@ -1991,7 +1991,7 @@ impl<'s> Parser<'s> {
                 let value = self.parse_expr()?;
                 Ok(Some(self.node_with_joined_span(ast::Assignment { name, value }, start)))
             }
-            _ if self.options.dialect.is_django() => {
+            _ if self.options.dialect.has_as_assignments() => {
                 let Some(value) = self.peek_resultant_fn(|g| g.parse_expr()) else {
                     return Ok(None);
                 };
