@@ -770,7 +770,7 @@ impl<'s> Parser<'s> {
                 self.skip_fast(token.kind); // `<lit>` Skip the literal token.
                 self.node_with_span(ast::Expr::Lit(ast::LitExpr { lit }), token.span)
             }
-            TokenKind::Tree(Delimiter::Paren, _) if self.options.dialect.is_liquid() => {
+            TokenKind::Tree(Delimiter::Paren, _) if self.options.dialect.has_ranges() => {
                 return self.parse_range(token);
             }
 
@@ -810,7 +810,7 @@ impl<'s> Parser<'s> {
     /// The Liquid literal that `token` is, if any, e.g. `nil`. In the other
     /// dialects, these are names like any other.
     fn liquid_literal(&self, token: Token) -> Option<ast::Lit> {
-        if !self.options.dialect.is_liquid() {
+        if !self.options.dialect.has_nil_and_empty_literals() {
             return None;
         }
 
@@ -1148,8 +1148,8 @@ impl<'s> Parser<'s> {
         let start = self.current_pos();
 
         loop {
-            // Liquid can also separate the parameters with commas.
-            if self.options.dialect.is_liquid() && !params.is_empty() {
+            // The parameters can also be separated by commas.
+            if self.options.dialect.has_loop_params() && !params.is_empty() {
                 self.parse_token_fast(TokenKind::Comma);
             }
 
@@ -1163,7 +1163,7 @@ impl<'s> Parser<'s> {
                     );
                 }
                 (Some(Token { kind, span }), Some(tok!(Colon)))
-                    if self.options.dialect.is_liquid() && kind.is_ident_like() =>
+                    if self.options.dialect.has_loop_params() && kind.is_ident_like() =>
                 {
                     let name = self.parse_name()?;
                     self.skip_fast(TokenKind::Colon); // `:` Skip the colon token.

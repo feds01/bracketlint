@@ -116,6 +116,24 @@ impl Dialect {
         matches!(self, Dialect::Liquid)
     }
 
+    /// Whether a range of integers can be written `(1..n)`.
+    pub fn has_ranges(self) -> bool {
+        matches!(self, Dialect::Liquid)
+    }
+
+    /// Whether `nil`, `null`, `blank` and `empty` are literals, along with
+    /// `true` and `false`, e.g. `{% if items == empty %}`. The other dialects
+    /// read them as names like any other.
+    pub fn has_nil_and_empty_literals(self) -> bool {
+        matches!(self, Dialect::Liquid)
+    }
+
+    /// Whether a loop takes parameters after its iterator, which can be
+    /// separated by commas, e.g. `{% for item in items limit: 2, offset: 1 %}`.
+    pub fn has_loop_params(self) -> bool {
+        matches!(self, Dialect::Liquid)
+    }
+
     /// How the dialect spells `elif`, which is `elsif` in Liquid.
     pub fn elif_tag(self) -> &'static str {
         if self.is_liquid() { "elsif" } else { "elif" }
