@@ -179,6 +179,26 @@ impl<'lex> Lexer<'lex> {
         self.offset.get() - 1
     }
 
+    /// Skip the whitespace before the next token. It is almost always ASCII,
+    /// so its bytes are checked directly, up to the first non-ASCII byte, from
+    /// where [char::is_whitespace] decides.
+    fn skip_whitespace(&self) {
+        let rest = unsafe { self.as_slice() }.as_bytes();
+
+        // The ASCII characters that `char::is_whitespace` accepts, which include
+        // the vertical tab that `u8::is_ascii_whitespace` leaves out.
+        let len = rest
+            .iter()
+            .position(|byte| !matches!(byte, b' ' | b'\t' | b'\n' | b'\x0B' | b'\x0C' | b'\r'))
+            .unwrap_or(rest.len());
+
+        self.offset.update(|x| x + len);
+
+        if rest.get(len).is_some_and(|byte| !byte.is_ascii()) {
+            self.eat_while_and_discard(char::is_whitespace);
+        }
+    }
+
     /// Eat while the condition holds, and discard any characters that it
     /// encounters whilst eating the input, this is useful because in some
     /// cases we don't want to preserve what the token represents, such as
@@ -213,7 +233,7 @@ impl<'lex> Lexer<'lex> {
     pub fn advance_token(&mut self) -> Option<Token> {
         // First, discard all of the white-space characters that we encounter
         // before we start lexing the next token.
-        self.eat_while_and_discard(char::is_whitespace);
+        self.skip_whitespace();
 
         // Record where the token starts, and then we can start lexing the
         // token.
