@@ -121,22 +121,16 @@ impl<'ctx> HTMLBiomeFormatter<'ctx> {
 }
 
 impl<'ctx> HasHTMLParsing<'ctx> for HTMLBiomeFormatter<'ctx> {
-    /// Format the HTML contents using the Biome formatter.
+    /// Format the HTML contents using the Biome formatter, by parsing them
+    /// with `biome_html_parser` and formatting the tree with
+    /// `biome_html_formatter`.
     ///
-    /// /// This will follow the algorithm:
+    /// ##Note: The contents are a piece of the template between its tags, e.g.
+    /// `<li class="`, which often isn't valid HTML on its own. Biome's parse
+    /// errors are ignored, and it formats as much as it could parse.
     ///
-    /// 1. Parse the HTML contents using the `biome_html_parser`.
-    ///
-    /// 2. If there are any errors, return them as a `FmtError`.
-    ///
-    ///
-    /// 3. Format the parsed HTML using the `biome_html_formatter`.
-    ///
-    /// 4. Return the formatted HTML as a `String`.
-    ///
-    /// @@Todo: for (2 & 4) we may not want to do this, and simply return the
-    /// contents as verbatim. We could emit an event for debugging purposes
-    /// that parsing this content failed for some reason.
+    /// @@Todo: We may want to keep the contents as they are written when they
+    /// don't parse, and emit an event for debugging that they didn't.
     fn format(&mut self, contents: &str) -> FmtResult<String> {
         let parsed = parse_html(contents, HtmlParserOptions::from(&HtmlFileSource::html()));
         let tree = parsed.tree();
@@ -152,26 +146,6 @@ impl<'ctx> HasHTMLParsing<'ctx> for HTMLBiomeFormatter<'ctx> {
         self.apply_state_from_tree(&tree);
 
         let language = LanguageType::Html;
-        let mut errors = Vec::new();
-
-        if parsed.has_errors() {
-            for diagnostic in parsed.diagnostics() {
-                let message = format!("{}", diagnostic.message);
-                let err = diagnostic.clone().with_file_source_code("");
-
-                // Extract this span from the error.
-                errors.push(FmtError::new(
-                    FmtErrorKind::ExternalLanguageParseError { language, message },
-                    err.location().span.map(|text_range| {
-                        bl_ast::Span::new(
-                            ByteRange::new(text_range.start().into(), text_range.end().into()),
-                            self.context.id(),
-                        )
-                    }),
-                ));
-            }
-        }
-
         let options = self.options.html.clone();
 
         match format_node(options, &parsed.syntax(), vec![]) {
