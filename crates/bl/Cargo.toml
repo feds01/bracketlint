@@ -21,5 +21,6 @@ argfile = { workspace = true }
 clap = { workspace = true, features = ["derive", "env", "wrap_help"] }
 colored = { workspace = true }
 log = { workspace = true }
+mimalloc = { workspace = true }
 wild = { workspace = true}
 once_cell = { workspace = true }
