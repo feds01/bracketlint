@@ -457,12 +457,12 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         self.with_block(|formatter| formatter.visit_body(loop_body.ast_ref()))?;
 
         // Check if we have an empty loop body, which comes after `{% empty %}`
-        // in Django and `{% else %}` in the other dialects.
-        // Reference:
-        // - Django: https://docs.djangoproject.com/en/stable/ref/templates/builtins/#for-empty
-        // - Jinja: https://jinja.palletsprojects.com/en/stable/templates/#for
-        // - Liquid: https://shopify.github.io/liquid/tags/iteration/#else
-        // - Twig: https://twig.symfony.com/doc/3.x/tags/for.html#the-else-clause
+        // in [Django] and `{% else %}` in [Jinja], [Liquid] and [Twig].
+        //
+        // [Django]: https://docs.djangoproject.com/en/stable/ref/templates/builtins/#for-empty
+        // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#for
+        // [Liquid]: https://shopify.github.io/liquid/tags/iteration/#else
+        // [Twig]: https://twig.symfony.com/doc/3.x/tags/for.html#the-else-clause
         if let Some(loop_empty) = loop_empty {
             self.push_tag_line(self.ctx.dialect.empty_loop_tag(), *empty_trim)?;
             self.with_block(|formatter| formatter.visit_body(loop_empty.ast_ref()))?;
@@ -509,8 +509,9 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         self.within_tag(TagKind::Block, *trim, |this| {
             match kind {
                 bl_ast::ClauseKind::If => this.push_hunk("if "),
-                // Liquid spells `elif` as `elsif`.
-                // Reference: https://shopify.github.io/liquid/tags/control-flow/#elsif--else
+                // [Liquid] spells `elif` as `elsif`.
+                //
+                // [Liquid]: https://shopify.github.io/liquid/tags/control-flow/#elsif--else
                 bl_ast::ClauseKind::Elif => {
                     this.push_hunk(this.ctx.dialect.elif_tag());
                     this.push_hunk(" ");

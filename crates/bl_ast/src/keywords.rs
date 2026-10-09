@@ -333,11 +333,14 @@ pub(crate) fn keyword(name: &str) -> Option<Keyword> {
     Some(keyword)
 }
 
-/// The keywords that only Liquid has, which are its `contains` operator and
-/// some of its tags:
-/// - https://shopify.github.io/liquid/basics/operators/
-/// - https://shopify.github.io/liquid/tags/control-flow/
-/// - https://shopify.github.io/liquid/tags/iteration/
+/// The keywords that only Liquid has, which are its [`contains`] operator and
+/// some of its tags: [control flow], [iteration], [`capture`] and [`render`].
+///
+/// [`contains`]: https://shopify.github.io/liquid/basics/operators/#contains
+/// [control flow]: https://shopify.github.io/liquid/tags/control-flow/
+/// [iteration]: https://shopify.github.io/liquid/tags/iteration/
+/// [`capture`]: https://shopify.github.io/liquid/tags/variable/#capture
+/// [`render`]: https://shopify.github.io/liquid/tags/template/#render
 pub(crate) fn liquid_keyword(name: &str) -> Option<Keyword> {
     let keyword = match name {
         "contains" => Keyword::Contains,

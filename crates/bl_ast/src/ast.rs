@@ -589,7 +589,7 @@ define_tree! {
         pub context: Children!(Arg),
     }
 
-    /// A Liquid `render` tag, which renders another template with variables of
+    /// A Liquid [`render`] tag, which renders another template with variables of
     /// its own, i.e.
     ///
     /// ```liquid
@@ -598,7 +598,7 @@ define_tree! {
     /// {% render "card" for products as product %}
     /// ```
     ///
-    /// Reference: https://shopify.github.io/liquid/tags/template/#render
+    /// [`render`]: https://shopify.github.io/liquid/tags/template/#render
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct Render {
@@ -616,13 +616,13 @@ define_tree! {
         pub args: Children!(Arg),
     }
 
-    /// A Liquid `capture` block, which renders its body into a variable, i.e.
+    /// A Liquid [`capture`] block, which renders its body into a variable, i.e.
     ///
     /// ```liquid
     /// {% capture greeting %}Hello {{ name }}{% endcapture %}
     /// ```
     ///
-    /// Reference: https://shopify.github.io/liquid/tags/variable/#capture
+    /// [`capture`]: https://shopify.github.io/liquid/tags/variable/#capture
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct Capture {
@@ -874,7 +874,7 @@ define_tree! {
     }
 
     /// The target of a [`For`] loop, which can be a simple variable or a variable
-    /// with an optional value.
+    /// with an optional value, as in [Jinja].
     ///
     /// For example:
     ///
@@ -889,7 +889,7 @@ define_tree! {
     /// {% endfor %}
     /// ```
     ///
-    /// Reference: https://jinja.palletsprojects.com/en/3.0.x/templates/#for
+    /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#for
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct ForTarget {
