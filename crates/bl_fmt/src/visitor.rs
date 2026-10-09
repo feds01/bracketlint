@@ -291,12 +291,12 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         node: bl_ast::AstNodeRef<bl_ast::Tag>,
     ) -> Result<Self::TagRet, Self::Error> {
         match node.body() {
-            bl_ast::Tag::Block(block) => self.visit_block(node.with_body(block)),
-            bl_ast::Tag::With(with) => self.visit_with(node.with_body(with)),
+            bl_ast::Tag::Block(block) => self.visit_block(block.ast_ref()),
+            bl_ast::Tag::With(with) => self.visit_with(with.ast_ref()),
             bl_ast::Tag::Extends(extends) => self.visit_extends(node.with_body(extends)),
             bl_ast::Tag::If(if_block) => self.visit_if(node.with_body(if_block)),
-            bl_ast::Tag::For(for_loop) => self.visit_for(node.with_body(for_loop)),
-            bl_ast::Tag::Case(case) => self.visit_case(node.with_body(case)),
+            bl_ast::Tag::For(for_loop) => self.visit_for(for_loop.ast_ref()),
+            bl_ast::Tag::Case(case) => self.visit_case(case.ast_ref()),
             bl_ast::Tag::Generic(_)
             | bl_ast::Tag::Unprocessable(_)
             | bl_ast::Tag::Assignment(_)
