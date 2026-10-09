@@ -1161,8 +1161,8 @@ impl<'s> Parser<'s> {
             (None, ast::TrimMarker::default(), ending_trim)
         };
 
-        Ok(self.node_with_joined_span(
-            ast::Statement::Tag(ast::Tag::For(ast::For {
+        let for_loop = self.node_with_joined_span(
+            ast::For {
                 kind,
                 target,
                 iterator,
@@ -1173,9 +1173,10 @@ impl<'s> Parser<'s> {
                 params,
                 trim: ast::TrimTag { start: trim, end: end_trim },
                 empty_trim,
-            })),
+            },
             start,
-        ))
+        );
+        Ok(self.node_with_joined_span(ast::Statement::Tag(ast::Tag::For(for_loop)), start))
     }
 
     /// Parse the modifiers after the iterator of a loop, in any order: the
@@ -1464,17 +1465,18 @@ impl<'s> Parser<'s> {
         };
 
         let branches = self.nodes_with_joined_span(branches, branches_start);
-        Ok(self.node_with_joined_span(
-            ast::Statement::Tag(ast::Tag::Case(ast::Case {
+        let case = self.node_with_joined_span(
+            ast::Case {
                 subject,
                 leading,
                 branches,
                 otherwise,
                 trim: ast::TrimTag { start: trim, end: end_trim },
                 else_trim,
-            })),
+            },
             start,
-        ))
+        );
+        Ok(self.node_with_joined_span(ast::Statement::Tag(ast::Tag::Case(case)), start))
     }
 
     /// Parse the values of a `{% when %}` clause, which are separated by `,`
@@ -1532,15 +1534,16 @@ impl<'s> Parser<'s> {
             },
         )?;
 
-        Ok(self.node_with_joined_span(
-            ast::Statement::Tag(ast::Tag::With(ast::With {
+        let with = self.node_with_joined_span(
+            ast::With {
                 assignments,
                 block_body,
                 kind: ast::AssignmentKind::With,
                 trim: ast::TrimTag { start: trim, end: end_trim },
-            })),
+            },
             token.span,
-        ))
+        );
+        Ok(self.node_with_joined_span(ast::Statement::Tag(ast::Tag::With(with)), token.span))
     }
 
     fn parse_block_statement(&mut self) -> ParseResult<AstNode<ast::Statement>> {
@@ -1577,15 +1580,16 @@ impl<'s> Parser<'s> {
             },
         )?;
 
-        Ok(self.node_with_joined_span(
-            ast::Statement::Tag(ast::Tag::Block(ast::Block {
+        let block = self.node_with_joined_span(
+            ast::Block {
                 label: Some(label),
                 block_body,
                 end_label,
                 trim: ast::TrimTag { start: trim, end: end_trim },
-            })),
+            },
             token.span,
-        ))
+        );
+        Ok(self.node_with_joined_span(ast::Statement::Tag(ast::Tag::Block(block)), token.span))
     }
 
     fn parse_raw_block(&mut self) -> ParseResult<AstNode<ast::Statement>> {
@@ -1744,16 +1748,11 @@ impl<'s> Parser<'s> {
 
             let args = g.parse_args()?;
 
-            Ok(g.node_with_span(
-                ast::Statement::Tag(ast::Tag::Render(ast::Render {
-                    template,
-                    with_value,
-                    for_value,
-                    alias,
-                    args,
-                })),
+            let render = g.node_with_span(
+                ast::Render { template, with_value, for_value, alias, args },
                 g.range(),
-            ))
+            );
+            Ok(g.node_with_span(ast::Statement::Tag(ast::Tag::Render(render)), g.range()))
         })
     }
 

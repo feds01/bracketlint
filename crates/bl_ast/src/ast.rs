@@ -919,6 +919,8 @@ define_tree! {
     pub struct Comment {
     }
 
+    /// ##Note: The tags that are much larger than the others are behind a
+    /// [AstNode], so that a [Tag], and every [Statement], stays small.
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub enum Tag {
@@ -929,10 +931,10 @@ define_tree! {
         Unprocessable(UnprocessableTag),
 
         /// The `{% block name %}` tag, ending with `{% endblock %}`
-        Block(Block),
+        Block(Child!(Block)),
 
         /// The `{% with x = 10 %}` tag, ending with `{% endwith %}`
-        With(With),
+        With(Child!(With)),
 
         /// Assignment, just like `with` but with a single inline assignment.
         ///
@@ -957,13 +959,13 @@ define_tree! {
         If(If),
 
         /// The `{% for item in items %}` tag
-        For(For),
+        For(Child!(For)),
 
         /// The Liquid `{% case subject %}` tag
-        Case(Case),
+        Case(Child!(Case)),
 
         /// The Liquid `{% render "file" %}` tag
-        Render(Render),
+        Render(Child!(Render)),
 
         /// The Liquid `{% capture name %}` tag, ending with `{% endcapture %}`
         Capture(Capture),
