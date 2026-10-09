@@ -1,9 +1,10 @@
 //! The parser module is responsible for converting a stream of tokens into an
 //! abstract syntax tree.
 //!
-//! Based on several documentation sources:
+//! Based on several documentation sources, such as the [Jinja templates]
+//! docs. Each dialect rule links its own spec, see `bl_ast::Dialect`.
 //!
-//! - https://jinja.palletsprojects.com/en/stable/templates/
+//! [Jinja templates]: https://jinja.palletsprojects.com/en/stable/templates/
 
 use std::cell::Cell;
 
@@ -456,12 +457,12 @@ impl<'s> Parser<'s> {
     /// The whitespace control markers of the tag that the current frame is in,
     /// e.g. the `-`s in `{%- if x -%}`. The lexer leaves the markers out of
     /// the tag's tokens, so they are read from its source, see [tag_trim]. A
-    /// line of a `liquid` tag has no delimiters, and so no markers.
+    /// line of a `liquid` tag has no delimiters, and so no markers. See
+    /// [Jinja], [Liquid] and [Twig].
     ///
-    /// Reference:
-    /// - Jinja: https://jinja.palletsprojects.com/en/stable/templates/#whitespace-control
-    /// - Liquid: https://shopify.github.io/liquid/basics/whitespace/
-    /// - Twig: https://twig.symfony.com/doc/3.x/templates.html#whitespace-control
+    /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#whitespace-control
+    /// [Liquid]: https://shopify.github.io/liquid/basics/whitespace/
+    /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#whitespace-control
     pub(crate) fn trim(&self) -> ast::TrimMarker {
         if self.frame.delimiter == Some(Delimiter::Line) {
             return ast::TrimMarker::default();
@@ -681,6 +682,11 @@ impl<'s> Parser<'s> {
     fn parse_variable_block(&mut self) -> ParseResult<AstNode<ast::Statement>> {
         let token = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
         let (expr, trim) = self.in_tag(Delimiter::Brace, |g| {
+            // Jinja's [`Parser.subparse`] and Twig's [`Parser::subparse`] parse
+            // `{{ }}` as any expression, rather than a single value.
+            //
+            // [`Parser.subparse`]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L1019-L1022
+            // [`Parser::subparse`]: https://github.com/twigphp/Twig/blob/v3.30.0/src/Parser.php#L187-L190
             let (subject, subject_span) = g.track_span(|g| {
                 if g.options.dialect.variable_supports_operators() {
                     g.parse_compound_expr(0)
@@ -724,11 +730,13 @@ impl<'s> Parser<'s> {
             // An operator that the dialect doesn't have, e.g. `*` in Django,
             // doesn't continue the expression. It is left for the tag, which
             // reports it as unexpected, like any token after an expression.
-            // Reference:
-            // - Django: https://github.com/django/django/blob/5.2.18/django/template/smartif.py#L97-L111
-            // - Jinja: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L536-L624
-            // - Liquid: https://shopify.github.io/liquid/basics/operators/#order-of-operations
-            // - Twig: https://github.com/twigphp/Twig/blob/v3.30.0/src/Extension/CoreExtension.php#L343-L391
+            // How tightly each operator binds follows [Django], [Jinja],
+            // [Liquid] and [Twig].
+            //
+            // [Django]: https://github.com/django/django/blob/5.2.18/django/template/smartif.py#L97-L111
+            // [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L536-L624
+            // [Liquid]: https://shopify.github.io/liquid/basics/operators/#order-of-operations
+            // [Twig]: https://github.com/twigphp/Twig/blob/v3.30.0/src/Extension/CoreExtension.php#L343-L391
             let Some((l_precedence, r_precedence)) = self.options.dialect.infix_binding_power(op)
             else {
                 break;
@@ -783,8 +791,9 @@ impl<'s> Parser<'s> {
                 self.skip_fast(token.kind); // `<lit>` Skip the literal token.
                 self.node_with_span(ast::Expr::Lit(ast::LitExpr { lit }), token.span)
             }
-            // A Liquid range, e.g. `(1..n)`.
-            // Reference: https://shopify.github.io/liquid/tags/iteration/#range
+            // A [Liquid] range, e.g. `(1..n)`.
+            //
+            // [Liquid]: https://shopify.github.io/liquid/tags/iteration/#range
             TokenKind::Tree(Delimiter::Paren, _) if self.options.dialect.has_ranges() => {
                 return self.parse_range(token);
             }
@@ -822,12 +831,11 @@ impl<'s> Parser<'s> {
         })
     }
 
-    /// The Liquid literal that `token` is, if any, e.g. `nil`. In the other
-    /// dialects, these are names like any other.
+    /// The Liquid literal that `token` is, if any, e.g. [`nil`] or [`empty`].
+    /// In the other dialects, these are names like any other.
     ///
-    /// Reference:
-    /// - https://shopify.github.io/liquid/basics/types/#nil
-    /// - https://shopify.github.io/liquid/basics/types/#emptydrop
+    /// [`nil`]: https://shopify.github.io/liquid/basics/types/#nil
+    /// [`empty`]: https://shopify.github.io/liquid/basics/types/#emptydrop
     fn liquid_literal(&self, token: Token) -> Option<ast::Lit> {
         if !self.options.dialect.has_nil_and_empty_literals() {
             return None;
@@ -931,11 +939,12 @@ impl<'s> Parser<'s> {
 
         self.skip_fast(token.kind); // `<op>` Skip the operator token.
 
-        // Reference:
-        // - Django: https://github.com/django/django/blob/5.2.18/django/template/smartif.py#L97-L111
-        // - Jinja: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L536-L624
-        // - Liquid: https://shopify.github.io/liquid/basics/operators/#order-of-operations
-        // - Twig: https://github.com/twigphp/Twig/blob/v3.30.0/src/Extension/CoreExtension.php#L343-L391
+        // How tightly `not` binds follows [Django], [Jinja], [Liquid] and [Twig].
+        //
+        // [Django]: https://github.com/django/django/blob/5.2.18/django/template/smartif.py#L97-L111
+        // [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L536-L624
+        // [Liquid]: https://shopify.github.io/liquid/basics/operators/#order-of-operations
+        // [Twig]: https://github.com/twigphp/Twig/blob/v3.30.0/src/Extension/CoreExtension.php#L343-L391
         let expr = self.parse_compound_expr(self.options.dialect.prefix_binding_power(*op.body))?;
         Ok(self.node_with_joined_span(ast::Expr::Unary(ast::UnaryExpr { op, expr }), token.span))
     }
@@ -982,8 +991,9 @@ impl<'s> Parser<'s> {
             let start = self.current_pos();
             let mut args = thin_vec![self.parse_filter_arg()?];
 
-            // Liquid filters take a list of arguments, e.g. `f: a, b`.
-            // Reference: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/variable.rb#L17
+            // [Liquid filters] take a list of arguments, e.g. `f: a, b`.
+            //
+            // [Liquid filters]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/variable.rb#L17
             if self.options.dialect.filter_supports_arg_list() {
                 while self.parse_token_fast(TokenKind::Comma).is_some() {
                     args.push(self.parse_filter_arg()?);
@@ -1000,10 +1010,10 @@ impl<'s> Parser<'s> {
 
     /// Parse an argument of a filter, i.e. `a` in `x|f:a`. The argument has no
     /// filters of its own, so in `x|f:a|g` the filter `g` applies to `x|f:a`
-    /// rather than to `a`. Liquid filters also take keyword arguments, e.g.
+    /// rather than to `a`. [Liquid filters] also take keyword arguments, e.g.
     /// `allow_false: true`.
     ///
-    /// Reference: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/variable.rb#L17
+    /// [Liquid filters]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/variable.rb#L17
     fn parse_filter_arg(&mut self) -> ParseResult<AstNode<ast::Arg>> {
         let start = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
 
@@ -1105,13 +1115,13 @@ impl<'s> Parser<'s> {
             ast::LoopKind::TableRow => (Keyword::TableRow, Keyword::EndTableRow),
         };
 
-        // The body for an empty loop comes after `{% empty %}` in Django, and
-        // after `{% else %}` in the other dialects.
-        // Reference:
-        // - Django: https://docs.djangoproject.com/en/stable/ref/templates/builtins/#for-empty
-        // - Jinja: https://jinja.palletsprojects.com/en/stable/templates/#for
-        // - Liquid: https://shopify.github.io/liquid/tags/iteration/#else
-        // - Twig: https://twig.symfony.com/doc/3.x/tags/for.html#the-else-clause
+        // The body for an empty loop comes after `{% empty %}` in [Django], and
+        // after `{% else %}` in [Jinja], [Liquid] and [Twig].
+        //
+        // [Django]: https://docs.djangoproject.com/en/stable/ref/templates/builtins/#for-empty
+        // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#for
+        // [Liquid]: https://shopify.github.io/liquid/tags/iteration/#else
+        // [Twig]: https://twig.symfony.com/doc/3.x/tags/for.html#the-else-clause
         let dialect = self.options.dialect;
         let empty = match kind {
             ast::LoopKind::For => dialect.keyword(dialect.empty_loop_tag()),
@@ -1181,9 +1191,9 @@ impl<'s> Parser<'s> {
     }
 
     /// Parse the modifiers after the iterator of a loop, in any order: the
-    /// `reversed` modifier, and in Liquid, parameters such as `limit: 2`.
+    /// `reversed` modifier, and in [Liquid], parameters such as `limit: 2`.
     ///
-    /// Reference: https://shopify.github.io/liquid/tags/iteration/#for-parameters
+    /// [Liquid]: https://shopify.github.io/liquid/tags/iteration/#for-parameters
     fn parse_loop_modifiers(
         &mut self,
     ) -> ParseResult<(Option<AstNode<ast::Name>>, AstNodes<ast::Arg>)> {
@@ -1693,10 +1703,11 @@ impl<'s> Parser<'s> {
         let start = self.current_pos();
 
         while self.peek().is_some() {
-            // Liquid separates a tag's arguments with commas.
-            // Reference:
-            // - https://shopify.github.io/liquid/tags/iteration/#cycle
-            // - https://shopify.github.io/liquid/tags/template/#render-parameters
+            // Liquid separates a tag's arguments with commas, e.g. in [`cycle`]
+            // and [`render`].
+            //
+            // [`cycle`]: https://shopify.github.io/liquid/tags/iteration/#cycle
+            // [`render`]: https://shopify.github.io/liquid/tags/template/#render-parameters
             if self.options.dialect.requires_comma_separated_args() {
                 self.parse_token_fast(TokenKind::Comma);
             }
@@ -1806,14 +1817,14 @@ impl<'s> Parser<'s> {
         ))
     }
 
-    /// Parse an `extends` statement, i.e.
+    /// Parse an [`extends`] statement, i.e.
     ///
     ///
     /// ```html
     /// {% extends "base.html" %}
     /// ```
     ///
-    /// Based on: https://www.w3schools.com/django/django_tags_extends.php
+    /// [`extends`]: https://docs.djangoproject.com/en/stable/ref/templates/builtins/#extends
     fn parse_extends_statement(&mut self) -> ParseResult<AstNode<ast::Statement>> {
         self.in_tree(Delimiter::Percent, None, |g| {
             g.parse_token(TokenKind::Keyword(Keyword::Extends))?;
@@ -1826,13 +1837,13 @@ impl<'s> Parser<'s> {
         })
     }
 
-    /// Parse an `include` statement, i.e.
+    /// Parse an [`include`] statement, i.e.
     ///
     /// ```html
     /// {% include "header.html" with title="Header" %}
     /// ```
     ///
-    /// Based on: https://www.w3schools.com/django/django_tags_include.php
+    /// [`include`]: https://docs.djangoproject.com/en/stable/ref/templates/builtins/#include
     fn parse_include_statement(&mut self) -> ParseResult<AstNode<ast::Statement>> {
         // Parse the header first, we should get `block <name>`.
         self.in_tree(Delimiter::Percent, None, |g| {
@@ -1840,9 +1851,10 @@ impl<'s> Parser<'s> {
             let template = g.parse_expr()?;
 
             // With comma separated arguments, the comma after the template
-            // starts them rather than `with`, e.g. `{% include "card", product: product
-            // %}`.
-            // Reference: https://shopify.github.io/liquid/tags/template/#render-parameters
+            // starts them rather than `with`, as in Liquid's [`render`], e.g.
+            // `{% include "card", product: product %}`.
+            //
+            // [`render`]: https://shopify.github.io/liquid/tags/template/#render-parameters
             let context = if g.parse_token_fast(TokenKind::Keyword(Keyword::With)).is_some()
                 || g.options.dialect.requires_comma_separated_args()
             {
@@ -1874,13 +1886,13 @@ impl<'s> Parser<'s> {
         })
     }
 
-    /// Parse a Jinja import statement, i.e.
+    /// Parse a Jinja [`import`] statement, i.e.
     ///
     /// ```html
     /// {% import "forms.html" as forms %}
     /// ```
     ///
-    /// Reference: https://jinja.palletsprojects.com/en/stable/templates/#import
+    /// [`import`]: https://jinja.palletsprojects.com/en/stable/templates/#import
     fn parse_import_statement(&mut self) -> ParseResult<AstNode<ast::Statement>> {
         self.in_tree(Delimiter::Percent, None, |g| {
             g.parse_token(TokenKind::Keyword(Keyword::Import))?;
@@ -1980,11 +1992,12 @@ impl<'s> Parser<'s> {
                     span,
                 )))
             }
-            // The name can also be a string, e.g. the group of a Liquid `cycle`
-            // in `{% cycle "group": "a", "b" %}`.
-            // Reference:
-            // - https://shopify.github.io/liquid/tags/iteration/#cycle
-            // - https://shopify.github.io/liquid/tags/template/#render-parameters
+            // Liquid writes a named argument `name: value`, as in [`render`].
+            // The name can also be a string, e.g. the group of a [`cycle`] in
+            // `{% cycle "group": "a", "b" %}`.
+            //
+            // [`render`]: https://shopify.github.io/liquid/tags/template/#render-parameters
+            // [`cycle`]: https://shopify.github.io/liquid/tags/iteration/#cycle
             (Some(Token { kind, span }), Some(tok!(Colon)))
                 if self.options.dialect.named_args_use_colon()
                     && (kind.is_ident_like() || kind == TokenKind::Str) =>
@@ -2038,8 +2051,10 @@ impl<'s> Parser<'s> {
                 let value = self.parse_expr()?;
                 Ok(Some(self.node_with_joined_span(ast::Assignment { name, value }, start)))
             }
-            // Django's `value as name`, e.g. `{% with business.employees.count as total %}`.
-            // Reference: https://docs.djangoproject.com/en/stable/ref/templates/builtins/#with
+            // [Django]'s `value as name`, e.g.
+            // `{% with business.employees.count as total %}`.
+            //
+            // [Django]: https://docs.djangoproject.com/en/stable/ref/templates/builtins/#with
             _ if self.options.dialect.has_as_assignments() => {
                 let Some(value) = self.peek_resultant_fn(|g| g.parse_expr()) else {
                     return Ok(None);
