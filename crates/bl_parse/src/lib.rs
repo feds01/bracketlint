@@ -1,8 +1,6 @@
 //! Contains all of the parsing logic for the `bl` project.
 
-use bl_ast::{
-    AstNode, AstVisitor, Dialect, Document, LocalSpanMap, SourceId, Span, SpanMap, TempSourceMap,
-};
+use bl_ast::{AstNode, AstVisitor, Dialect, Document, SourceId, Span, TempSourceMap};
 use bl_ast_utils::{AstTreePrinter, TreeWriter, TreeWriterConfig};
 use bl_lexer::{Lexer, LexerMetadata, token::Token};
 use bl_reporting::{
@@ -90,7 +88,6 @@ pub fn parse_source(query: ParseQuery) -> ParseQueryResult {
     // Lex the contents of the module or interactive block
     let LexerMetadata { tokens, mut diagnostics } =
         Lexer::new(spanned, id, member.dialect).tokenise();
-    let mut spans = LocalSpanMap::with_capacity(tokens.len() * 2);
 
     // @@Todo: Make this a query instead so that we can call it as a debugging
     // tool.
@@ -101,7 +98,6 @@ pub fn parse_source(query: ParseQuery) -> ParseQueryResult {
 
     // Check if the lexer has errors...
     if diagnostics.has_errors() {
-        SpanMap::add_local_map(id, spans);
         return ParseQueryResult {
             node: None,
             diagnostics: diagnostics.into_reports(Reports::from, Reports::from),
@@ -111,13 +107,12 @@ pub fn parse_source(query: ParseQuery) -> ParseQueryResult {
     // Create a new import resolver in the event of more modules that
     // are encountered whilst parsing this module.
     let mut diagnostics = ParserDiagnostics::new();
-    let mut parser = Parser::new(id, spanned, &tokens, &mut diagnostics, &mut spans, options);
+    let mut parser = Parser::new(id, spanned, &tokens, &mut diagnostics, options);
 
     // Perform the parsing operation now... and send the result through the
     // message queue, regardless of it being an error or not.
     let node = parser.parse_document();
 
-    SpanMap::add_local_map(id, spans);
     ParseQueryResult {
         node: Some(node),
         diagnostics: diagnostics.into_reports(Reports::from, Reports::from),

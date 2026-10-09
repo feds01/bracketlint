@@ -134,7 +134,7 @@ impl AstVisitor for AstTreePrinter<'_> {
         &self,
         node: ast::AstNodeRef<ast::BoolLit>,
     ) -> Result<Self::BoolLitRet, Self::Error> {
-        Ok(TreeNode::leaf(labelled("bool_lit", self.source.hunk(node.span().range), "")))
+        Ok(TreeNode::leaf(labelled("bool_lit", self.source.hunk(node.range()), "")))
     }
 
     type MacroDefRet = TreeNode;
@@ -252,7 +252,7 @@ impl AstVisitor for AstTreePrinter<'_> {
         &self,
         node: ast::AstNodeRef<ast::FloatLit>,
     ) -> Result<Self::FloatLitRet, Self::Error> {
-        Ok(TreeNode::leaf(labelled("float_lit", self.source.hunk(node.span().range), "")))
+        Ok(TreeNode::leaf(labelled("float_lit", self.source.hunk(node.range()), "")))
     }
 
     type BodyRet = TreeNode;
@@ -307,7 +307,7 @@ impl AstVisitor for AstTreePrinter<'_> {
         &self,
         node: ast::AstNodeRef<ast::IntLit>,
     ) -> Result<Self::IntLitRet, Self::Error> {
-        Ok(TreeNode::leaf(labelled("int_lit", self.source.hunk(node.span().range), "")))
+        Ok(TreeNode::leaf(labelled("int_lit", self.source.hunk(node.range()), "")))
     }
 
     type UnaryExprRet = TreeNode;
@@ -324,7 +324,7 @@ impl AstVisitor for AstTreePrinter<'_> {
     type NameRet = TreeNode;
 
     fn visit_name(&self, node: ast::AstNodeRef<ast::Name>) -> Result<Self::NameRet, Self::Error> {
-        Ok(TreeNode::leaf(labelled("name", self.source.hunk(node.span().range), "\"")))
+        Ok(TreeNode::leaf(labelled("name", self.source.hunk(node.range()), "\"")))
     }
 
     type StrLitRet = TreeNode;
@@ -333,7 +333,7 @@ impl AstVisitor for AstTreePrinter<'_> {
         &self,
         node: ast::AstNodeRef<ast::StrLit>,
     ) -> Result<Self::StrLitRet, Self::Error> {
-        Ok(TreeNode::leaf(labelled("str_lit", self.source.hunk(node.span().range), "")))
+        Ok(TreeNode::leaf(labelled("str_lit", self.source.hunk(node.range()), "")))
     }
 
     type ArrayExprRet = TreeNode;
@@ -605,7 +605,7 @@ impl AstVisitor for AstTreePrinter<'_> {
         &self,
         node: ast::AstNodeRef<ast::NilLit>,
     ) -> Result<Self::NilLitRet, Self::Error> {
-        Ok(TreeNode::leaf(labelled("nil_lit", self.source.hunk(node.span().range), "")))
+        Ok(TreeNode::leaf(labelled("nil_lit", self.source.hunk(node.range()), "")))
     }
 
     type EmptyLitRet = TreeNode;
@@ -614,7 +614,7 @@ impl AstVisitor for AstTreePrinter<'_> {
         &self,
         node: ast::AstNodeRef<ast::EmptyLit>,
     ) -> Result<Self::EmptyLitRet, Self::Error> {
-        Ok(TreeNode::leaf(labelled("empty_lit", self.source.hunk(node.span().range), "")))
+        Ok(TreeNode::leaf(labelled("empty_lit", self.source.hunk(node.range()), "")))
     }
 
     type FilterRet = TreeNode;

@@ -12,10 +12,6 @@ fn main() {
 }
 
 /// Lexes and parses the template, as `bracketlint check` does.
-///
-/// ##Note: Each parse adds the span of every node to the global `SpanMap`, which
-/// is never cleared, so it grows with each iteration and with each case run
-/// before this one.
 #[divan::bench(args = TestCase::all())]
 fn parser(bencher: Bencher, case: &TestCase) {
     let (id, members) = case.to_member();

@@ -7,205 +7,39 @@ use std::{
 };
 
 use bl_macros::define_tree;
-use bl_utils::counter;
-use once_cell::sync::Lazy;
-use parking_lot::{RwLock, RwLockWriteGuard};
 use replace_with::replace_with_or_abort;
 use thin_vec::{ThinVec, thin_vec};
 
-use crate::{
-    ByteRange,
-    location::{SourceId, Span},
-};
-
-counter! {
-    /// This is the unique identifier for an AST node. This is used to
-    /// map spans to nodes, and vice versa. [AstNodeId]s are unique and
-    /// they are always increasing as a new nodes are created.
-    name: AstNodeId,
-    counter_name: AST_COUNTER,
-    visibility: pub,
-    method_visibility:,
-    derives: (Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd, Debug),
-}
-
-impl AstNodeId {
-    /// Create a null node id.
-    pub fn null() -> Self {
-        AstNodeId::from(0)
-    }
-
-    /// Get the [Span] of this [AstNodeId].
-    pub fn span(&self) -> Span {
-        SpanMap::span_of(*self)
-    }
-
-    /// Get the [SourceId] of this [AstNodeId].
-    pub fn source(&self) -> SourceId {
-        SpanMap::source_of(*self)
-    }
-}
-
-/// Name for some reference within the AST to a source
-/// hunk. This is essentially an interned [Span] that
-/// can be used to reference a particular part of the
-/// source.
-pub type Hunk = AstNodeId;
-
-impl Hunk {
-    /// Create a new [Hunk] from a [Span].
-    pub fn create(span: Span) -> Self {
-        SpanMap::add_span(span)
-    }
-}
-
-/// The [`SPAN_MAP`] is a global static that is used to store the span
-/// of each AST node. This is used to avoid storing the [Span] on the
-/// [`AstNode<T>`] itself in order for other data structures to be able
-/// to query the [Span] of a node simply by using the [AstNodeId] of the
-/// node.
-static SPAN_MAP: Lazy<RwLock<Vec<Span>>> = Lazy::new(|| {
-    // We initialise the map with a NULL node-id so we can use it as the default
-    // for items that need a node, but don't have one.
-    RwLock::new(vec![Span::new(ByteRange::new(0, 0), SourceId::default())])
-});
-
-/// A thread/job local map of [AstNodeId]s to [ByteRange]s. The [LocalSpanMap]
-/// can be used by a thread to "reserve" [AstNodeId]s for nodes that will be
-/// added to the global [`SPAN_MAP`] later.
-///
-/// ##Note: This is only used by the parser in order to reduce contention for [`SPAN_MAP`].
-pub struct LocalSpanMap {
-    map: Vec<(AstNodeId, ByteRange)>,
-}
-
-impl Default for LocalSpanMap {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl LocalSpanMap {
-    /// Create a new [LocalSpanMap].
-    pub fn new() -> Self {
-        Self { map: vec![] }
-    }
-
-    /// Create a new [LocalSpanMap] with a given capacity.
-    pub fn with_capacity(capacity: usize) -> Self {
-        Self { map: Vec::with_capacity(capacity) }
-    }
-
-    /// Add a new node to the map.
-    pub fn add(&mut self, range: ByteRange) -> AstNodeId {
-        let id = AstNodeId::new();
-        self.map.push((id, range));
-        id
-    }
-
-    pub fn len(&self) -> usize {
-        self.map.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.map.is_empty()
-    }
-}
-
-/// Utilities for working with the [`SPAN_MAP`].
-pub struct SpanMap;
-
-impl SpanMap {
-    /// Get the span of a node by [AstNodeId].
-    pub fn span_of(id: AstNodeId) -> Span {
-        let span = SPAN_MAP.read()[id.to_usize()];
-        debug_assert_ne!(span, Span::null(), "span of node {id:?} is null");
-        span
-    }
-
-    /// Get the [SourceId] of a node by [AstNodeId].
-    pub fn source_of(id: AstNodeId) -> SourceId {
-        SpanMap::span_of(id).id
-    }
-
-    fn extend_map(writer: &mut RwLockWriteGuard<Vec<Span>>, id: AstNodeId) {
-        let len = (id.to_usize() + 1).saturating_sub(writer.len());
-        if len > 0 {
-            writer.extend(std::iter::repeat_n(Span::null(), len));
-        }
-    }
-
-    /// Get a mutable reference to the [`SPAN_MAP`]. This is only
-    /// internal to the `bl-ast` crate since it creates entries
-    /// in the span map when creating new AST nodes.
-    fn add_span(span: Span) -> AstNodeId {
-        let mut writer = SPAN_MAP.write();
-
-        // Create the new id, expand the map for capacity and
-        // then write the span into the map.
-        let id = AstNodeId::new();
-        Self::extend_map(&mut writer, id);
-        writer[id.to_usize()] = span;
-
-        id
-    }
-
-    /// Update the span of a node by [AstNodeId].
-    fn update_span(id: AstNodeId, span: Span) {
-        SPAN_MAP.write()[id.to_usize()] = span;
-    }
-
-    /// Merge a [LocalSpanMap] into the [`SPAN_MAP`].
-    pub fn add_local_map(source: SourceId, local: LocalSpanMap) {
-        // If no nodes were added, don't do anything!
-        if local.map.is_empty() {
-            return;
-        }
-
-        let mut writer = SPAN_MAP.write();
-        let (key, _) = local.map.last().unwrap();
-
-        // Reserve enough space in the global map to fit the local map.
-        //
-        // ##Note: During high loads, we're likely reserving space for all of the
-        // other nodes that are to be added.
-        Self::extend_map(&mut writer, *key);
-
-        // Now we write all of the items into the map.
-        for (id, range) in local.map {
-            writer[id.to_usize()] = Span::new(range, source);
-        }
-    }
-}
+use crate::ByteRange;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AstNode<T> {
     pub body: Box<T>,
 
-    /// The location of the node in the source file.
-    pub id: AstNodeId,
+    /// The location of the node in its source file.
+    pub range: ByteRange,
 }
 
 impl<T> AstNode<T> {
-    /// Create an [AstNode] with an existing [AstNodeId].
-    pub fn with_id(body: T, id: AstNodeId) -> Self {
-        Self { body: Box::new(body), id }
+    /// Create an [AstNode] at the given [ByteRange].
+    pub fn new(body: T, range: ByteRange) -> Self {
+        Self { body: Box::new(body), range }
     }
 
     /// Create an [AstNodeRef] from this [AstNode].
     pub fn ast_ref(&self) -> AstNodeRef<'_, T> {
-        AstNodeRef { body: self.body.as_ref(), id: self.id }
+        AstNodeRef { body: self.body.as_ref(), range: self.range }
     }
 
     /// Create an [AstNodeRefMut] from this [AstNode].
     pub fn ast_ref_mut(&mut self) -> AstNodeRefMut<'_, T> {
-        AstNodeRefMut { body: self.body.as_mut(), id: self.id }
+        AstNodeRefMut { body: self.body.as_mut(), range: self.range }
     }
 
     /// Create an [AstNodeRef] by providing a body and copying over the
-    /// [AstNodeId] that belong to this [AstNode].
+    /// [ByteRange] of this [AstNode].
     pub fn with_body<'u, U>(&self, body: &'u U) -> AstNodeRef<'u, U> {
-        AstNodeRef { body, id: self.id }
+        AstNodeRef { body, range: self.range }
     }
 }
 
@@ -214,9 +48,8 @@ pub struct AstNodeRef<'t, T> {
     /// A reference to the body of the [AstNode].
     pub body: &'t T,
 
-    /// The [AstNodeId] of the node, representing a unique identifier within
-    /// the AST, useful for performing fast comparisons of trees.
-    pub id: AstNodeId,
+    /// The location of the node in its source file.
+    pub range: ByteRange,
 }
 
 impl<T> Clone for AstNodeRef<'_, T> {
@@ -229,8 +62,8 @@ impl<T> Copy for AstNodeRef<'_, T> {}
 
 impl<'t, T> AstNodeRef<'t, T> {
     /// Create a new [AstNodeRef<T>].
-    pub fn new(body: &'t T, id: AstNodeId) -> Self {
-        AstNodeRef { body, id }
+    pub fn new(body: &'t T, range: ByteRange) -> Self {
+        AstNodeRef { body, range }
     }
 
     /// Get a reference to body of the [AstNodeRef].
@@ -238,20 +71,15 @@ impl<'t, T> AstNodeRef<'t, T> {
         self.body
     }
 
-    /// Utility function to copy over the [AstNodeId] from
+    /// Utility function to copy over the [ByteRange] from
     /// another [AstNodeRef] with a provided body.
     pub fn with_body<'u, U>(&self, body: &'u U) -> AstNodeRef<'u, U> {
-        AstNodeRef { body, id: self.id }
+        AstNodeRef { body, range: self.range }
     }
 
-    /// Get the [Span] of this [AstNodeRef].
-    pub fn span(&self) -> Span {
-        SpanMap::span_of(self.id)
-    }
-
-    /// Get the [AstNodeId] of this [AstNodeRef].
-    pub fn id(&self) -> AstNodeId {
-        self.id
+    /// Get the location of this [AstNodeRef] in its source file.
+    pub fn range(&self) -> ByteRange {
+        self.range
     }
 }
 
@@ -268,15 +96,14 @@ pub struct AstNodeRefMut<'t, T> {
     /// A mutable reference to the body of the [AstNode].
     body: &'t mut T,
 
-    /// The [AstNodeId] of the [AstNode], representing a unique identifier
-    /// within the AST, useful for performing fast comparisons of trees.
-    pub id: AstNodeId,
+    /// The location of the node in its source file.
+    pub range: ByteRange,
 }
 
 impl<'t, T> AstNodeRefMut<'t, T> {
     /// Create a new [AstNodeRefMut<T>].
-    pub fn new(body: &'t mut T, id: AstNodeId) -> Self {
-        AstNodeRefMut { body, id }
+    pub fn new(body: &'t mut T, range: ByteRange) -> Self {
+        AstNodeRefMut { body, range }
     }
 
     /// Get a reference to body of the [AstNodeRefMut].
@@ -294,19 +121,14 @@ impl<'t, T> AstNodeRefMut<'t, T> {
         self.body
     }
 
-    /// Get the [Span] of this [AstNodeRefMut].
-    pub fn span(&self) -> Span {
-        SpanMap::span_of(self.id)
-    }
-
-    /// Get the [AstNodeId] of this [AstNodeRefMut].
-    pub fn id(&self) -> AstNodeId {
-        self.id
+    /// Get the location of this [AstNodeRefMut] in its source file.
+    pub fn range(&self) -> ByteRange {
+        self.range
     }
 
     /// Get this node as an immutable reference
     pub fn immutable(&self) -> AstNodeRef<'_, T> {
-        AstNodeRef::new(self.body, self.id)
+        AstNodeRef::new(self.body, self.range)
     }
 }
 
@@ -352,43 +174,33 @@ pub struct AstNodes<T> {
     /// The nodes that the [AstNodes] holds.
     pub nodes: ThinVec<AstNode<T>>,
 
-    /// The id that is used to refer to the span of the [AstNodes].
-    id: AstNodeId,
+    /// The location of the nodes in their source file, including any
+    /// delimiters around them.
+    range: ByteRange,
 }
 
 impl<T> AstNodes<T> {
     /// Create a new [AstNodes].
-    pub fn empty(span: Span) -> Self {
-        Self::new(thin_vec![], span)
+    pub fn empty(range: ByteRange) -> Self {
+        Self::new(thin_vec![], range)
     }
 
-    /// Create an [AstNodes] with items and a [Span].
-    pub fn new(nodes: ThinVec<AstNode<T>>, span: Span) -> Self {
-        let id = SpanMap::add_span(span);
-        Self { nodes, id }
-    }
-
-    /// Create a new [AstNodes] with an existing [AstNodeId].
-    pub fn with_id(nodes: ThinVec<AstNode<T>>, id: AstNodeId) -> Self {
-        Self { nodes, id }
+    /// Create an [AstNodes] with items at the given [ByteRange].
+    pub fn new(nodes: ThinVec<AstNode<T>>, range: ByteRange) -> Self {
+        Self { nodes, range }
     }
 
     /// Function to adjust the span location of [AstNodes] if it is initially
     /// incorrectly offset because there is a 'pre-conditional' token that must
     /// be parsed before parsing the nodes. This token could be something like a
     /// '<' or '(' which starts a tuple, or type bound
-    pub fn set_span(&mut self, span: Span) {
-        SpanMap::update_span(self.id, span);
+    pub fn set_range(&mut self, range: ByteRange) {
+        self.range = range;
     }
 
-    /// Get the [AstNodeId] of this [AstNodes].
-    pub fn id(&self) -> AstNodeId {
-        self.id
-    }
-
-    /// Get the [Span] of this [AstNodes].
-    pub fn span(&self) -> Span {
-        SpanMap::span_of(self.id)
+    /// Get the location of this [AstNodes] in its source file.
+    pub fn range(&self) -> ByteRange {
+        self.range
     }
 
     /// Insert an item into the [AstNodes] at a particular index.
@@ -399,10 +211,10 @@ impl<T> AstNodes<T> {
     /// Merge two [AstNodes] together, this will append the nodes of the
     /// other [AstNodes] to this one, and then return the new [AstNodes].
     ///
-    /// **Note** this will automatically update the [Span] of this node
-    /// by extending it with the span of the other node.
+    /// **Note** this will automatically update the [ByteRange] of this node
+    /// by extending it with the range of the other node.
     pub fn merge(&mut self, other: Self) {
-        self.set_span(self.span().join(other.span()));
+        self.set_range(self.range.join(other.range));
         self.nodes.extend(other.nodes);
     }
 
@@ -920,7 +732,7 @@ define_tree! {
 
     }
 
-    /// A hunk of text, the [Span] of this node exactly represents the range
+    /// A hunk of text, the [ByteRange] of this node exactly represents the range
     /// of text that this node represents.
     #[derive(Clone, Debug, PartialEq)]
     #[node]

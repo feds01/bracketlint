@@ -8,8 +8,8 @@
 use std::cell::Cell;
 
 use bl_ast::{
-    self as ast, AstNode, AstNodes, ByteRange, Identifier, Keyword, LocalSpanMap, SourceId, Span,
-    SpannedSource, VarExpr,
+    self as ast, AstNode, AstNodes, ByteRange, Identifier, Keyword, SourceId, Span, SpannedSource,
+    VarExpr,
 };
 use bl_lexer::{
     kw, tok,
@@ -194,11 +194,6 @@ pub struct Parser<'s> {
     /// Any options that are supplied to the parser to alter
     /// its mode of operation.
     options: ParseOptions,
-
-    /// The local span map that is used to store created [Span]s for [AstNode]s
-    /// that will be synced when the parsing is complete, i.e. at the end of
-    /// the `parse_source` query.
-    span_map: &'s mut LocalSpanMap,
 }
 
 impl<'s> Parser<'s> {
@@ -207,7 +202,6 @@ impl<'s> Parser<'s> {
         source: SpannedSource<'s>,
         stream: &'s [Token],
         diagnostics: &'s mut ParserDiagnostics,
-        span_map: &'s mut LocalSpanMap,
         options: ParseOptions,
     ) -> Self {
         // We compute the `parent_span` from the given stream.
@@ -222,7 +216,6 @@ impl<'s> Parser<'s> {
             id,
             _source: source,
             diagnostics,
-            span_map,
             options,
             frame: ParseFrame::from_stream(stream, parent_span),
         }
@@ -255,41 +248,36 @@ impl<'s> Parser<'s> {
 
     /// Create a new [AstNode] from the information provided by the [AstGen]
     #[inline(always)]
-    pub fn node_with_span<T>(&mut self, inner: T, location: ByteRange) -> AstNode<T> {
-        let id = self.span_map.add(location);
-        AstNode::with_id(inner, id)
+    pub fn node_with_span<T>(&self, inner: T, location: ByteRange) -> AstNode<T> {
+        AstNode::new(inner, location)
     }
 
     /// Create a new [AstNode] with a span that ranges from the start
     /// [ByteRange] to join with the [ByteRange].
     #[inline(always)]
-    pub(crate) fn node_with_joined_span<T>(&mut self, body: T, start: ByteRange) -> AstNode<T> {
+    pub(crate) fn node_with_joined_span<T>(&self, body: T, start: ByteRange) -> AstNode<T> {
         // We get the previous token, before the current since we want to
         // know the span up to the current token, not including it.
-
-        let id = self.span_map.add(start.join(self.previous_pos()));
-        AstNode::with_id(body, id)
+        AstNode::new(body, start.join(self.previous_pos()))
     }
 
     /// Create [AstNodes] with a span.
     pub(crate) fn nodes_with_span<T>(
-        &mut self,
+        &self,
         nodes: ThinVec<AstNode<T>>,
         location: ByteRange,
     ) -> AstNodes<T> {
-        let id = self.span_map.add(location);
-        AstNodes::with_id(nodes, id)
+        AstNodes::new(nodes, location)
     }
 
     /// Create [AstNodes] with a span that ranges from the start [ByteRange] to
     /// the current [ByteRange].
     pub(crate) fn nodes_with_joined_span<T>(
-        &mut self,
+        &self,
         nodes: ThinVec<AstNode<T>>,
         start: ByteRange,
     ) -> AstNodes<T> {
-        let id = self.span_map.add(start.join(self.previous_pos()));
-        AstNodes::with_id(nodes, id)
+        AstNodes::new(nodes, start.join(self.previous_pos()))
     }
 
     /// Create an error without wrapping it in an [Err] variant
@@ -992,7 +980,7 @@ impl<'s> Parser<'s> {
 
             self.nodes_with_joined_span(args, start)
         } else {
-            AstNodes::empty(self.make_span(subject_span))
+            AstNodes::empty(subject_span)
         };
 
         Ok(self.node_with_joined_span(ast::Filter { name, args }, subject_span))
