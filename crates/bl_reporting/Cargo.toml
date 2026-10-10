@@ -9,8 +9,10 @@ bl_ast = { workspace = true }
 bl_utils = { workspace = true }
 
 annotate-snippets = { workspace = true }
+bytecount = { workspace = true }
 derive_more = { workspace = true }
 index_vec = { workspace = true }
+memchr = { workspace = true }
 parking_lot = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true }

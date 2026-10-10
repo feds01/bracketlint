@@ -3,9 +3,9 @@
 //! human-readable format. This is done via the [annotate_snippets] crate and
 //! its API.
 
-use std::fmt;
+use std::{fmt, ops::Range};
 
-use annotate_snippets::{AnnotationKind, Element, Level, Renderer, Snippet};
+use annotate_snippets::{Annotation, AnnotationKind, Element, Level, Renderer, Snippet};
 use bl_ast::HasSource;
 
 use crate::{Report, ReportCodeBlock, ReportElement, Reports};
@@ -57,15 +57,13 @@ impl<S: HasSource> fmt::Display for Reporter<'_, S> {
                     ReportElement::CodeBlock(ReportCodeBlock { notes }) => {
                         for (span, note) in notes {
                             elements.push(
-                                Snippet::source(self.sources.contents(span.id))
-                                    .path(self.sources.path(span.id))
-                                    .fold(true)
-                                    .annotation(
-                                        AnnotationKind::Context
-                                            .span(span.range.start()..(span.range.end() + 1))
-                                            .label(note.as_str()),
-                                    )
-                                    .into(),
+                                snippet(
+                                    self.sources.contents(span.id),
+                                    self.sources.path(span.id),
+                                    span.range.start()..(span.range.end() + 1),
+                                    note,
+                                )
+                                .into(),
                             );
                         }
                     }
@@ -81,5 +79,99 @@ impl<S: HasSource> fmt::Display for Reporter<'_, S> {
         }
 
         Ok(())
+    }
+}
+
+/// A snippet of `contents` that labels the `annotated` part of it.
+///
+/// ##Note: A snippet only shows the lines that its annotations are on, but
+/// `annotate_snippets` splits all of its source into lines first. Giving it
+/// only those lines, rather than the whole file, saves doing that for each
+/// note.
+fn snippet<'a>(
+    contents: &'a str,
+    path: &'a str,
+    annotated: Range<usize>,
+    label: &'a str,
+) -> Snippet<'a, Annotation<'a>> {
+    let lines = lines_around(contents, &annotated);
+    let line_start = 1 + bytecount::count(&contents.as_bytes()[..lines.start], b'\n');
+    let annotated = (annotated.start - lines.start)..(annotated.end - lines.start);
+
+    Snippet::source(&contents[lines])
+        .line_start(line_start)
+        .path(path)
+        .fold(true)
+        .annotation(AnnotationKind::Context.span(annotated).label(label))
+}
+
+/// The range of the whole lines of `contents` that `annotated` is on, as
+/// `annotate_snippets` places it.
+fn lines_around(contents: &str, annotated: &Range<usize>) -> Range<usize> {
+    let bytes = contents.as_bytes();
+    let start = annotated.start.min(bytes.len());
+
+    // An annotation that takes in a newline ends on the next line, so the
+    // window runs to the end of the line that the annotation ends on.
+    let end = annotated.end.max(start).min(bytes.len());
+
+    // `annotate_snippets` puts the end of a file that ends with a newline on
+    // its last line, rather than on an empty line after it.
+    let before = match bytes.last() {
+        Some(b'\n') if start == bytes.len() => start - 1,
+        _ => start,
+    };
+    let line_start = memchr::memrchr(b'\n', &bytes[..before]).map_or(0, |index| index + 1);
+    let line_end =
+        memchr::memchr(b'\n', &bytes[end..]).map_or(bytes.len(), |index| end + index + 1);
+    line_start..line_end
+}
+
+#[cfg(test)]
+mod tests {
+    use annotate_snippets::{AnnotationKind, Level, Renderer, Snippet};
+
+    use super::snippet;
+
+    /// A snippet of only the annotated lines must render as one of the whole
+    /// file does, for every span, including those that take in a newline or
+    /// reach the end of the file.
+    #[test]
+    fn snippet_renders_as_one_of_the_whole_file() {
+        let sources = [
+            "first\nsecond line\n\nfourth\n",
+            "first\nsecond line\n\nfourth",
+            "one line",
+            "",
+            "\n\n",
+            "a\r\nbé\r\n\r\nü",
+        ];
+        let render = |snippet: Snippet<'_, _>| {
+            Renderer::plain().render(&[Level::ERROR.primary_title("title").element(snippet)])
+        };
+
+        for contents in sources {
+            let boundaries = (0..=contents.len()).filter(|&index| contents.is_char_boundary(index));
+
+            for start in boundaries {
+                // The reporter's spans end one byte after the last one that they
+                // take in, so they can reach one byte past the end of the file.
+                let ends = (start + 1..=contents.len() + 1)
+                    .filter(|&end| end > contents.len() || contents.is_char_boundary(end));
+
+                for end in ends {
+                    let whole = Snippet::source(contents)
+                        .path("file")
+                        .fold(true)
+                        .annotation(AnnotationKind::Context.span(start..end).label("here"));
+
+                    assert_eq!(
+                        render(snippet(contents, "file", start..end, "here")),
+                        render(whole),
+                        "{contents:?} at {start}..{end}"
+                    );
+                }
+            }
+        }
     }
 }
