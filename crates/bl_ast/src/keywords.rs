@@ -3,6 +3,8 @@ use std::fmt;
 
 use strum::AsRefStr;
 
+use crate::Dialect;
+
 /// Template language keywords. Most of them are shared by every dialect, and
 /// [crate::Dialect::keyword] finds the ones that a dialect has.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, AsRefStr)]
@@ -340,114 +342,187 @@ impl Name {
     }
 }
 
-/// Define a function that finds the keyword that a [Name] is, from a table of
-/// each keyword's text.
-macro_rules! keyword_table {
-    ($(#[$attr:meta])* fn $function:ident { $($text:literal => $keyword:ident,)* }) => {
-        $(#[$attr])*
-        #[allow(non_upper_case_globals)]
-        pub(crate) fn $function(name: Name) -> Option<Keyword> {
-            // Each keyword's text, packed, named after the keyword.
-            $(const $keyword: u128 = Name::new($text).0;)*
-
-            match name.0 {
-                $($keyword => Some(Keyword::$keyword),)*
-                _ => None,
-            }
-        }
-    };
-}
-
-keyword_table! {
-    /// The keyword that the identifier `name` is in every dialect, if any.
-    fn keyword {
+/// The keywords that every dialect has.
+const KEYWORDS: &[(&str, Keyword)] = {
+    use Keyword::*;
+    &[
         // Control flow
-        "for" => For,
-        "endfor" => EndFor,
-        "if" => If,
-        "elif" => Elif,
-        "else" => Else,
-        "endif" => EndIf,
-        "break" => Break,
-        "continue" => Continue,
-        "empty" => Empty,
-
+        ("for", For),
+        ("endfor", EndFor),
+        ("if", If),
+        ("elif", Elif),
+        ("else", Else),
+        ("endif", EndIf),
+        ("break", Break),
+        ("continue", Continue),
+        ("empty", Empty),
         // Logical operators
-        "and" => And,
-        "or" => Or,
-        "not" => Not,
-        "in" => In,
-        "as" => As,
-        "is" => Is,
-
+        ("and", And),
+        ("or", Or),
+        ("not", Not),
+        ("in", In),
+        ("as", As),
+        ("is", Is),
         // Context management
-        "with" => With,
-        "endwith" => EndWith,
-
+        ("with", With),
+        ("endwith", EndWith),
         // Template structure
-        "block" => Block,
-        "endblock" => EndBlock,
-        "extends" => Extends,
-        "include" => Include,
-        "load" => Load,
-
+        ("block", Block),
+        ("endblock", EndBlock),
+        ("extends", Extends),
+        ("include", Include),
+        ("load", Load),
         // Comments
-        "comment" => Comment,
-        "endcomment" => EndComment,
-        "raw" => Raw,
-        "endraw" => EndRaw,
-
+        ("comment", Comment),
+        ("endcomment", EndComment),
+        ("raw", Raw),
+        ("endraw", EndRaw),
         // Constants
-        "True" => True,
-        "False" => False,
-
+        ("True", True),
+        ("False", False),
         // Template importing
-        "import" => Import,
-
+        ("import", Import),
         // Modifiers
-        "reversed" => Reversed,
-    }
+        ("reversed", Reversed),
+    ]
+};
+
+/// The keywords that only Liquid has, which are its [`contains`] operator and
+/// some of its tags: [control flow], [iteration], [`capture`], [`render`] and
+/// [`doc`].
+///
+/// [`contains`]: https://shopify.github.io/liquid/basics/operators/#contains
+/// [control flow]: https://shopify.github.io/liquid/tags/control-flow/
+/// [iteration]: https://shopify.github.io/liquid/tags/iteration/
+/// [`capture`]: https://shopify.github.io/liquid/tags/variable/#capture
+/// [`render`]: https://shopify.github.io/liquid/tags/template/#render
+/// [`doc`]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/tags/doc.rb#L30
+const LIQUID_KEYWORDS: &[(&str, Keyword)] = {
+    use Keyword::*;
+    &[
+        ("contains", Contains),
+        ("unless", Unless),
+        ("endunless", EndUnless),
+        ("case", Case),
+        ("when", When),
+        ("endcase", EndCase),
+        ("tablerow", TableRow),
+        ("endtablerow", EndTableRow),
+        ("capture", Capture),
+        ("endcapture", EndCapture),
+        ("render", Render),
+        ("doc", Doc),
+        ("enddoc", EndDoc),
+    ]
+};
+
+/// The number of slots in a [KeywordTable], at least four for each keyword, so
+/// that a seed that gives each keyword a slot of its own is quick to find.
+const SLOTS: usize = ((KEYWORDS.len() + LIQUID_KEYWORDS.len()) * 4).next_power_of_two();
+
+/// The keywords of a dialect, in a table where a perfect hash of a [Name]
+/// picks the only slot that its keyword can be in, so that finding a name's
+/// keyword takes one comparison.
+pub(crate) struct KeywordTable {
+    /// The multiplier of the hash, under which no two keywords share a slot.
+    seed: u64,
+
+    /// Each keyword, in the slot that its name hashes to.
+    slots: [Option<(Name, Keyword)>; SLOTS],
 }
 
-keyword_table! {
-    /// The keywords that only Liquid has, which are its [`contains`] operator and
-    /// some of its tags: [control flow], [iteration], [`capture`], [`render`] and
-    /// [`doc`].
-    ///
-    /// [`contains`]: https://shopify.github.io/liquid/basics/operators/#contains
-    /// [control flow]: https://shopify.github.io/liquid/tags/control-flow/
-    /// [iteration]: https://shopify.github.io/liquid/tags/iteration/
-    /// [`capture`]: https://shopify.github.io/liquid/tags/variable/#capture
-    /// [`render`]: https://shopify.github.io/liquid/tags/template/#render
-    /// [`doc`]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/tags/doc.rb#L30
-    fn liquid_keyword {
-        "contains" => Contains,
-        "unless" => Unless,
-        "endunless" => EndUnless,
-        "case" => Case,
-        "when" => When,
-        "endcase" => EndCase,
-        "tablerow" => TableRow,
-        "endtablerow" => EndTableRow,
-        "capture" => Capture,
-        "endcapture" => EndCapture,
-        "render" => Render,
-        "doc" => Doc,
-        "enddoc" => EndDoc,
+impl KeywordTable {
+    /// The table of the keywords of `dialect`: those of every dialect, and
+    /// Liquid's own in Liquid, with `elif` spelled as the dialect spells it.
+    pub(crate) const fn of(dialect: Dialect) -> Self {
+        let lists: &[&[(&str, Keyword)]] =
+            if dialect.is_liquid() { &[KEYWORDS, LIQUID_KEYWORDS] } else { &[KEYWORDS] };
+        Self::build(lists, dialect.elif_tag())
+    }
+
+    /// The table of the keywords in `lists`, with `elif` spelled as `elif`.
+    const fn build(lists: &[&[(&str, Keyword)]], elif: &str) -> Self {
+        // Try seeds until one puts each keyword in a slot of its own.
+        let mut seed: u64 = 0x9E37_79B9_7F4A_7C15;
+        'seeds: loop {
+            let mut slots = [None; SLOTS];
+
+            let mut list = 0;
+            while list < lists.len() {
+                let mut index = 0;
+                while index < lists[list].len() {
+                    let (text, keyword) = lists[list][index];
+                    let text = if matches!(keyword, Keyword::Elif) { elif } else { text };
+                    let name = Name::new(text);
+                    let slot = Self::slot(name, seed);
+                    if slots[slot].is_some() {
+                        seed = seed.wrapping_add(0x6A09_E667_F3BC_C908);
+                        continue 'seeds;
+                    }
+
+                    slots[slot] = Some((name, keyword));
+                    index += 1;
+                }
+                list += 1;
+            }
+
+            return Self { seed, slots };
+        }
+    }
+
+    /// The slot that `name` hashes to under `seed`.
+    const fn slot(name: Name, seed: u64) -> usize {
+        let (low, high) = (name.0 as u64, (name.0 >> 64) as u64);
+        let hash = (low ^ high.rotate_left(29)).wrapping_mul(seed);
+        (hash >> (u64::BITS - SLOTS.trailing_zeros())) as usize
+    }
+
+    /// The keyword that `name` is, if any.
+    pub(crate) fn get(&self, name: &str) -> Option<Keyword> {
+        let name = Name::new(name);
+        match self.slots[Self::slot(name, self.seed)] {
+            Some((key, keyword)) if key == name => Some(keyword),
+            _ => None,
+        }
     }
 }
 
 impl TryFrom<&str> for Keyword {
     type Error = ();
 
+    /// The keyword that `value` is in every dialect, if any.
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        keyword(Name::new(value)).ok_or(())
+        static EVERY_DIALECT: KeywordTable = KeywordTable::build(&[KEYWORDS], "elif");
+        EVERY_DIALECT.get(value).ok_or(())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::Name;
+    use super::{KEYWORDS, Keyword, LIQUID_KEYWORDS, Name};
+    use crate::Dialect;
+
+    #[test]
+    fn each_dialect_finds_its_keywords() {
+        for &dialect in Dialect::ALL {
+            let liquid = dialect.is_liquid();
+            for &(text, keyword) in KEYWORDS.iter().filter(|(_, k)| *k != Keyword::Elif) {
+                assert_eq!(dialect.keyword(text), Some(keyword), "{text:?} in {dialect}");
+            }
+            for &(text, keyword) in LIQUID_KEYWORDS {
+                let expected = liquid.then_some(keyword);
+                assert_eq!(dialect.keyword(text), expected, "{text:?} in {dialect}");
+            }
+
+            let (elif, other) = if liquid { ("elsif", "elif") } else { ("elif", "elsif") };
+            assert_eq!(dialect.keyword(elif), Some(Keyword::Elif), "{elif:?} in {dialect}");
+            assert_eq!(dialect.keyword(other), None, "{other:?} in {dialect}");
+
+            for name in ["", "item", "fors", "fo", "endforx", "a_name_that_is_long", "For"] {
+                assert_eq!(dialect.keyword(name), None, "{name:?} in {dialect}");
+            }
+        }
+    }
 
     #[test]
     fn names_pack_apart() {
