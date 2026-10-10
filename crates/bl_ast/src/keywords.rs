@@ -276,94 +276,171 @@ impl fmt::Display for Keyword {
     }
 }
 
-/// The keyword that the identifier `name` is in every dialect, if any.
+/// A name of up to 15 bytes, packed into an integer, so that comparing it with
+/// a keyword is one integer comparison rather than a call to `memcmp`. Every
+/// keyword is that short, so a longer name packs to [Name::LONG], which isn't
+/// one.
 ///
-/// ##Note: A `match` compares the length and bytes of `name` directly, which is
-/// faster for these short names than hashing it into a map.
-pub(crate) fn keyword(name: &str) -> Option<Keyword> {
-    let keyword = match name {
-        // Control flow
-        "for" => Keyword::For,
-        "endfor" => Keyword::EndFor,
-        "if" => Keyword::If,
-        "elif" => Keyword::Elif,
-        "else" => Keyword::Else,
-        "endif" => Keyword::EndIf,
-        "break" => Keyword::Break,
-        "continue" => Keyword::Continue,
-        "empty" => Keyword::Empty,
+/// The name is read as two chunks of the same size, from its start and from its
+/// end, which between them hold each of its bytes, and which overlap when it is
+/// shorter than both. Reading them takes two loads, rather than a copy of each
+/// byte. Its length goes in the top byte, so that no two names pack to the same
+/// integer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Name(u128);
 
-        // Logical operators
-        "and" => Keyword::And,
-        "or" => Keyword::Or,
-        "not" => Keyword::Not,
-        "in" => Keyword::In,
-        "as" => Keyword::As,
-        "is" => Keyword::Is,
+impl Name {
+    /// Any name that is longer than 15 bytes.
+    const LONG: Self = Self(u128::MAX);
 
-        // Context management
-        "with" => Keyword::With,
-        "endwith" => Keyword::EndWith,
+    pub(crate) const fn new(name: &str) -> Self {
+        let bytes = name.as_bytes();
+        let chunks = match bytes.len() {
+            0 => 0,
+            1 => bytes[0] as u128,
+            2..=3 => match (bytes.first_chunk(), bytes.last_chunk()) {
+                (Some(start), Some(end)) => {
+                    u16::from_le_bytes(*start) as u128 | (u16::from_le_bytes(*end) as u128) << 16
+                }
+                _ => unreachable!(),
+            },
+            4..=7 => match (bytes.first_chunk(), bytes.last_chunk()) {
+                (Some(start), Some(end)) => {
+                    u32::from_le_bytes(*start) as u128 | (u32::from_le_bytes(*end) as u128) << 32
+                }
+                _ => unreachable!(),
+            },
+            // The first byte of the end chunk is in the start chunk too, so it is
+            // shifted out to leave the top byte for the length.
+            8..=15 => match (bytes.first_chunk(), bytes.last_chunk()) {
+                (Some(start), Some(end)) => {
+                    u64::from_le_bytes(*start) as u128
+                        | ((u64::from_le_bytes(*end) >> 8) as u128) << 64
+                }
+                _ => unreachable!(),
+            },
+            _ => return Self::LONG,
+        };
 
-        // Template structure
-        "block" => Keyword::Block,
-        "endblock" => Keyword::EndBlock,
-        "extends" => Keyword::Extends,
-        "include" => Keyword::Include,
-        "load" => Keyword::Load,
-
-        // Comments
-        "comment" => Keyword::Comment,
-        "endcomment" => Keyword::EndComment,
-        "raw" => Keyword::Raw,
-        "endraw" => Keyword::EndRaw,
-
-        // Constants
-        "True" => Keyword::True,
-        "False" => Keyword::False,
-
-        // Template importing
-        "import" => Keyword::Import,
-
-        // Modifiers
-        "reversed" => Keyword::Reversed,
-        _ => return None,
-    };
-
-    Some(keyword)
+        Self(chunks | (bytes.len() as u128) << 120)
+    }
 }
 
-/// The keywords that only Liquid has, which are its [`contains`] operator and
-/// some of its tags: [control flow], [iteration], [`capture`] and [`render`].
-///
-/// [`contains`]: https://shopify.github.io/liquid/basics/operators/#contains
-/// [control flow]: https://shopify.github.io/liquid/tags/control-flow/
-/// [iteration]: https://shopify.github.io/liquid/tags/iteration/
-/// [`capture`]: https://shopify.github.io/liquid/tags/variable/#capture
-/// [`render`]: https://shopify.github.io/liquid/tags/template/#render
-pub(crate) fn liquid_keyword(name: &str) -> Option<Keyword> {
-    let keyword = match name {
-        "contains" => Keyword::Contains,
-        "unless" => Keyword::Unless,
-        "endunless" => Keyword::EndUnless,
-        "case" => Keyword::Case,
-        "when" => Keyword::When,
-        "endcase" => Keyword::EndCase,
-        "tablerow" => Keyword::TableRow,
-        "endtablerow" => Keyword::EndTableRow,
-        "capture" => Keyword::Capture,
-        "endcapture" => Keyword::EndCapture,
-        "render" => Keyword::Render,
-        _ => return None,
-    };
+/// Define a function that finds the keyword that a [Name] is, from a table of
+/// each keyword's text.
+macro_rules! keyword_table {
+    ($(#[$attr:meta])* fn $function:ident { $($text:literal => $keyword:ident,)* }) => {
+        $(#[$attr])*
+        #[allow(non_upper_case_globals)]
+        pub(crate) fn $function(name: Name) -> Option<Keyword> {
+            // Each keyword's text, packed, named after the keyword.
+            $(const $keyword: u128 = Name::new($text).0;)*
 
-    Some(keyword)
+            match name.0 {
+                $($keyword => Some(Keyword::$keyword),)*
+                _ => None,
+            }
+        }
+    };
+}
+
+keyword_table! {
+    /// The keyword that the identifier `name` is in every dialect, if any.
+    fn keyword {
+        // Control flow
+        "for" => For,
+        "endfor" => EndFor,
+        "if" => If,
+        "elif" => Elif,
+        "else" => Else,
+        "endif" => EndIf,
+        "break" => Break,
+        "continue" => Continue,
+        "empty" => Empty,
+
+        // Logical operators
+        "and" => And,
+        "or" => Or,
+        "not" => Not,
+        "in" => In,
+        "as" => As,
+        "is" => Is,
+
+        // Context management
+        "with" => With,
+        "endwith" => EndWith,
+
+        // Template structure
+        "block" => Block,
+        "endblock" => EndBlock,
+        "extends" => Extends,
+        "include" => Include,
+        "load" => Load,
+
+        // Comments
+        "comment" => Comment,
+        "endcomment" => EndComment,
+        "raw" => Raw,
+        "endraw" => EndRaw,
+
+        // Constants
+        "True" => True,
+        "False" => False,
+
+        // Template importing
+        "import" => Import,
+
+        // Modifiers
+        "reversed" => Reversed,
+    }
+}
+
+keyword_table! {
+    /// The keywords that only Liquid has, which are its [`contains`] operator and
+    /// some of its tags: [control flow], [iteration], [`capture`] and [`render`].
+    ///
+    /// [`contains`]: https://shopify.github.io/liquid/basics/operators/#contains
+    /// [control flow]: https://shopify.github.io/liquid/tags/control-flow/
+    /// [iteration]: https://shopify.github.io/liquid/tags/iteration/
+    /// [`capture`]: https://shopify.github.io/liquid/tags/variable/#capture
+    /// [`render`]: https://shopify.github.io/liquid/tags/template/#render
+    fn liquid_keyword {
+        "contains" => Contains,
+        "unless" => Unless,
+        "endunless" => EndUnless,
+        "case" => Case,
+        "when" => When,
+        "endcase" => EndCase,
+        "tablerow" => TableRow,
+        "endtablerow" => EndTableRow,
+        "capture" => Capture,
+        "endcapture" => EndCapture,
+        "render" => Render,
+    }
 }
 
 impl TryFrom<&str> for Keyword {
     type Error = ();
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        keyword(value).ok_or(())
+        keyword(Name::new(value)).ok_or(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Name;
+
+    #[test]
+    fn names_pack_apart() {
+        let names = ["", "a", "a\0", "for", "for\0", "fo", "endtablerow", "elsif", "elif"];
+        for (index, name) in names.iter().enumerate() {
+            for other in &names[index + 1..] {
+                assert_ne!(Name::new(name), Name::new(other), "{name:?} and {other:?}");
+            }
+        }
+
+        assert_eq!(Name::new("sixteen_bytes_ab"), Name::LONG);
+        assert_ne!(Name::new("fifteen_bytes_a"), Name::LONG);
     }
 }
