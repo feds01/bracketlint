@@ -1,8 +1,8 @@
 parse-error   share/templates/base/cell_id_anchor.j2
 parse-error   share/templates/base/celltags.j2
 parse-error   share/templates/base/display_priority.j2
-fmt-error     share/templates/base/jupyter_widgets.html.j2
-unstable      share/templates/base/mathjax.html.j2
+ok            share/templates/base/jupyter_widgets.html.j2
+ok            share/templates/base/mathjax.html.j2
 parse-error   share/templates/base/null.j2
 ok            share/templates/basic/index.html.j2
 parse-error   share/templates/classic/base.html.j2

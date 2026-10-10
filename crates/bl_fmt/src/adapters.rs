@@ -24,6 +24,28 @@ pub enum LanguageType {
     Text,
 }
 
+impl LanguageType {
+    /// Where the code of a `<style>` or `<script>` element ends in `text`, i.e.
+    /// its closing tag, when it is the element's language.
+    pub fn end_in(self, text: &str) -> Option<usize> {
+        let closing: &[u8] = match self {
+            LanguageType::Css => b"</style",
+            LanguageType::Js => b"</script",
+            LanguageType::Html | LanguageType::Text => return None,
+        };
+
+        // The name of the tag ends at whitespace, `/` or `>`, so that e.g.
+        // `</scripts>` is still code.
+        let text = text.as_bytes();
+        (0..text.len()).find(|&start| {
+            text[start..].get(..closing.len()).is_some_and(|tag| tag.eq_ignore_ascii_case(closing))
+                && text
+                    .get(start + closing.len())
+                    .is_none_or(|next| next.is_ascii_whitespace() || matches!(next, b'/' | b'>'))
+        })
+    }
+}
+
 impl fmt::Display for LanguageType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -102,7 +124,9 @@ impl<'s> FormatterContext<'s> {
 
 /// A trait that represents a type that has the capability to parse HTML.
 pub trait HasHTMLParsing<'ctx> {
-    fn format(&mut self, contents: &str) -> FmtResult<String>;
+    /// Format `contents`, or return `None` if they don't parse, in which case
+    /// they are kept as they are written.
+    fn format(&mut self, contents: &str) -> FmtResult<Option<String>>;
 
     /// Get the [TerminalState] of the parser.
     fn into_state(self) -> TerminalState;
@@ -110,7 +134,9 @@ pub trait HasHTMLParsing<'ctx> {
 
 /// A trait that represents a type that has the capability to parse CSS.
 pub trait HasCSSParsing<'ctx> {
-    fn format(&self, contents: &str) -> FmtResult<String>;
+    /// Format `contents`, or return `None` if they don't parse, in which case
+    /// they are kept as they are written.
+    fn format(&self, contents: &str) -> FmtResult<Option<String>>;
 
     /// Attempt to compute the [TerminalState] of the parser.
     fn into_state(self) -> TerminalState;
@@ -118,7 +144,9 @@ pub trait HasCSSParsing<'ctx> {
 
 /// A trait that represents a type that has the capability to parse JavaScript.
 pub trait HasJSParsing<'ctx> {
-    fn format(&self, contents: &str) -> FmtResult<String>;
+    /// Format `contents`, or return `None` if they don't parse, in which case
+    /// they are kept as they are written.
+    fn format(&self, contents: &str) -> FmtResult<Option<String>>;
 
     /// Attempt to compute the [TerminalState] of the parser.
     fn into_state(self) -> TerminalState;

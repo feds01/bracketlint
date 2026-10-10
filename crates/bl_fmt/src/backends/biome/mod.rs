@@ -10,16 +10,15 @@ use std::{
 
 use biome_css_formatter::{self as css_formatter, context::CssFormatOptions};
 use biome_css_parser::{self as css_parser, CssParserOptions};
-use biome_diagnostics::DiagnosticExt;
-use biome_formatter::IndentStyle;
+use biome_formatter::{FormatError, IndentStyle};
 use biome_html_formatter::{HtmlFormatOptions, format_node};
 use biome_html_parser::{HtmlParserOptions, parse_html_with_cache};
-use biome_html_syntax::{HtmlElementList, HtmlRoot};
+use biome_html_syntax::{HtmlElementList, HtmlRoot, HtmlSyntaxNode, T};
 use biome_js_formatter::{self as js_formatter, context::JsFormatOptions};
 use biome_js_parser::{self as js_parser, JsParserOptions};
 use biome_languages::{CssFileSource, HtmlFileSource, JsFileSource};
-use biome_rowan::{AstNode, AstNodeList, NodeCache};
-use bl_ast::{ByteRange, SpannedSource};
+use biome_rowan::{AstNode, AstNodeList, Direction, NodeCache, SyntaxKind};
+use bl_ast::SpannedSource;
 
 use crate::{
     adapters::{
@@ -135,13 +134,12 @@ impl<'ctx> HasHTMLParsing<'ctx> for HTMLBiomeFormatter<'ctx> {
     /// with `biome_html_parser` and formatting the tree with
     /// `biome_html_formatter`.
     ///
-    /// ##Note: The contents are a piece of the template between its tags, e.g.
-    /// `<li class="`, which often isn't valid HTML on its own. Biome's parse
-    /// errors are ignored, and it formats as much as it could parse.
-    ///
-    /// @@Todo: We may want to keep the contents as they are written when they
-    /// don't parse, and emit an event for debugging that they didn't.
-    fn format(&mut self, contents: &str) -> FmtResult<String> {
+    /// ##Note: The contents are a piece of the template between its tags,
+    /// which often isn't valid HTML on its own. Elements that the piece opens
+    /// or closes without the other are formatted all the same, but a piece
+    /// where a template tag cuts an HTML tag, e.g. `<li class="`, is kept as
+    /// it is written, see [has_broken_tag].
+    fn format(&mut self, contents: &str) -> FmtResult<Option<String>> {
         let options = HtmlParserOptions::from(&HtmlFileSource::html());
         let parsed = parse_html_with_cache(contents, &mut self.cache.borrow_mut(), options);
         let tree = parsed.tree();
@@ -156,17 +154,22 @@ impl<'ctx> HasHTMLParsing<'ctx> for HTMLBiomeFormatter<'ctx> {
         //    - Otherwise, we are in a HTML block.
         self.apply_state_from_tree(&tree);
 
+        if has_broken_tag(&parsed.syntax()) {
+            return Ok(None);
+        }
+
         let language = LanguageType::Html;
         let options = self.options.html.clone();
 
         match format_node(options, &parsed.syntax(), vec![]) {
             Ok(formatted) => {
                 let printed = formatted.print().unwrap();
-                Ok(printed.into_code())
+                Ok(Some(printed.into_code()))
             }
-            Err(_) => {
-                Err(FmtError::new(FmtErrorKind::ExternalLanguageFormatError { language }, None))
-            }
+            // A tag without its `>`, e.g. `<div ` before `{{ attributes }}`,
+            // has no node that Biome can format.
+            Err(FormatError::SyntaxError) => Ok(None),
+            Err(_) => Err(FmtError::new(FmtErrorKind::ExternalLanguageFormatError { language })),
         }
     }
 
@@ -175,6 +178,40 @@ impl<'ctx> HasHTMLParsing<'ctx> for HTMLBiomeFormatter<'ctx> {
         self.state
     }
 }
+
+/// Whether Biome couldn't parse a tag in the HTML of `root`, e.g. `<li class="`
+/// that a template tag cuts. Biome prints what it couldn't parse as it is
+/// written, among the HTML that it lays out, so that formatting the piece again
+/// lays it out differently. For one, the other lines of such a tag keep the
+/// indentation of the source, which the formatter would indent again each run.
+///
+/// A closing tag whose element opens before a template tag, e.g. the `</li>` in
+/// `{% endif %}</li>`, is parsed into a bogus element as well. It is printed as
+/// any other closing tag, unless it spans several lines, e.g. `</li\n>`, or it
+/// closes an element whose content Biome would lay out as other HTML, see
+/// [VERBATIM_ELEMENTS].
+fn has_broken_tag(root: &HtmlSyntaxNode) -> bool {
+    let is_closing_tag = |node: &HtmlSyntaxNode| {
+        let mut tokens = node.descendants_tokens(Direction::Next);
+        let (Some(open), Some(slash), Some(name)) = (tokens.next(), tokens.next(), tokens.next())
+        else {
+            return false;
+        };
+
+        let name = name.text_trimmed();
+        open.kind() == T![<]
+            && slash.kind() == T![/]
+            && !VERBATIM_ELEMENTS.iter().any(|element| name.eq_ignore_ascii_case(element))
+            && !node.text_trimmed().contains_char('\n')
+    };
+
+    root.descendants().any(|node| node.kind().is_bogus() && !is_closing_tag(&node))
+}
+
+/// The elements whose content can't be laid out as other HTML is: whitespace
+/// matters in `<pre>` and `<textarea>`, and `<script>` and `<style>` hold code.
+/// Biome only knows so when it parses their opening tag.
+const VERBATIM_ELEMENTS: [&str; 4] = ["pre", "textarea", "script", "style"];
 
 enum TerminalCalculationState {
     None,
@@ -282,11 +319,15 @@ fn find_rightmost_child_and_extract_state(
             }
         };
 
-        let language = match name.text() {
-            "style" => LanguageType::Css,
-            "script" => LanguageType::Js,
-            _ => LanguageType::Html,
-        };
+        // The text after a `<style>` or `<script>` element is CSS or JavaScript
+        // only while the element is open, e.g. when a tag in its body splits
+        // it. Once it is closed, the text after it is HTML again.
+        let language =
+            match (name.text().to_ascii_lowercase().as_str(), html_element.closing_element()) {
+                ("style", None) => LanguageType::Css,
+                ("script", None) => LanguageType::Js,
+                _ => LanguageType::Html,
+            };
 
         TerminalCalculationState::Some { language, indent }
     } else {
@@ -302,22 +343,14 @@ struct CSSBiomeFormatter<'ctx> {
 }
 
 impl<'ctx> HasCSSParsing<'ctx> for CSSBiomeFormatter<'ctx> {
-    /// Format the CSS contents using the Biome formatter.
+    /// Format the CSS contents using the Biome formatter, by parsing them with
+    /// `biome_css_parser` and formatting the tree with `biome_css_formatter`.
     ///
-    /// This will follow the algorithm:
-    ///
-    /// 1. Parse the CSS contents using the `biome_css_parser`.
-    ///
-    /// 2. If there are any errors, return them as a `FmtError`.
-    ///
-    /// 3. Format the parsed CSS using the `biome_css_formatter`.
-    ///
-    /// 4. Return the formatted CSS as a `String`.
-    ///
-    /// @@Todo: for (2 & 4) we may not want to do this, and simply return the
-    /// contents as verbatim. We could emit an event for debugging purposes
-    /// that parsing this content failed for some reason.
-    fn format(&self, contents: &str) -> FmtResult<String> {
+    /// ##Note: When a tag splits a `<style>` element, its contents are pieces
+    /// of CSS, e.g. `#Banner-` before `{{ section.id }}`, which often aren't
+    /// valid on their own. When they don't parse, they are kept as they are
+    /// written.
+    fn format(&self, contents: &str) -> FmtResult<Option<String>> {
         // @@Todo: consider using `parse_css_with_cache` here, and store the cache
         // within our caching system.
         let parsed = css_parser::parse_css(
@@ -325,44 +358,16 @@ impl<'ctx> HasCSSParsing<'ctx> for CSSBiomeFormatter<'ctx> {
             CssFileSource::css(),
             CssParserOptions::default().allow_wrong_line_comments().allow_metavariables(),
         );
+        if parsed.has_errors() {
+            return Ok(None);
+        }
+
         let language = LanguageType::Css;
-        let mut diagnostics = vec![];
-        let mut has_errors = false;
-
-        for diagnostic in parsed.diagnostics() {
-            has_errors |= diagnostic.is_error();
-
-            let message = format!("{}", diagnostic.message);
-            let err = diagnostic.clone().with_file_source_code("");
-
-            // Extract this span from the error.
-            diagnostics.push(FmtError::new(
-                FmtErrorKind::ExternalLanguageParseError { language, message },
-                err.location().span.map(|text_range| {
-                    bl_ast::Span::new(
-                        ByteRange::new(text_range.start().into(), text_range.end().into()),
-                        self.context.id(),
-                    )
-                }),
-            ));
-        }
-
-        // If there are any errors, return them.
-        if has_errors {
-            return Err(FmtError::compound(diagnostics));
-        }
-
-        // Now, format the CSS.
         let options = self.options.css.clone();
 
         match css_formatter::format_node(options, &parsed.syntax()) {
-            Ok(formatted) => {
-                // @@Temp: for now, just return the original contents.
-                Ok(formatted.print().unwrap().into_code())
-            }
-            Err(_) => {
-                Err(FmtError::new(FmtErrorKind::ExternalLanguageFormatError { language }, None))
-            }
+            Ok(formatted) => Ok(Some(formatted.print().unwrap().into_code())),
+            Err(_) => Err(FmtError::new(FmtErrorKind::ExternalLanguageFormatError { language })),
         }
     }
 
@@ -370,9 +375,10 @@ impl<'ctx> HasCSSParsing<'ctx> for CSSBiomeFormatter<'ctx> {
     ///
     /// Since a CSS block is a terminal "node" in the context of a template i.e.
     /// there may not be any other embedded languages within the CSS block,
-    /// we can safely assume that the terminal state is `Css`.
+    /// we can safely assume that the terminal state is `Css`, at the same
+    /// indent.
     fn into_state(self) -> TerminalState {
-        TerminalState { language: LanguageType::Css, indent: 0 }
+        TerminalState { language: LanguageType::Css, ..self.context.state }
     }
 }
 
@@ -384,63 +390,24 @@ struct JSBiomeFormatter<'ctx> {
 }
 
 impl<'ctx> HasJSParsing<'ctx> for JSBiomeFormatter<'ctx> {
-    /// Format the JS contents using the Biome formatter.
-    ///
-    /// This will follow the algorithm:
-    ///
-    /// 1. Parse the JS contents using the `biome_js_parser`.
-    ///
-    /// 2. If there are any errors, return them as a `FmtError`.
-    ///
-    /// 3. Format the parsed JS using the `biome_js_formatter`.
-    ///
-    /// 4. Return the formatted JS as a `String`.
-    ///
-    /// @@Todo: for (2 & 4) we may not want to do this, and simply return the
-    /// contents as verbatim. We could emit an event for debugging purposes
-    /// that parsing this content failed for some reason.
-    fn format(&self, contents: &str) -> FmtResult<String> {
+    /// Format the JS contents using the Biome formatter, by parsing them with
+    /// `biome_js_parser` and formatting the tree with `biome_js_formatter`, or
+    /// return `None` if they don't parse.
+    fn format(&self, contents: &str) -> FmtResult<Option<String>> {
         // @@Todo: consider using `parse_js_with_cache` here, and store the
         // cache within our caching system.
         let parsed = js_parser::parse_script(contents, JsParserOptions::default());
 
+        if parsed.has_errors() {
+            return Ok(None);
+        }
+
         let language = LanguageType::Js;
-        let mut diagnostics = vec![];
-
-        let mut has_errors = false;
-        for diagnostic in parsed.diagnostics() {
-            has_errors |= diagnostic.is_error();
-
-            let message = format!("{}", diagnostic.message);
-            let err = diagnostic.clone().with_file_source_code("");
-
-            // Extract this span from the error.
-            diagnostics.push(FmtError::new(
-                FmtErrorKind::ExternalLanguageParseError { language, message },
-                err.location().span.map(|text_range| {
-                    bl_ast::Span::new(
-                        ByteRange::new(text_range.start().into(), text_range.end().into()),
-                        self.context.id(),
-                    )
-                }),
-            ));
-        }
-
-        // If there are any errors, return them.
-        if has_errors {
-            return Err(FmtError::compound(diagnostics));
-        }
-
-        // Now, format the JS.
         let options = self.options.js.clone();
-        let formatted = js_formatter::format_node(options, &parsed.syntax(), vec![]);
 
-        // @@Temp: for now, just return the original contents.
-        match formatted {
-            Ok(formatted) => Ok(formatted.print().unwrap().into_code()),
-            Err(_) => {
-                Err(FmtError::new(FmtErrorKind::ExternalLanguageFormatError { language }, None))
-            }
+        match js_formatter::format_node(options, &parsed.syntax(), vec![]) {
+            Ok(formatted) => Ok(Some(formatted.print().unwrap().into_code())),
+            Err(_) => Err(FmtError::new(FmtErrorKind::ExternalLanguageFormatError { language })),
         }
     }
 
@@ -448,9 +415,10 @@ impl<'ctx> HasJSParsing<'ctx> for JSBiomeFormatter<'ctx> {
     ///
     /// Since a JS block is a terminal "node" in the context of a template i.e.
     /// there may not be any other embedded languages within the JS block,
-    /// we can safely assume that the terminal state is `Js`.
+    /// we can safely assume that the terminal state is `Js`, at the same
+    /// indent.
     fn into_state(self) -> TerminalState {
-        TerminalState { language: LanguageType::Js, indent: 0 }
+        TerminalState { language: LanguageType::Js, ..self.context.state }
     }
 }
 

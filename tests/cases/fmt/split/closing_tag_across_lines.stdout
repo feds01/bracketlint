@@ -1,0 +1,7 @@
+<ul>
+{% for item in items %}
+        <li class="{{ item.class }}">{{ item.title }}</li
+>
+    {% endfor %}
+    </ul>
+
