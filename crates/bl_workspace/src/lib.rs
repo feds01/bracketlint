@@ -43,7 +43,7 @@ impl WorkspaceMembers {
         let line_map = LineRanges::new_from_str(&contents);
         let metadata = MemberSourceMetadata::new(line_map);
 
-        let id = self.members.push(Member::new(path.clone(), contents, dialect, None, metadata));
+        let id = self.members.push(Member::new(path.clone(), contents, dialect, metadata));
         self.member_map.insert(path, id);
 
         id

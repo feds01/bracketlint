@@ -1,167 +1,73 @@
 //! The module contains all of the AST definitions for the templates that
 //! `bracketlint` supports parsing.
+//!
+//! A tree lives in an arena, a [bumpalo::Bump] that the parser is given, and
+//! each node refers to its children by reference into it. A tree isn't changed
+//! once it is parsed, and none of its nodes need dropping, so the whole tree is
+//! freed at once, with its arena.
 
-use std::{
-    fmt,
-    ops::{Deref, DerefMut},
-};
+use std::{fmt, ops::Deref};
 
 use bl_macros::define_tree;
-use replace_with::replace_with_or_abort;
-use thin_vec::{ThinVec, thin_vec};
 
 use crate::ByteRange;
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct AstNode<T> {
-    pub body: Box<T>,
+/// A node of a tree, and its location in its source file.
+#[derive(Debug, PartialEq)]
+pub struct AstNode<'a, T> {
+    /// The node, in the arena that the tree lives in.
+    pub body: &'a T,
 
     /// The location of the node in its source file.
     pub range: ByteRange,
 }
 
-impl<T> AstNode<T> {
-    /// Create an [AstNode] at the given [ByteRange].
-    pub fn new(body: T, range: ByteRange) -> Self {
-        Self { body: Box::new(body), range }
-    }
+/// A reference to a node, which a visitor is given. An [AstNode] is itself a
+/// reference into the arena, so the two are the same.
+pub type AstNodeRef<'a, T> = AstNode<'a, T>;
 
-    /// Create an [AstNodeRef] from this [AstNode].
-    pub fn ast_ref(&self) -> AstNodeRef<'_, T> {
-        AstNodeRef { body: self.body.as_ref(), range: self.range }
-    }
-
-    /// Create an [AstNodeRefMut] from this [AstNode].
-    pub fn ast_ref_mut(&mut self) -> AstNodeRefMut<'_, T> {
-        AstNodeRefMut { body: self.body.as_mut(), range: self.range }
-    }
-
-    /// Create an [AstNodeRef] by providing a body and copying over the
-    /// [ByteRange] of this [AstNode].
-    pub fn with_body<'u, U>(&self, body: &'u U) -> AstNodeRef<'u, U> {
-        AstNodeRef { body, range: self.range }
-    }
-}
-
-#[derive(Debug)]
-pub struct AstNodeRef<'t, T> {
-    /// A reference to the body of the [AstNode].
-    pub body: &'t T,
-
-    /// The location of the node in its source file.
-    pub range: ByteRange,
-}
-
-impl<T> Clone for AstNodeRef<'_, T> {
+impl<T> Clone for AstNode<'_, T> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<T> Copy for AstNodeRef<'_, T> {}
+impl<T> Copy for AstNode<'_, T> {}
 
-impl<'t, T> AstNodeRef<'t, T> {
-    /// Create a new [AstNodeRef<T>].
-    pub fn new(body: &'t T, range: ByteRange) -> Self {
-        AstNodeRef { body, range }
+impl<'a, T> AstNode<'a, T> {
+    /// Create an [AstNode] of a `body` in the arena, at the given [ByteRange].
+    pub fn new(body: &'a T, range: ByteRange) -> Self {
+        Self { body, range }
     }
 
-    /// Get a reference to body of the [AstNodeRef].
-    pub fn body(&self) -> &'t T {
+    /// Get an [AstNodeRef] to this node.
+    pub fn ast_ref(&self) -> AstNodeRef<'a, T> {
+        *self
+    }
+
+    /// Get a reference to the body of the node.
+    pub fn body(&self) -> &'a T {
         self.body
     }
 
-    /// Utility function to copy over the [ByteRange] from
-    /// another [AstNodeRef] with a provided body.
+    /// Create an [AstNodeRef] by providing a body and copying over the
+    /// [ByteRange] of this [AstNode].
     pub fn with_body<'u, U>(&self, body: &'u U) -> AstNodeRef<'u, U> {
-        AstNodeRef { body, range: self.range }
+        AstNode { body, range: self.range }
     }
 
-    /// Get the location of this [AstNodeRef] in its source file.
+    /// Get the location of this node in its source file.
     pub fn range(&self) -> ByteRange {
         self.range
     }
 }
 
 /// [AstNode] dereferences to its inner `body` type.
-impl<T> Deref for AstNodeRef<'_, T> {
-    type Target = T;
-    fn deref(&self) -> &Self::Target {
-        self.body()
-    }
-}
-
-#[derive(Debug)]
-pub struct AstNodeRefMut<'t, T> {
-    /// A mutable reference to the body of the [AstNode].
-    body: &'t mut T,
-
-    /// The location of the node in its source file.
-    pub range: ByteRange,
-}
-
-impl<'t, T> AstNodeRefMut<'t, T> {
-    /// Create a new [AstNodeRefMut<T>].
-    pub fn new(body: &'t mut T, range: ByteRange) -> Self {
-        AstNodeRefMut { body, range }
-    }
-
-    /// Get a reference to body of the [AstNodeRefMut].
-    pub fn body(&self) -> &T {
-        self.body
-    }
-
-    /// Replace the body of the [AstNodeRefMut] with another body.
-    pub fn replace(&mut self, f: impl FnOnce(T) -> T) {
-        replace_with_or_abort(self.body, f);
-    }
-
-    /// Get a mutable reference to the body.
-    pub fn body_mut(&mut self) -> &mut T {
-        self.body
-    }
-
-    /// Get the location of this [AstNodeRefMut] in its source file.
-    pub fn range(&self) -> ByteRange {
-        self.range
-    }
-
-    /// Get this node as an immutable reference
-    pub fn immutable(&self) -> AstNodeRef<'_, T> {
-        AstNodeRef::new(self.body, self.range)
-    }
-}
-
-impl<T> Deref for AstNodeRefMut<'_, T> {
+impl<T> Deref for AstNode<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        self.body()
-    }
-}
-
-impl<T> DerefMut for AstNodeRefMut<'_, T> {
-    fn deref_mut(&mut self) -> &mut T {
         self.body
-    }
-}
-
-/// Helper trait to access a node from a structure that contains one.
-pub trait OwnsAstNode<T> {
-    /// Get a reference to [AstNode<T>].
-    fn node(&self) -> &AstNode<T>;
-
-    /// Get a mutable reference to [AstNode<T>].
-    fn node_mut(&mut self) -> &mut AstNode<T>;
-
-    /// Get a [AstNodeRef<T>].
-    fn node_ref(&self) -> AstNodeRef<'_, T> {
-        self.node().ast_ref()
-    }
-
-    /// Get a [AstNodeRefMut<T>].
-    fn node_ref_mut(&mut self) -> AstNodeRefMut<'_, T> {
-        self.node_mut().ast_ref_mut()
     }
 }
 
@@ -169,33 +75,34 @@ pub trait OwnsAstNode<T> {
 /// span. This is often used to represent collections
 /// of [AstNode]s when they are wrapped within some kind
 /// of delimiter.
-#[derive(Debug, PartialEq, Clone)]
-pub struct AstNodes<T> {
-    /// The nodes that the [AstNodes] holds.
-    pub nodes: ThinVec<AstNode<T>>,
+#[derive(Debug, PartialEq)]
+pub struct AstNodes<'a, T> {
+    /// The nodes that the [AstNodes] holds, in the arena that the tree lives
+    /// in.
+    pub nodes: &'a [AstNode<'a, T>],
 
     /// The location of the nodes in their source file, including any
     /// delimiters around them.
     range: ByteRange,
 }
 
-impl<T> AstNodes<T> {
-    /// Create a new [AstNodes].
+impl<T> Clone for AstNodes<'_, T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T> Copy for AstNodes<'_, T> {}
+
+impl<'a, T> AstNodes<'a, T> {
+    /// Create an empty [AstNodes] at the given [ByteRange].
     pub fn empty(range: ByteRange) -> Self {
-        Self::new(thin_vec![], range)
+        Self::new(&[], range)
     }
 
-    /// Create an [AstNodes] with items at the given [ByteRange].
-    pub fn new(nodes: ThinVec<AstNode<T>>, range: ByteRange) -> Self {
+    /// Create an [AstNodes] of `nodes` in the arena, at the given [ByteRange].
+    pub fn new(nodes: &'a [AstNode<'a, T>], range: ByteRange) -> Self {
         Self { nodes, range }
-    }
-
-    /// Function to adjust the span location of [AstNodes] if it is initially
-    /// incorrectly offset because there is a 'pre-conditional' token that must
-    /// be parsed before parsing the nodes. This token could be something like a
-    /// '<' or '(' which starts a tuple, or type bound
-    pub fn set_range(&mut self, range: ByteRange) {
-        self.range = range;
     }
 
     /// Get the location of this [AstNodes] in its source file.
@@ -203,36 +110,17 @@ impl<T> AstNodes<T> {
         self.range
     }
 
-    /// Insert an item into the [AstNodes] at a particular index.
-    pub fn insert(&mut self, item: AstNode<T>, index: usize) {
-        self.nodes.insert(index, item);
-    }
-
-    /// Merge two [AstNodes] together, this will append the nodes of the
-    /// other [AstNodes] to this one, and then return the new [AstNodes].
-    ///
-    /// **Note** this will automatically update the [ByteRange] of this node
-    /// by extending it with the range of the other node.
-    pub fn merge(&mut self, other: Self) {
-        self.set_range(self.range.join(other.range));
-        self.nodes.extend(other.nodes);
-    }
-
-    /// Iterate over each child whilst wrapping it in a [AstNodeRef].
-    pub fn ast_ref_iter(&self) -> impl Iterator<Item = AstNodeRef<'_, T>> {
-        self.nodes.iter().map(|x| x.ast_ref())
+    /// Iterate over each child as an [AstNodeRef].
+    pub fn ast_ref_iter(&self) -> impl Iterator<Item = AstNodeRef<'a, T>> + 'a {
+        self.nodes.iter().copied()
     }
 }
 
-impl<T> Deref for AstNodes<T> {
-    type Target = [AstNode<T>];
+impl<'a, T> Deref for AstNodes<'a, T> {
+    type Target = [AstNode<'a, T>];
+
     fn deref(&self) -> &Self::Target {
-        &self.nodes
-    }
-}
-impl<T> DerefMut for AstNodes<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.nodes
+        self.nodes
     }
 }
 
@@ -539,7 +427,7 @@ define_tree! {
         FilteredExpr(FilteredExpr)
     }
 
-    impl Expr {
+    impl Expr<'_> {
         pub fn is_var(&self) -> bool {
             matches!(self, Expr::Var(_))
         }
@@ -983,7 +871,7 @@ define_tree! {
         Raw(Raw),
     }
 
-    impl Tag {
+    impl Tag<'_> {
         pub fn _continue() -> Self {
             Tag::Continue(Continue {})
         }
@@ -1046,7 +934,7 @@ define_tree! {
         Comment(Comment),
     }
 
-    impl Statement {
+    impl Statement<'_> {
         pub fn text() -> Self {
             Statement::Text(Text {})
         }
