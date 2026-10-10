@@ -3,8 +3,8 @@ ok            _includes/footer.html
 fmt-error     _includes/google-analytics.html
 ok            _includes/head.html
 ok            _includes/header.html
-parse-error   _includes/icon-github.html
-parse-error   _includes/icon-twitter.html
+ok            _includes/icon-github.html
+ok            _includes/icon-twitter.html
 ok            _includes/social.html
 ok            _layouts/default.html
 unstable      _layouts/home.html

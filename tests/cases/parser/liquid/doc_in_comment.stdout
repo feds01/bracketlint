@@ -1,0 +1,17 @@
+info: parsed module '$DIR/doc_in_comment.html' as liquid:
+body
+├─comment
+└─if
+  └─clauses
+    └─if_clause
+      ├─condition
+      │ └─var_expr
+      │   └─name "name"
+      └─clause_body
+        └─body
+          ├─text
+          ├─inline
+          │ └─var_expr
+          │   └─name "name"
+          └─text
+

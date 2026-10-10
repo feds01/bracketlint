@@ -634,9 +634,12 @@ impl<'s> Parser<'s> {
                     self.with_tag_context(TagContext::Block, |g| g.parse_block_statement())
                 }
                 Keyword::Raw => self.with_tag_context(TagContext::Raw, |g| g.parse_raw_block()),
-                Keyword::Comment => {
-                    self.with_tag_context(TagContext::Comment, |g| g.parse_comment_block())
-                }
+                Keyword::Comment => self.with_tag_context(TagContext::Comment, |g| {
+                    g.parse_comment_block(Keyword::EndComment)
+                }),
+                // The lexer reads the contents of a Liquid `{% doc %}` block as
+                // text, so it is a comment that ends at `{% enddoc %}`.
+                Keyword::Doc => self.parse_comment_block(Keyword::EndDoc),
 
                 kwd if let Some(ctx) = self.tag_context()
                     && ctx.applies_to(kwd) =>
@@ -1616,7 +1619,9 @@ impl<'s> Parser<'s> {
         ))
     }
 
-    fn parse_comment_block(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+    /// Parse a block that isn't rendered, up to its `end` tag, e.g.
+    /// `{% endcomment %}`, which it must have, as any other block.
+    fn parse_comment_block(&mut self, end: Keyword) -> ParseResult<AstNode<ast::Statement>> {
         let start = self.current_pos();
 
         while let Some(token) = self.peek() {
@@ -1624,19 +1629,26 @@ impl<'s> Parser<'s> {
             // of the block.
             if token.kind.is_tag_tree() {
                 let maybe_token = self.peek_raw(1).map(|tok| tok.kind);
-                if let Some(TokenKind::Keyword(Keyword::EndComment)) = maybe_token {
+                if maybe_token == Some(TokenKind::Keyword(end)) {
                     self.in_tree(Delimiter::Percent, None, |g| {
-                        g.parse_token(TokenKind::Keyword(Keyword::EndComment))?;
+                        g.parse_token(TokenKind::Keyword(end))?;
                         Ok(())
                     })?;
-                    break;
+
+                    let comment = ast::Statement::Comment(ast::Comment {});
+                    return Ok(self.node_with_joined_span(comment, start));
                 }
             }
 
             self.skip_token();
         }
 
-        Ok(self.node_with_joined_span(ast::Statement::Comment(ast::Comment {}), start))
+        self.err_with_location(
+            ParseErrorKind::UnclosedTag(end),
+            ExpectedItem::empty(),
+            None,
+            self.eof_pos(),
+        )
     }
 
     /// Parse statements until the footer tag that `peek_fn` accepts, and then
@@ -2032,7 +2044,7 @@ impl<'s> Parser<'s> {
         let start = self.current_pos();
 
         match (self.peek(), self.peek_second()) {
-            (Some(tok!(Ident)), Some(tok!(Eq))) => {
+            (Some(Token { kind, .. }), Some(tok!(Eq))) if kind.is_ident_like() => {
                 let name = self.parse_name()?;
                 self.skip_fast(TokenKind::Eq); // `<eq>` Skip the assignment operator token.
                 let value = self.parse_expr()?;

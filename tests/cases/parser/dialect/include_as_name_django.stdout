@@ -1,0 +1,20 @@
+info: parsed module '$DIR/include_as_name_django.html' as django:
+body
+├─inline
+│ └─access_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "include"
+│   └─field
+│     └─name "title"
+└─set
+  ├─assignments
+  │ └─assignment
+  │   ├─name "include"
+  │   └─lit_expr
+  │     └─int_lit 1
+  └─body
+    └─inline
+      └─var_expr
+        └─name "include"
+

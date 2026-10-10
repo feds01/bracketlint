@@ -1,0 +1,4 @@
+// run=pass, stage=check, dialect=jinja
+
+{{ include.title }}
+{% for include in includes %}{{ include }}{% endfor %}
