@@ -656,7 +656,7 @@ impl<'lex> Lexer<'lex> {
                     (Some(b'%' | b'}'), Some(b'}'))
                 );
 
-            if !is_id_continue(byte as char) || at_marker {
+            if !ID_CONTINUE[usize::from(byte)] || at_marker {
                 break;
             }
 
@@ -864,10 +864,21 @@ fn is_ident_start(c: char) -> bool {
     c.is_ascii_alphabetic() || c == '_'
 }
 
-/// True if `c` is valid as a non-first character of an identifier.
-pub(crate) fn is_id_continue(c: char) -> bool {
-    c.is_ascii_alphanumeric() || c == '_' || c == '-'
-}
+/// Whether each byte is valid as a non-first character of an identifier.
+///
+/// ##Note: Looking a byte up is one load, where checking which range it is in
+/// takes several branches, for each byte of each name.
+static ID_CONTINUE: [bool; 256] = {
+    let mut table = [false; 256];
+    let mut index = 0;
+    while index < table.len() {
+        let byte = index as u8;
+        table[index] = byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-';
+        index += 1;
+    }
+
+    table
+};
 
 #[cfg(test)]
 mod tests {
