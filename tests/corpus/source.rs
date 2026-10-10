@@ -69,9 +69,15 @@ impl Source {
     /// unless they already are, returning where they are.
     fn download(&self) -> PathBuf {
         let checkout = target_dir().join(format!("{}@{}", self.name, self.tag));
-        if checkout.exists() {
+
+        // A checkout is only whole if git's files are there. CI's cache of
+        // `target/` drops every file outside Cargo's own, keeping only the
+        // directories, which would otherwise be taken for a checkout without
+        // templates.
+        if checkout.join(".git/HEAD").is_file() {
             return checkout;
         }
+        let _ = fs::remove_dir_all(&checkout);
 
         // Download next to the checkout first, so that a download that fails
         // half way isn't taken for one.
