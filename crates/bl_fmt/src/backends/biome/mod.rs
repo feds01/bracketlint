@@ -2,8 +2,10 @@
 //! code.
 
 use std::{
+    cell::RefCell,
     convert::Infallible,
     ops::{FromResidual, Residual, Try},
+    rc::Rc,
 };
 
 use biome_css_formatter::{self as css_formatter, context::CssFormatOptions};
@@ -11,12 +13,12 @@ use biome_css_parser::{self as css_parser, CssParserOptions};
 use biome_diagnostics::DiagnosticExt;
 use biome_formatter::IndentStyle;
 use biome_html_formatter::{HtmlFormatOptions, format_node};
-use biome_html_parser::{HtmlParserOptions, parse_html};
+use biome_html_parser::{HtmlParserOptions, parse_html_with_cache};
 use biome_html_syntax::{HtmlElementList, HtmlRoot};
 use biome_js_formatter::{self as js_formatter, context::JsFormatOptions};
 use biome_js_parser::{self as js_parser, JsParserOptions};
 use biome_languages::{CssFileSource, HtmlFileSource, JsFileSource};
-use biome_rowan::{AstNode, AstNodeList};
+use biome_rowan::{AstNode, AstNodeList, NodeCache};
 use bl_ast::{ByteRange, SpannedSource};
 
 use crate::{
@@ -49,6 +51,10 @@ pub struct BiomeFormatterOptions {
 pub struct BiomeFormatter {
     /// The options for the formatter, encapsulating backend specific options.
     options: BiomeFormatterOptions,
+
+    /// The cache of the nodes and tokens that the HTML parser makes, which is
+    /// shared by each piece of HTML in the template.
+    html_cache: Rc<RefCell<NodeCache>>,
 }
 
 impl BiomeFormatter {
@@ -65,6 +71,7 @@ impl BiomeFormatter {
                 // we are selecting snippets from the templates.
                 js: JsFormatOptions::new(JsFileSource::js_script()),
             },
+            html_cache: Rc::default(),
         }
     }
 }
@@ -74,6 +81,9 @@ struct HTMLBiomeFormatter<'ctx> {
 
     /// The options for the formatter, encapsulating backend specific options.
     options: BiomeFormatterOptions,
+
+    /// The cache of the nodes and tokens that the HTML parser makes.
+    cache: Rc<RefCell<NodeCache>>,
 
     /// The state of the formatter, which is used to determine the
     /// terminal state of the formatter.
@@ -121,24 +131,19 @@ impl<'ctx> HTMLBiomeFormatter<'ctx> {
 }
 
 impl<'ctx> HasHTMLParsing<'ctx> for HTMLBiomeFormatter<'ctx> {
-    /// Format the HTML contents using the Biome formatter.
+    /// Format the HTML contents using the Biome formatter, by parsing them
+    /// with `biome_html_parser` and formatting the tree with
+    /// `biome_html_formatter`.
     ///
-    /// /// This will follow the algorithm:
+    /// ##Note: The contents are a piece of the template between its tags, e.g.
+    /// `<li class="`, which often isn't valid HTML on its own. Biome's parse
+    /// errors are ignored, and it formats as much as it could parse.
     ///
-    /// 1. Parse the HTML contents using the `biome_html_parser`.
-    ///
-    /// 2. If there are any errors, return them as a `FmtError`.
-    ///
-    ///
-    /// 3. Format the parsed HTML using the `biome_html_formatter`.
-    ///
-    /// 4. Return the formatted HTML as a `String`.
-    ///
-    /// @@Todo: for (2 & 4) we may not want to do this, and simply return the
-    /// contents as verbatim. We could emit an event for debugging purposes
-    /// that parsing this content failed for some reason.
+    /// @@Todo: We may want to keep the contents as they are written when they
+    /// don't parse, and emit an event for debugging that they didn't.
     fn format(&mut self, contents: &str) -> FmtResult<String> {
-        let parsed = parse_html(contents, HtmlParserOptions::from(&HtmlFileSource::html()));
+        let options = HtmlParserOptions::from(&HtmlFileSource::html());
+        let parsed = parse_html_with_cache(contents, &mut self.cache.borrow_mut(), options);
         let tree = parsed.tree();
 
         // In order to compute the terminal state, we're going to check
@@ -152,26 +157,6 @@ impl<'ctx> HasHTMLParsing<'ctx> for HTMLBiomeFormatter<'ctx> {
         self.apply_state_from_tree(&tree);
 
         let language = LanguageType::Html;
-        let mut errors = Vec::new();
-
-        if parsed.has_errors() {
-            for diagnostic in parsed.diagnostics() {
-                let message = format!("{}", diagnostic.message);
-                let err = diagnostic.clone().with_file_source_code("");
-
-                // Extract this span from the error.
-                errors.push(FmtError::new(
-                    FmtErrorKind::ExternalLanguageParseError { language, message },
-                    err.location().span.map(|text_range| {
-                        bl_ast::Span::new(
-                            ByteRange::new(text_range.start().into(), text_range.end().into()),
-                            self.context.id(),
-                        )
-                    }),
-                ));
-            }
-        }
-
         let options = self.options.html.clone();
 
         match format_node(options, &parsed.syntax(), vec![]) {
@@ -478,7 +463,12 @@ impl ExternalLanguagesEngineAdaptor for BiomeFormatter {
     type JSEngine<'ctx> = impl HasJSParsing<'ctx>;
 
     fn html_engine<'ctx>(&self, context: &'ctx FormatterContext<'ctx>) -> Self::HTMLEngine<'ctx> {
-        HTMLBiomeFormatter { context, options: self.options.clone(), state: context.state }
+        HTMLBiomeFormatter {
+            context,
+            options: self.options.clone(),
+            cache: self.html_cache.clone(),
+            state: context.state,
+        }
     }
 
     fn css_engine<'ctx>(&self, context: &'ctx FormatterContext<'ctx>) -> Self::CSSEngine<'ctx> {
