@@ -5,6 +5,11 @@ use std::process::ExitCode;
 use bracketlint::{cli::Cli, run};
 use clap::Parser;
 
+// Parsing and formatting make many small allocations, which mimalloc serves
+// faster than the system allocators do.
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 pub fn main() -> ExitCode {
     // Enabled ANSI colours on Windows 10.
     #[cfg(windows)]
