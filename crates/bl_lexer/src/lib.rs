@@ -258,7 +258,20 @@ impl<'lex> Lexer<'lex> {
             if this.dialect.has_raw_blocks()
                 && matches!(this.tokens[tree..], tree!(Percent, [kw!(Raw)]))
             {
-                this.hunk();
+                this.hunk("endraw");
+            }
+
+            // The contents of a `{% doc %}` block, as in [Liquid], are
+            // documentation that needn't be valid Liquid, so they are text too.
+            // One without its `{% enddoc %}` is lexed as usual, since it may be
+            // in a `{% comment %}`, or else the parser reports it.
+            //
+            // [Liquid]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/tags/doc.rb#L38-L55
+            if this.dialect.has_doc_blocks()
+                && matches!(this.tokens[tree..], tree!(Percent, [kw!(Doc)]))
+                && this.has_end_tag("enddoc")
+            {
+                this.hunk("enddoc");
             }
 
             // Immediately try to index the next token...
@@ -802,16 +815,18 @@ impl<'lex> Lexer<'lex> {
                 .is_some_and(|token| token.kind.is_ident_like() || token.kind.is_lit())
     }
 
-    /// Lex the contents of a `{% raw %}` block, as in [Jinja] and [Liquid], as
-    /// text, up to its `{% endraw %}` tag, or the end of the source if it has
-    /// none.
-    ///
-    /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#escaping
-    /// [Liquid]: https://shopify.github.io/liquid/tags/template/#raw
-    fn hunk(&mut self) {
+    /// Whether the source ahead has an `end` tag, e.g. `{% enddoc %}`.
+    fn has_end_tag(&self, end: &str) -> bool {
+        let slice = unsafe { self.as_slice() };
+        find_end_tag(slice, end, self.dialect.trim_markers()).is_some()
+    }
+
+    /// Lex the contents of a block as text, up to its `end` tag, e.g. `endraw`,
+    /// or the end of the source if it has none.
+    fn hunk(&mut self, end: &str) {
         let start = self.offset.get();
         let slice = unsafe { self.as_slice() };
-        let len = find_end_raw(slice, self.dialect.trim_markers()).unwrap_or(slice.len());
+        let len = find_end_tag(slice, end, self.dialect.trim_markers()).unwrap_or(slice.len());
 
         if len > 0 {
             self.offset.update(|x| x + len);
@@ -847,14 +862,14 @@ impl<'lex> Lexer<'lex> {
     }
 }
 
-/// The offset of the first `{% endraw %}` tag in `source`, if there is one.
-/// The tag can have any of the whitespace control `markers`, e.g.
-/// `{%- endraw -%}`.
-fn find_end_raw(source: &str, markers: &[char]) -> Option<usize> {
+/// The offset of the first `{% end %}` tag in `source`, e.g. `{% endraw %}`, if
+/// there is one. The tag can have any of the whitespace control `markers`,
+/// e.g. `{%- endraw -%}`.
+fn find_end_tag(source: &str, end: &str, markers: &[char]) -> Option<usize> {
     source.match_indices("{%").find_map(|(index, _)| {
         let tag = &source[index + 2..];
         let tag = tag.strip_prefix(markers).unwrap_or(tag).trim_start();
-        let rest = tag.strip_prefix("endraw")?.trim_start();
+        let rest = tag.strip_prefix(end)?.trim_start();
 
         rest.strip_prefix(markers).unwrap_or(rest).starts_with("%}").then_some(index)
     })

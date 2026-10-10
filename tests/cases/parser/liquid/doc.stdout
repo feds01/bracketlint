@@ -1,0 +1,13 @@
+info: parsed module '$DIR/doc.html' as liquid:
+body
+├─comment
+├─text
+├─inline
+│ └─access_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "doc"
+│   └─field
+│     └─name "title"
+└─text
+

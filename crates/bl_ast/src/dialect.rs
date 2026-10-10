@@ -97,6 +97,15 @@ impl Dialect {
         matches!(self, Dialect::Jinja | Dialect::Liquid)
     }
 
+    /// Whether `{% doc %}` blocks exist, as in [Liquid], whose contents are
+    /// documentation that is neither rendered nor run. Liquid reads them as
+    /// text up to `{% enddoc %}`, so they needn't be valid Liquid.
+    ///
+    /// [Liquid]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/tags/doc.rb#L38-L55
+    pub fn has_doc_blocks(self) -> bool {
+        matches!(self, Dialect::Liquid)
+    }
+
     /// Whether a `{% %}` tag that starts with `#` is a comment, as in
     /// [Liquid], e.g. `{% # note %}`.
     ///

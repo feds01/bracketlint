@@ -1,0 +1,21 @@
+info: parsed module '$DIR/include_as_name_twig.html' as twig:
+body
+├─inline
+│ └─access_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "include"
+│   └─field
+│     └─name "title"
+└─for
+  ├─target
+  │ └─name "include"
+  ├─iterator
+  │ └─var_expr
+  │   └─name "includes"
+  └─loop_body
+    └─body
+      └─inline
+        └─var_expr
+          └─name "include"
+

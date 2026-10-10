@@ -1,0 +1,9 @@
+{% doc %}
+  @param {string} name - The name to greet.
+
+  @example
+  {% render 'greeting', name: 'World' }
+{% enddoc %}
+
+<p>Hello {{ name }}</p>
+

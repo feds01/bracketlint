@@ -1,0 +1,21 @@
+info: parsed module '$DIR/include_as_name.html' as liquid:
+body
+├─text
+├─inline
+│ └─access_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "include"
+│   └─field
+│     └─name "username"
+├─text
+├─include
+│ ├─access_expr
+│ │ ├─subject
+│ │ │ └─var_expr
+│ │ │   └─name "icon-github"
+│ │ └─field
+│ │   └─name "svg"
+│ └─context
+└─text
+

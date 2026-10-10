@@ -131,7 +131,9 @@ pub enum Keyword {
     /// {% extends "base.html" %}
     /// ```
     Extends,
-    /// `include` - Includes another template
+    /// `include` - Includes another template. It is only a keyword at the
+    /// start of a tag, so that `include` is still a name elsewhere, e.g.
+    /// Jekyll's `{{ include.title }}`
     /// ```django
     /// {% include "navbar.html" %}
     /// ```
@@ -159,6 +161,16 @@ pub enum Keyword {
     Raw,
     /// `endraw` - Ends a raw block
     EndRaw,
+    /// `doc` - Begins a Liquid block of documentation, which is neither
+    /// rendered nor run
+    /// ```liquid
+    /// {% doc %}
+    ///   @param {string} name - The name to greet.
+    /// {% enddoc %}
+    /// ```
+    Doc,
+    /// `enddoc` - Ends a `doc` block
+    EndDoc,
     /// `True` - Boolean true constant
     /// ```django
     /// {% if user.is_active == True %}
@@ -266,6 +278,8 @@ impl Keyword {
                 | Keyword::TableRow
                 | Keyword::Capture
                 | Keyword::Render
+                | Keyword::Doc
+                | Keyword::Include
         )
     }
 }
@@ -397,13 +411,15 @@ keyword_table! {
 
 keyword_table! {
     /// The keywords that only Liquid has, which are its [`contains`] operator and
-    /// some of its tags: [control flow], [iteration], [`capture`] and [`render`].
+    /// some of its tags: [control flow], [iteration], [`capture`], [`render`] and
+    /// [`doc`].
     ///
     /// [`contains`]: https://shopify.github.io/liquid/basics/operators/#contains
     /// [control flow]: https://shopify.github.io/liquid/tags/control-flow/
     /// [iteration]: https://shopify.github.io/liquid/tags/iteration/
     /// [`capture`]: https://shopify.github.io/liquid/tags/variable/#capture
     /// [`render`]: https://shopify.github.io/liquid/tags/template/#render
+    /// [`doc`]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/tags/doc.rb#L30
     fn liquid_keyword {
         "contains" => Contains,
         "unless" => Unless,
@@ -416,6 +432,8 @@ keyword_table! {
         "capture" => Capture,
         "endcapture" => EndCapture,
         "render" => Render,
+        "doc" => Doc,
+        "enddoc" => EndDoc,
     }
 }
 

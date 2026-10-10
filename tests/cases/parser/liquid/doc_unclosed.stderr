@@ -1,0 +1,5 @@
+error: expected a closing `{% enddoc %}` tag
+ --> $DIR/doc_unclosed.html:3:25
+  |
+3 | <p>Hello {{ name }}</p>
+  |                        -
