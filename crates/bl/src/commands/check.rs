@@ -3,6 +3,7 @@
 use std::{fs, path::PathBuf};
 
 use anyhow::Result;
+use bl_ast::Arena;
 use bl_parse::{ParseQuery, ParseQueryResult, emit_source_tree, parse_source};
 use bl_reporting::Reports;
 use bl_utils::timed;
@@ -26,6 +27,10 @@ pub fn check(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
 
     let mut pipeline_diagnostics = Reports::default();
 
+    // Each file is parsed into the arena, and then freed from it, so that the
+    // next file reuses its memory.
+    let mut arena = Arena::new();
+
     // @@Todo: integrate a cache system here, we should be able to avoid re-linting
     // already existent files and just skip them.
     // Now iterate the files, parse them and lint them.
@@ -48,12 +53,17 @@ pub fn check(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
                         let member = workspace.members.member(id);
 
                         let ParseQueryResult { node, diagnostics } =
-                            parse_source(ParseQuery::new(id, member));
+                            parse_source(ParseQuery::new(id, member), &arena);
 
                         pipeline_diagnostics.extend(diagnostics);
 
-                        let member = workspace.members.member_mut(id);
-                        member.document = node;
+                        if let Some(document) = node
+                            && workspace.settings.should_dump_ast()
+                        {
+                            emit_source_tree(member, document);
+                        }
+
+                        arena.reset();
                     }
                     Err(err) => {
                         // @@todo: Create a diagnostic for the error, and print it!
@@ -67,14 +77,6 @@ pub fn check(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
             debug!("parsed files in {duration:?}");
         },
     );
-
-    if workspace.settings.should_dump_ast() {
-        for (_, member) in workspace.members.iter() {
-            if member.document.is_some() {
-                emit_source_tree(member);
-            }
-        }
-    }
 
     Ok(pipeline_diagnostics)
 }

@@ -7,7 +7,7 @@ use std::{
     path::PathBuf,
 };
 
-use bl_ast::Dialect;
+use bl_ast::{Arena, Dialect};
 use bl_fmt::{FormatQuery, FormatQueryResult, FormatterOptions, fmt_module};
 use bl_parse::{ParseQuery, ParseQueryResult, parse_source};
 use bl_reporting::Reports;
@@ -125,18 +125,20 @@ fn check(dialect: Dialect, contents: &str) -> Outcome {
 fn format(dialect: Dialect, contents: &str) -> Result<String, Outcome> {
     let mut members = WorkspaceMembers::new();
     let id = members.reserve_member(PathBuf::from("template"), contents.to_string(), dialect);
+    let member = members.member(id);
+    let arena = Arena::new();
 
     let document = run_stage(Status::ParseError, || {
         let ParseQueryResult { node, diagnostics } =
-            parse_source(ParseQuery::new(id, members.member(id)));
+            parse_source(ParseQuery::new(id, member), &arena);
         (node, diagnostics)
     })?;
-    members.member_mut(id).document = document;
 
     run_stage(Status::FmtError, || {
+        let document = document.expect("Attempted to format a module without a document.");
         let options = FormatterOptions::default();
         let FormatQueryResult { buffer, diagnostics } =
-            fmt_module(FormatQuery { member: members.member(id), source: id, options });
+            fmt_module(FormatQuery { member, source: id, options, document });
         (buffer, diagnostics)
     })
 }

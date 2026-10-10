@@ -107,11 +107,11 @@ pub(crate) const ROOT_MODULE_OPTS_FIELD: &str = "root_module";
 /// A set of auxiliary options given to the tree definition macro.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct TreeDefOpts {
-    /// The type name of the tree node wrapper type. This type must take a
-    /// single type argument.
+    /// The type name of the tree node wrapper type. This type must take the
+    /// lifetime of the arena that the tree lives in, and a type argument.
     pub(crate) node_type_name: syn::Ident,
-    /// The type name of the tree node list wrapper type. This type must take a
-    /// single type argument.
+    /// The type name of the tree node list wrapper type. This type must take
+    /// the lifetime of the arena that the tree lives in, and a type argument.
     pub(crate) nodes_type_name: syn::Ident,
     /// The base name to use for the created visitor
     pub(crate) visitor_trait_base_name: syn::Ident,

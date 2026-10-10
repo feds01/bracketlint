@@ -4,7 +4,6 @@
 use std::{fmt, path::PathBuf};
 
 use bl_ast::{Dialect, SourceId};
-use bl_parse::{ParseQuery, parse_source};
 use bl_workspace::WorkspaceMembers;
 
 /// A template that a benchmark lexes, parses or formats.
@@ -71,15 +70,6 @@ impl TestCase {
         let id = members.reserve_member(path, self.contents.clone(), self.dialect);
         (id, members)
     }
-
-    /// Like [TestCase::to_member], but with the template parsed into the
-    /// member's document, which is what the formatter reads.
-    pub fn to_parsed_member(&self) -> (SourceId, WorkspaceMembers) {
-        let (id, mut members) = self.to_member();
-        let result = parse_source(ParseQuery::new(id, members.member(id)));
-        members.member_mut(id).document = result.node;
-        (id, members)
-    }
 }
 
 impl fmt::Display for TestCase {
@@ -104,6 +94,7 @@ fn many_tags(lines: usize) -> String {
 
 #[cfg(test)]
 mod tests {
+    use bl_ast::Arena;
     use bl_fmt::{FormatQuery, FormatterOptions, fmt_module};
     use bl_parse::{ParseQuery, parse_source};
 
@@ -115,7 +106,8 @@ mod tests {
     fn test_cases_parse_without_errors() {
         for case in TestCase::all() {
             let (id, members) = case.to_member();
-            let result = parse_source(ParseQuery::new(id, members.member(id)));
+            let arena = Arena::new();
+            let result = parse_source(ParseQuery::new(id, members.member(id)), &arena);
 
             let errors: Vec<_> = result.diagnostics.iter().filter(|r| r.is_error()).collect();
             assert!(errors.is_empty(), "`{case}` failed to parse: {errors:#?}");
@@ -127,12 +119,12 @@ mod tests {
     #[test]
     fn test_cases_format_without_errors() {
         for case in TestCase::formattable() {
-            let (id, members) = case.to_parsed_member();
-            let query = FormatQuery {
-                options: FormatterOptions::default(),
-                source: id,
-                member: members.member(id),
-            };
+            let (id, members) = case.to_member();
+            let member = members.member(id);
+            let arena = Arena::new();
+            let document = parse_source(ParseQuery::new(id, member), &arena).node.unwrap();
+            let query =
+                FormatQuery { options: FormatterOptions::default(), source: id, member, document };
             let result = fmt_module(query);
 
             let errors: Vec<_> = result.diagnostics.iter().filter(|r| r.is_error()).collect();
