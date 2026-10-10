@@ -7,13 +7,19 @@ use std::fmt;
 /// to a specified stream.
 ///
 /// This macro conveniently unwraps the result of the write operation.
+///
+/// ##Note: The line is formatted before it is written, so that it takes one
+/// write. `stderr` isn't buffered, and [`writeln!`] writes each piece of the
+/// line on its own, which for a diff or a report is a system call per piece.
 #[macro_export]
 macro_rules! stream_writeln {
-    ($stream:expr, $($arg:tt)*) => {
-        writeln!($stream, $($arg)*).unwrap()
-    };
+    ($stream:expr, $($arg:tt)*) => {{
+        let mut line = format!($($arg)*);
+        line.push('\n');
+        $stream.write_all(line.as_bytes()).unwrap()
+    }};
     ($stream:expr) => {
-        writeln!($stream).unwrap()
+        $stream.write_all(b"\n").unwrap()
     };
 
 }
@@ -22,13 +28,13 @@ macro_rules! stream_writeln {
 /// to a specified stream.
 ///
 /// This macro conveniently unwraps the result of the write operation.
+///
+/// ##Note: Like [`stream_writeln!`], the text is formatted before it is
+/// written, so that it takes one write.
 #[macro_export]
 macro_rules! stream_write {
     ($stream:expr, $($arg:tt)*) => {
-        write!($stream, $($arg)*).unwrap()
-    };
-    ($stream:expr) => {
-        write!($stream).unwrap()
+        $stream.write_all(format!($($arg)*).as_bytes()).unwrap()
     };
 
 }
