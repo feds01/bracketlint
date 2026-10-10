@@ -7,7 +7,7 @@ use strum::{Display, EnumString, IntoStaticStr, VariantArray};
 
 use crate::{
     BinOp, UnaryOp,
-    keywords::{self, Keyword},
+    keywords::{self, Keyword, Name},
 };
 
 /// The template language that a file is written in. It is either given with
@@ -242,12 +242,13 @@ impl Dialect {
     /// The keyword that the identifier `name` is in the dialect, if any.
     /// Liquid has keywords of its own, and spells `elif` as `elsif`.
     pub fn keyword(self, name: &str) -> Option<Keyword> {
-        if name == self.elif_tag() {
+        let name = Name::new(name);
+        if name == Name::new(self.elif_tag()) {
             return Some(Keyword::Elif);
         }
 
         match self {
-            Dialect::Liquid if name == "elif" => None,
+            Dialect::Liquid if name == Name::new("elif") => None,
             Dialect::Liquid => keywords::liquid_keyword(name).or_else(|| keywords::keyword(name)),
             _ => keywords::keyword(name),
         }
