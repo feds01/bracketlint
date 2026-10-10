@@ -23,7 +23,7 @@ use bl_ast::SpannedSource;
 use crate::{
     adapters::{
         ExternalLanguagesEngineAdaptor, FormatterContext, HasCSSParsing, HasHTMLParsing,
-        HasJSParsing, LanguageType, TerminalState,
+        HasJSParsing, LanguageType, TerminalState, VERBATIM_ELEMENTS,
     },
     diagnostics::{FmtError, FmtErrorKind, FmtResult},
 };
@@ -188,8 +188,8 @@ impl<'ctx> HasHTMLParsing<'ctx> for HTMLBiomeFormatter<'ctx> {
 /// A closing tag whose element opens before a template tag, e.g. the `</li>` in
 /// `{% endif %}</li>`, is parsed into a bogus element as well. It is printed as
 /// any other closing tag, unless it spans several lines, e.g. `</li\n>`, or it
-/// closes an element whose content Biome would lay out as other HTML, see
-/// [VERBATIM_ELEMENTS].
+/// closes one of the [VERBATIM_ELEMENTS], whose content Biome would then lay
+/// out as other HTML, since it only knows it from their opening tag.
 fn has_broken_tag(root: &HtmlSyntaxNode) -> bool {
     let is_closing_tag = |node: &HtmlSyntaxNode| {
         let mut tokens = node.descendants_tokens(Direction::Next);
@@ -207,11 +207,6 @@ fn has_broken_tag(root: &HtmlSyntaxNode) -> bool {
 
     root.descendants().any(|node| node.kind().is_bogus() && !is_closing_tag(&node))
 }
-
-/// The elements whose content can't be laid out as other HTML is: whitespace
-/// matters in `<pre>` and `<textarea>`, and `<script>` and `<style>` hold code.
-/// Biome only knows so when it parses their opening tag.
-const VERBATIM_ELEMENTS: [&str; 4] = ["pre", "textarea", "script", "style"];
 
 enum TerminalCalculationState {
     None,
@@ -322,12 +317,9 @@ fn find_rightmost_child_and_extract_state(
         // The text after a `<style>` or `<script>` element is CSS or JavaScript
         // only while the element is open, e.g. when a tag in its body splits
         // it. Once it is closed, the text after it is HTML again.
-        let language =
-            match (name.text().to_ascii_lowercase().as_str(), html_element.closing_element()) {
-                ("style", None) => LanguageType::Css,
-                ("script", None) => LanguageType::Js,
-                _ => LanguageType::Html,
-            };
+        let element = name.text();
+        let is_open = html_element.closing_element().is_none();
+        let language = if is_open { LanguageType::of_element(element) } else { LanguageType::Html };
 
         TerminalCalculationState::Some { language, indent }
     } else {

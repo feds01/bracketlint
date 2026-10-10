@@ -24,25 +24,56 @@ pub enum LanguageType {
     Text,
 }
 
-impl LanguageType {
-    /// Where the code of a `<style>` or `<script>` element ends in `text`, i.e.
-    /// its closing tag, when it is the element's language.
-    pub fn end_in(self, text: &str) -> Option<usize> {
-        let closing: &[u8] = match self {
-            LanguageType::Css => b"</style",
-            LanguageType::Js => b"</script",
-            LanguageType::Html | LanguageType::Text => return None,
-        };
+/// The elements whose content can't be laid out as other HTML is: whitespace
+/// matters in `<pre>` and `<textarea>`, and `<script>` and `<style>` hold
+/// code. Like any element name in HTML, they are matched regardless of case.
+pub const VERBATIM_ELEMENTS: [&str; 4] = ["pre", "textarea", "script", "style"];
 
-        // The name of the tag ends at whitespace, `/` or `>`, so that e.g.
-        // `</scripts>` is still code.
-        let text = text.as_bytes();
-        (0..text.len()).find(|&start| {
-            text[start..].get(..closing.len()).is_some_and(|tag| tag.eq_ignore_ascii_case(closing))
-                && text
-                    .get(start + closing.len())
-                    .is_none_or(|next| next.is_ascii_whitespace() || matches!(next, b'/' | b'>'))
-        })
+impl LanguageType {
+    /// The element that holds code in the language within HTML, e.g. `style`
+    /// for CSS, if the language is one that HTML embeds.
+    pub fn element(self) -> Option<&'static str> {
+        match self {
+            LanguageType::Css => Some("style"),
+            LanguageType::Js => Some("script"),
+            LanguageType::Html | LanguageType::Text => None,
+        }
+    }
+
+    /// The language of the content of the element `name`, e.g. CSS for a
+    /// `<style>`, which is HTML unless the element holds code.
+    pub fn of_element(name: &str) -> Self {
+        for language in [LanguageType::Css, LanguageType::Js] {
+            if language.element().is_some_and(|element| name.eq_ignore_ascii_case(element)) {
+                return language;
+            }
+        }
+
+        LanguageType::Html
+    }
+
+    /// Where the code in the language ends in `text`, i.e. the closing tag of
+    /// its [element](Self::element), e.g. `</style>` for CSS.
+    pub fn end_in(self, text: &str) -> Option<usize> {
+        let element = self.element()?;
+
+        for (start, _) in text.match_indices("</") {
+            let rest = &text[start + 2..];
+            let Some(name) = rest.get(..element.len()) else {
+                continue;
+            };
+
+            // The name ends at whitespace, `/` or `>`, so that e.g. `</scripts>`
+            // is still code.
+            let after = rest[element.len()..].chars().next();
+            if name.eq_ignore_ascii_case(element)
+                && after.is_none_or(|c| c.is_ascii_whitespace() || matches!(c, '/' | '>'))
+            {
+                return Some(start);
+            }
+        }
+
+        None
     }
 }
 
@@ -163,4 +194,25 @@ pub(crate) trait ExternalLanguagesEngineAdaptor {
     fn css_engine<'ctx>(&self, context: &'ctx FormatterContext<'_>) -> Self::CSSEngine<'ctx>;
 
     fn js_engine<'ctx>(&self, context: &'ctx FormatterContext<'_>) -> Self::JSEngine<'ctx>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::LanguageType;
+
+    #[test]
+    fn code_ends_at_the_closing_tag_of_its_element() {
+        assert_eq!(LanguageType::Js.end_in("f();\n</script>\n<p>"), Some(5));
+        assert_eq!(LanguageType::Css.end_in("p {}</STYLE >"), Some(4));
+        assert_eq!(LanguageType::Js.end_in("a < b; '</scripts>'; </script/>"), Some(21));
+        assert_eq!(LanguageType::Js.end_in("f(); </style>"), None);
+        assert_eq!(LanguageType::Html.end_in("</p>"), None);
+    }
+
+    #[test]
+    fn elements_hold_code_regardless_of_case() {
+        assert!(matches!(LanguageType::of_element("SCRIPT"), LanguageType::Js));
+        assert!(matches!(LanguageType::of_element("style"), LanguageType::Css));
+        assert!(matches!(LanguageType::of_element("pre"), LanguageType::Html));
+    }
 }
