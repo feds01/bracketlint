@@ -9,8 +9,8 @@
 use std::cell::Cell;
 
 use bl_ast::{
-    self as ast, AstNode, AstNodes, ByteRange, Identifier, Keyword, SourceId, Span, SpannedSource,
-    VarExpr,
+    self as ast, Arena, AstNode, AstNodes, ByteRange, Identifier, Keyword, SourceId, Span,
+    SpannedSource, VarExpr,
 };
 use bl_lexer::{
     kw, tok,
@@ -20,8 +20,8 @@ use bl_reporting::{
     HasDiagnosticsMut,
     inline::{InlineSnippet, note_on_span},
 };
+use bumpalo::collections::Vec as ArenaVec;
 use derive_more::Deref;
-use thin_vec::{ThinVec, thin_vec};
 
 use crate::{
     ParseOptions,
@@ -170,9 +170,12 @@ impl<'s> ParseFrame<'s> {
 /// The parser itself, which is responsible for converting a stream of tokens
 /// into an abstract syntax tree.
 #[derive(Deref)]
-pub struct Parser<'s> {
+pub struct Parser<'s, 'a> {
     /// The [SourceId] of the source that the parser is currently parsing.
     id: SourceId,
+
+    /// The arena that the parser allocates the tree in.
+    arena: &'a Arena,
 
     /// The source that the parser is currently parsing. A useful wrapper and
     /// utility for the parser to access the source, i.e. especially when
@@ -197,9 +200,10 @@ pub struct Parser<'s> {
     options: ParseOptions,
 }
 
-impl<'s> Parser<'s> {
+impl<'s, 'a> Parser<'s, 'a> {
     pub fn new(
         id: SourceId,
+        arena: &'a Arena,
         source: SpannedSource<'s>,
         stream: &'s [Token],
         diagnostics: &'s mut ParserDiagnostics,
@@ -215,6 +219,7 @@ impl<'s> Parser<'s> {
 
         Self {
             id,
+            arena,
             _source: source,
             diagnostics,
             options,
@@ -248,37 +253,35 @@ impl<'s> Parser<'s> {
     }
 
     /// Create a new [AstNode] from the information provided by the [AstGen]
-    #[inline(always)]
-    pub fn node_with_span<T>(&self, inner: T, location: ByteRange) -> AstNode<T> {
-        AstNode::new(inner, location)
+    pub fn node_with_span<T>(&self, inner: T, location: ByteRange) -> AstNode<'a, T> {
+        AstNode::new(self.arena.alloc(inner), location)
     }
 
     /// Create a new [AstNode] with a span that ranges from the start
     /// [ByteRange] to join with the [ByteRange].
-    #[inline(always)]
-    pub(crate) fn node_with_joined_span<T>(&self, body: T, start: ByteRange) -> AstNode<T> {
+    pub(crate) fn node_with_joined_span<T>(&self, body: T, start: ByteRange) -> AstNode<'a, T> {
         // We get the previous token, before the current since we want to
         // know the span up to the current token, not including it.
-        AstNode::new(body, start.join(self.previous_pos()))
+        AstNode::new(self.arena.alloc(body), start.join(self.previous_pos()))
     }
 
     /// Create [AstNodes] with a span.
     pub(crate) fn nodes_with_span<T>(
         &self,
-        nodes: ThinVec<AstNode<T>>,
+        nodes: ArenaVec<'a, AstNode<'a, T>>,
         location: ByteRange,
-    ) -> AstNodes<T> {
-        AstNodes::new(nodes, location)
+    ) -> AstNodes<'a, T> {
+        AstNodes::new(nodes.into_bump_slice(), location)
     }
 
     /// Create [AstNodes] with a span that ranges from the start [ByteRange] to
     /// the current [ByteRange].
     pub(crate) fn nodes_with_joined_span<T>(
         &self,
-        nodes: ThinVec<AstNode<T>>,
+        nodes: ArenaVec<'a, AstNode<'a, T>>,
         start: ByteRange,
-    ) -> AstNodes<T> {
-        AstNodes::new(nodes, start.join(self.previous_pos()))
+    ) -> AstNodes<'a, T> {
+        AstNodes::new(nodes.into_bump_slice(), start.join(self.previous_pos()))
     }
 
     /// Create an error without wrapping it in an [Err] variant
@@ -503,13 +506,13 @@ impl<'s> Parser<'s> {
         }
     }
 
-    pub fn parse_document(&mut self) -> AstNode<ast::Document> {
+    pub fn parse_document(&mut self) -> AstNode<'a, ast::Document<'a>> {
         // if self.options.recovery {
         //     log::info!("recovery mode enabled");
         // }
 
         let start = self.current_pos();
-        let mut children = thin_vec![];
+        let mut children = bumpalo::vec![in self.arena];
 
         while self.peek().is_some() {
             match self.parse_statement() {
@@ -528,7 +531,7 @@ impl<'s> Parser<'s> {
         self.node_with_joined_span(ast::Document { document }, start)
     }
 
-    fn parse_statement(&mut self) -> ParseResult<Option<AstNode<ast::Statement>>> {
+    fn parse_statement(&mut self) -> ParseResult<Option<AstNode<'a, ast::Statement<'a>>>> {
         let token = self.peek().ok_or_else(|| self.make_unexpected_eof())?;
         let statement = match token.kind {
             // For parsing text nodes.
@@ -552,14 +555,14 @@ impl<'s> Parser<'s> {
         Ok(Some(statement))
     }
 
-    fn parse_comment(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+    fn parse_comment(&mut self) -> ParseResult<AstNode<'a, ast::Statement<'a>>> {
         let token = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
         self.skip_fast(TokenKind::Comment); // `<comment>` Skip the comment token.
 
         Ok(self.node_with_joined_span(ast::Statement::Comment(ast::Comment {}), token.span))
     }
 
-    fn parse_tag(&mut self) -> ParseResult<Option<AstNode<ast::Statement>>> {
+    fn parse_tag(&mut self) -> ParseResult<Option<AstNode<'a, ast::Statement<'a>>>> {
         // The last token must be a percent tree, but we ensure this since
         // we pass the responsibility of consuming the header token to then child
         // functions.
@@ -670,7 +673,7 @@ impl<'s> Parser<'s> {
         Ok(Some(statement))
     }
 
-    fn parse_variable_block(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+    fn parse_variable_block(&mut self) -> ParseResult<AstNode<'a, ast::Statement<'a>>> {
         let token = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
         let (expr, trim) = self.in_tag(Delimiter::Brace, |g| {
             // Jinja's [`Parser.subparse`] and Twig's [`Parser::subparse`] parse
@@ -705,7 +708,10 @@ impl<'s> Parser<'s> {
             .node_with_joined_span(ast::Statement::Inline(ast::Inline { expr, trim }), token.span))
     }
 
-    fn parse_compound_expr(&mut self, min_precedence: u8) -> ParseResult<AstNode<ast::Expr>> {
+    fn parse_compound_expr(
+        &mut self,
+        min_precedence: u8,
+    ) -> ParseResult<AstNode<'a, ast::Expr<'a>>> {
         // first of all, we want to get the lhs...
         let (mut lhs, lhs_span) = self.track_span(|this| this.parse_expr())?;
 
@@ -753,7 +759,7 @@ impl<'s> Parser<'s> {
         Ok(lhs)
     }
 
-    fn parse_expr(&mut self) -> ParseResult<AstNode<ast::Expr>> {
+    fn parse_expr(&mut self) -> ParseResult<AstNode<'a, ast::Expr<'a>>> {
         let start = self.current_pos();
         let mut expr = self.parse_value()?;
 
@@ -773,7 +779,7 @@ impl<'s> Parser<'s> {
         Ok(expr)
     }
 
-    fn parse_expr_component(&mut self, token: Token) -> ParseResult<AstNode<ast::Expr>> {
+    fn parse_expr_component(&mut self, token: Token) -> ParseResult<AstNode<'a, ast::Expr<'a>>> {
         // ##Note: Each child path is responsible for skipping the current `token`.
         Ok(match token.kind {
             kind if kind.is_unary_op() => return self.parse_unary_expr(token),
@@ -848,7 +854,7 @@ impl<'s> Parser<'s> {
 
     /// Parse a Liquid range of integers, i.e. `(1..n)`. Its bounds are values,
     /// which have no filters.
-    fn parse_range(&mut self, token: Token) -> ParseResult<AstNode<ast::Expr>> {
+    fn parse_range(&mut self, token: Token) -> ParseResult<AstNode<'a, ast::Expr<'a>>> {
         let (start, end) = self.in_tree(Delimiter::Paren, None, |g| {
             let start = g.parse_value()?;
             g.parse_token(TokenKind::DotDot)?;
@@ -859,7 +865,7 @@ impl<'s> Parser<'s> {
     }
 
     /// Parse a value, i.e. an expression without any filters applied to it.
-    fn parse_value(&mut self) -> ParseResult<AstNode<ast::Expr>> {
+    fn parse_value(&mut self) -> ParseResult<AstNode<'a, ast::Expr<'a>>> {
         let token = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
 
         // Firstly, we have to get the initial part of the expression,
@@ -876,9 +882,9 @@ impl<'s> Parser<'s> {
     /// method calls, indexing, etc.
     fn parse_singular_expr(
         &mut self,
-        mut subject: AstNode<ast::Expr>,
+        mut subject: AstNode<'a, ast::Expr<'a>>,
         mut subject_span: ByteRange,
-    ) -> ParseResult<AstNode<ast::Expr>> {
+    ) -> ParseResult<AstNode<'a, ast::Expr<'a>>> {
         // so here we need to peek to see if this is either a index_access, field access
         // or a function call...
         while let Some(token) = self.peek() {
@@ -918,7 +924,7 @@ impl<'s> Parser<'s> {
         Ok(subject)
     }
 
-    fn parse_unary_expr(&mut self, token: Token) -> ParseResult<AstNode<ast::Expr>> {
+    fn parse_unary_expr(&mut self, token: Token) -> ParseResult<AstNode<'a, ast::Expr<'a>>> {
         let op = self.node_with_span(
             match token.kind {
                 TokenKind::Keyword(Keyword::Not) => ast::UnaryOp::Not,
@@ -942,9 +948,9 @@ impl<'s> Parser<'s> {
 
     fn parse_property_access(
         &mut self,
-        subject: AstNode<ast::Expr>,
+        subject: AstNode<'a, ast::Expr<'a>>,
         subject_span: ByteRange,
-    ) -> ParseResult<AstNode<ast::Expr>> {
+    ) -> ParseResult<AstNode<'a, ast::Expr<'a>>> {
         self.skip_fast(TokenKind::Dot); // `<dot>` Skip the dot token.
 
         let token = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
@@ -976,11 +982,14 @@ impl<'s> Parser<'s> {
         }
     }
 
-    fn parse_filter(&mut self, subject_span: ByteRange) -> ParseResult<AstNode<ast::Filter>> {
+    fn parse_filter(
+        &mut self,
+        subject_span: ByteRange,
+    ) -> ParseResult<AstNode<'a, ast::Filter<'a>>> {
         let name = self.parse_name()?;
         let args = if self.parse_token_fast(TokenKind::Colon).is_some() {
             let start = self.current_pos();
-            let mut args = thin_vec![self.parse_filter_arg()?];
+            let mut args = bumpalo::vec![in self.arena; self.parse_filter_arg()?];
 
             // [Liquid filters] take a list of arguments, e.g. `f: a, b`.
             //
@@ -1005,7 +1014,7 @@ impl<'s> Parser<'s> {
     /// `allow_false: true`.
     ///
     /// [Liquid filters]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/variable.rb#L17
-    fn parse_filter_arg(&mut self) -> ParseResult<AstNode<ast::Arg>> {
+    fn parse_filter_arg(&mut self) -> ParseResult<AstNode<'a, ast::Arg<'a>>> {
         let start = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
 
         let name = match self.peek_second() {
@@ -1099,7 +1108,10 @@ impl<'s> Parser<'s> {
 
     /// Parse a `for` loop, or a Liquid `tablerow` loop, which is written the
     /// same way apart from its tags, and has no body for an empty loop.
-    fn parse_for_loop(&mut self, kind: ast::LoopKind) -> ParseResult<AstNode<ast::Statement>> {
+    fn parse_for_loop(
+        &mut self,
+        kind: ast::LoopKind,
+    ) -> ParseResult<AstNode<'a, ast::Statement<'a>>> {
         let start = self.current_pos();
         let (opening, end) = match kind {
             ast::LoopKind::For => (Keyword::For, Keyword::EndFor),
@@ -1188,9 +1200,9 @@ impl<'s> Parser<'s> {
     /// [Liquid]: https://shopify.github.io/liquid/tags/iteration/#for-parameters
     fn parse_loop_modifiers(
         &mut self,
-    ) -> ParseResult<(Option<AstNode<ast::Name>>, AstNodes<ast::Arg>)> {
+    ) -> ParseResult<(Option<AstNode<'a, ast::Name>>, AstNodes<'a, ast::Arg<'a>>)> {
         let mut reverse_modifier = None;
-        let mut params = thin_vec![];
+        let mut params = bumpalo::vec![in self.arena];
         let start = self.current_pos();
 
         loop {
@@ -1228,7 +1240,7 @@ impl<'s> Parser<'s> {
     }
 
     /// Parse the value of a Liquid loop parameter, e.g. `2` in `limit: 2`.
-    fn parse_loop_param_value(&mut self) -> ParseResult<AstNode<ast::Expr>> {
+    fn parse_loop_param_value(&mut self) -> ParseResult<AstNode<'a, ast::Expr<'a>>> {
         let token = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
 
         // `offset: continue` starts where the last loop over the same items
@@ -1255,10 +1267,10 @@ impl<'s> Parser<'s> {
     ///    ...
     /// {% endfor %}
     /// ```
-    fn parse_for_target(&mut self) -> ParseResult<AstNode<ast::ForTarget>> {
+    fn parse_for_target(&mut self) -> ParseResult<AstNode<'a, ast::ForTarget<'a>>> {
         let start = self.current_pos();
         let key = self.parse_name()?;
-        let mut items = thin_vec![key];
+        let mut items = bumpalo::vec![in self.arena; key];
 
         loop {
             if self.parse_token_fast(TokenKind::Comma).is_none() {
@@ -1278,9 +1290,9 @@ impl<'s> Parser<'s> {
     fn parse_body_until(
         &mut self,
         stop: impl Fn(Keyword) -> bool,
-    ) -> ParseResult<AstNode<ast::Body>> {
+    ) -> ParseResult<AstNode<'a, ast::Body<'a>>> {
         let start = self.current_pos();
-        let mut contents = thin_vec![];
+        let mut contents = bumpalo::vec![in self.arena];
 
         while let Some(token) = self.peek() {
             if token.kind.is_tag_tree()
@@ -1302,8 +1314,8 @@ impl<'s> Parser<'s> {
 
     /// Parse an `if` block, or a Liquid `unless` block, which is written the
     /// same way apart from its opening and closing tags.
-    fn parse_if_block(&mut self) -> ParseResult<AstNode<ast::Statement>> {
-        let mut clauses = thin_vec![];
+    fn parse_if_block(&mut self) -> ParseResult<AstNode<'a, ast::Statement<'a>>> {
+        let mut clauses = bumpalo::vec![in self.arena];
         let mut otherwise = None;
         let mut else_trim = ast::TrimMarker::default();
         let mut end_trim = None;
@@ -1393,7 +1405,7 @@ impl<'s> Parser<'s> {
     ///     {% else %} Other
     /// {% endcase %}
     /// ```
-    fn parse_case_block(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+    fn parse_case_block(&mut self) -> ParseResult<AstNode<'a, ast::Statement<'a>>> {
         let start = self.current_pos();
         let is_clause = |kwd| matches!(kwd, Keyword::When | Keyword::Else | Keyword::EndCase);
 
@@ -1404,7 +1416,7 @@ impl<'s> Parser<'s> {
 
         let leading = self.parse_body_until(is_clause)?;
 
-        let mut branches = thin_vec![];
+        let mut branches = bumpalo::vec![in self.arena];
         let mut otherwise = None;
         let mut else_trim = ast::TrimMarker::default();
         let mut end_trim = None;
@@ -1484,9 +1496,9 @@ impl<'s> Parser<'s> {
 
     /// Parse the values of a `{% when %}` clause, which are separated by `,`
     /// or `or`.
-    fn parse_when_values(&mut self) -> ParseResult<AstNodes<ast::Expr>> {
+    fn parse_when_values(&mut self) -> ParseResult<AstNodes<'a, ast::Expr<'a>>> {
         let start = self.current_pos();
-        let mut values = thin_vec![self.parse_expr()?];
+        let mut values = bumpalo::vec![in self.arena; self.parse_expr()?];
 
         while self
             .parse_token_fast(TokenKind::Comma)
@@ -1499,14 +1511,14 @@ impl<'s> Parser<'s> {
         Ok(self.nodes_with_joined_span(values, start))
     }
 
-    fn parse_break_statement(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+    fn parse_break_statement(&mut self) -> ParseResult<AstNode<'a, ast::Statement<'a>>> {
         self.in_tree(Delimiter::Percent, None, |g| {
             g.parse_token(TokenKind::Keyword(Keyword::Break))?;
             Ok(g.node_with_span(ast::Statement::Tag(ast::Tag::Break(ast::Break {})), g.range()))
         })
     }
 
-    fn parse_continue_statement(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+    fn parse_continue_statement(&mut self) -> ParseResult<AstNode<'a, ast::Statement<'a>>> {
         self.in_tree(Delimiter::Percent, None, |g| {
             g.parse_token(TokenKind::Keyword(Keyword::Continue))?;
             Ok(g.node_with_span(
@@ -1516,7 +1528,7 @@ impl<'s> Parser<'s> {
         })
     }
 
-    fn parse_with_block(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+    fn parse_with_block(&mut self) -> ParseResult<AstNode<'a, ast::Statement<'a>>> {
         let token = *self.current_token();
 
         // Parse the header first, we should get `block <name>`.
@@ -1549,7 +1561,7 @@ impl<'s> Parser<'s> {
         Ok(self.node_with_joined_span(ast::Statement::Tag(ast::Tag::With(with)), token.span))
     }
 
-    fn parse_block_statement(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+    fn parse_block_statement(&mut self) -> ParseResult<AstNode<'a, ast::Statement<'a>>> {
         let token = *self.current_token();
 
         // Parse the header first, we should get `block <name>`.
@@ -1595,7 +1607,7 @@ impl<'s> Parser<'s> {
         Ok(self.node_with_joined_span(ast::Statement::Tag(ast::Tag::Block(block)), token.span))
     }
 
-    fn parse_raw_block(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+    fn parse_raw_block(&mut self) -> ParseResult<AstNode<'a, ast::Statement<'a>>> {
         let start = self.current_pos();
 
         self.in_tree(Delimiter::Percent, None, |g| {
@@ -1621,7 +1633,10 @@ impl<'s> Parser<'s> {
 
     /// Parse a block that isn't rendered, up to its `end` tag, e.g.
     /// `{% endcomment %}`, which it must have, as any other block.
-    fn parse_comment_block(&mut self, end: Keyword) -> ParseResult<AstNode<ast::Statement>> {
+    fn parse_comment_block(
+        &mut self,
+        end: Keyword,
+    ) -> ParseResult<AstNode<'a, ast::Statement<'a>>> {
         let start = self.current_pos();
 
         while let Some(token) = self.peek() {
@@ -1660,8 +1675,8 @@ impl<'s> Parser<'s> {
         closing: Keyword,
         peek_fn: impl Fn(TokenKind) -> bool,
         g: impl FnMut(&mut Self) -> ParseResult<U>,
-    ) -> ParseResult<(AstNode<ast::Body>, TokenKind, U)> {
-        let mut statements = thin_vec![];
+    ) -> ParseResult<(AstNode<'a, ast::Body<'a>>, TokenKind, U)> {
+        let mut statements = bumpalo::vec![in self.arena];
         let start = self.current_pos();
         let mut end: Option<_> = None;
 
@@ -1702,8 +1717,8 @@ impl<'s> Parser<'s> {
         }
     }
 
-    fn parse_args(&mut self) -> ParseResult<AstNodes<ast::Arg>> {
-        let mut args = thin_vec![];
+    fn parse_args(&mut self) -> ParseResult<AstNodes<'a, ast::Arg<'a>>> {
+        let mut args = bumpalo::vec![in self.arena];
         let start = self.current_pos();
 
         while self.peek().is_some() {
@@ -1733,7 +1748,7 @@ impl<'s> Parser<'s> {
     /// {% render "card" with featured as product %}
     /// {% render "card" for products as product %}
     /// ```
-    fn parse_render_statement(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+    fn parse_render_statement(&mut self) -> ParseResult<AstNode<'a, ast::Statement<'a>>> {
         self.in_tree(Delimiter::Percent, None, |g| {
             g.parse_token(TokenKind::Keyword(Keyword::Render))?;
             let template = g.parse_expr()?;
@@ -1771,7 +1786,7 @@ impl<'s> Parser<'s> {
     /// Parse a Liquid `{% liquid %}` tag. The lexer gives each of its lines a
     /// `{% %}` tree, so the lines are parsed like any other tags, up to the
     /// tree for its `%}`.
-    fn parse_liquid_tag(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+    fn parse_liquid_tag(&mut self) -> ParseResult<AstNode<'a, ast::Statement<'a>>> {
         let start = self.current_pos();
 
         // The lines of the tag are tags of their own, up to the end of the tag.
@@ -1788,7 +1803,7 @@ impl<'s> Parser<'s> {
 
     /// Parse a Liquid `capture` block, i.e.
     /// `{% capture greeting %}Hello {{ name }}{% endcapture %}`.
-    fn parse_capture_block(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+    fn parse_capture_block(&mut self) -> ParseResult<AstNode<'a, ast::Statement<'a>>> {
         let token = *self.current_token();
 
         let (name, trim) = self.in_tag(Delimiter::Percent, |g| {
@@ -1824,7 +1839,7 @@ impl<'s> Parser<'s> {
     /// ```
     ///
     /// [`extends`]: https://docs.djangoproject.com/en/stable/ref/templates/builtins/#extends
-    fn parse_extends_statement(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+    fn parse_extends_statement(&mut self) -> ParseResult<AstNode<'a, ast::Statement<'a>>> {
         self.in_tree(Delimiter::Percent, None, |g| {
             g.parse_token(TokenKind::Keyword(Keyword::Extends))?;
             let template = g.parse_expr()?;
@@ -1843,7 +1858,7 @@ impl<'s> Parser<'s> {
     /// ```
     ///
     /// [`include`]: https://docs.djangoproject.com/en/stable/ref/templates/builtins/#include
-    fn parse_include_statement(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+    fn parse_include_statement(&mut self) -> ParseResult<AstNode<'a, ast::Statement<'a>>> {
         // Parse the header first, we should get `block <name>`.
         self.in_tree(Delimiter::Percent, None, |g| {
             g.parse_token(TokenKind::Keyword(Keyword::Include))?;
@@ -1859,7 +1874,7 @@ impl<'s> Parser<'s> {
             {
                 g.parse_args()?
             } else {
-                g.nodes_with_span(thin_vec![], g.range())
+                g.nodes_with_span(bumpalo::vec![in g.arena], g.range())
             };
 
             Ok(g.node_with_span(
@@ -1869,7 +1884,7 @@ impl<'s> Parser<'s> {
         })
     }
 
-    fn parse_load_statement(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+    fn parse_load_statement(&mut self) -> ParseResult<AstNode<'a, ast::Statement<'a>>> {
         self.in_tree(Delimiter::Percent, None, |g| {
             let name = g.parse_name()?;
             // g.parse_token(TokenKind::Keyword(Keyword::Load))?;
@@ -1892,7 +1907,7 @@ impl<'s> Parser<'s> {
     /// ```
     ///
     /// [`import`]: https://jinja.palletsprojects.com/en/stable/templates/#import
-    fn parse_import_statement(&mut self) -> ParseResult<AstNode<ast::Statement>> {
+    fn parse_import_statement(&mut self) -> ParseResult<AstNode<'a, ast::Statement<'a>>> {
         self.in_tree(Delimiter::Percent, None, |g| {
             g.parse_token(TokenKind::Keyword(Keyword::Import))?;
             let template = g.parse_string()?;
@@ -1901,7 +1916,7 @@ impl<'s> Parser<'s> {
                 g.parse_names()?
             } else {
                 // This is effectively a dummy range, since we don't have an alias.
-                g.nodes_with_span(thin_vec![], g.range())
+                g.nodes_with_span(bumpalo::vec![in g.arena], g.range())
             };
 
             Ok(g.node_with_span(
@@ -1911,8 +1926,8 @@ impl<'s> Parser<'s> {
         })
     }
 
-    fn parse_names(&mut self) -> ParseResult<AstNodes<ast::Name>> {
-        let mut names = thin_vec![];
+    fn parse_names(&mut self) -> ParseResult<AstNodes<'a, ast::Name>> {
+        let mut names = bumpalo::vec![in self.arena];
         let start = self.current_pos();
 
         while self.peek().is_some() {
@@ -1930,7 +1945,7 @@ impl<'s> Parser<'s> {
 
     /// Parse a name, which can also be written as a string, e.g. the `"x"` in
     /// `{% capture "x" %}`.
-    fn parse_name_or_string(&mut self) -> ParseResult<AstNode<ast::Name>> {
+    fn parse_name_or_string(&mut self) -> ParseResult<AstNode<'a, ast::Name>> {
         match self.peek().copied() {
             Some(Token { kind: TokenKind::Str, span }) => {
                 self.skip_fast(TokenKind::Str); // `<string>` Skip the string token.
@@ -1940,7 +1955,7 @@ impl<'s> Parser<'s> {
         }
     }
 
-    fn parse_name(&mut self) -> ParseResult<AstNode<ast::Name>> {
+    fn parse_name(&mut self) -> ParseResult<AstNode<'a, ast::Name>> {
         match self.peek() {
             Some(Token { kind: TokenKind::Ident, span }) => {
                 self.skip_fast(TokenKind::Ident); // `<ident>` Skip the identifier token.
@@ -1962,7 +1977,7 @@ impl<'s> Parser<'s> {
         }
     }
 
-    fn parse_string(&mut self) -> ParseResult<AstNode<ast::StrLit>> {
+    fn parse_string(&mut self) -> ParseResult<AstNode<'a, ast::StrLit>> {
         match self.peek() {
             Some(Token { kind: TokenKind::Str, span }) => {
                 self.skip_fast(TokenKind::Str); // `<string>` Skip the string token.
@@ -1978,7 +1993,7 @@ impl<'s> Parser<'s> {
         }
     }
 
-    fn parse_arg(&mut self) -> ParseResult<Option<AstNode<ast::Arg>>> {
+    fn parse_arg(&mut self) -> ParseResult<Option<AstNode<'a, ast::Arg<'a>>>> {
         match (self.peek().copied(), self.peek_second().copied()) {
             (Some(Token { kind, span }), Some(tok!(Eq))) if kind.is_ident_like() => {
                 let name = self.parse_name()?;
@@ -2021,8 +2036,8 @@ impl<'s> Parser<'s> {
         }
     }
 
-    fn parse_assignments(&mut self) -> ParseResult<AstNodes<ast::Assignment>> {
-        let mut assignments = thin_vec![];
+    fn parse_assignments(&mut self) -> ParseResult<AstNodes<'a, ast::Assignment<'a>>> {
+        let mut assignments = bumpalo::vec![in self.arena];
         let start = self.current_pos();
 
         while self.peek().is_some() {
@@ -2039,7 +2054,7 @@ impl<'s> Parser<'s> {
         Ok(self.nodes_with_joined_span(assignments, start))
     }
 
-    fn parse_assignment(&mut self) -> ParseResult<Option<AstNode<ast::Assignment>>> {
+    fn parse_assignment(&mut self) -> ParseResult<Option<AstNode<'a, ast::Assignment<'a>>>> {
         let position = self.cursor.position();
         let start = self.current_pos();
 

@@ -1,6 +1,8 @@
 //! Contains all of the parsing logic for the `bl` project.
 
-use bl_ast::{AstNode, AstVisitor, Dialect, Document, SourceId, Span, TempSourceMap};
+use bl_ast::{
+    Arena, AstNode, AstNodeRef, AstVisitor, Dialect, Document, SourceId, Span, TempSourceMap,
+};
 use bl_ast_utils::{AstTreePrinter, TreeWriter, TreeWriterConfig};
 use bl_lexer::{Lexer, LexerMetadata, token::Token};
 use bl_reporting::{
@@ -66,20 +68,21 @@ impl<'a> ParseQuery<'a> {
 }
 
 /// A structure that represents the result of the parsing operation.
-pub struct ParseQueryResult {
-    /// The resultant parsed module.
+pub struct ParseQueryResult<'a> {
+    /// The resultant parsed module, in the arena that it was parsed into.
     ///
     /// If the node is `None`, then an unrecoverable error occurred during the
     /// parsing or lexing of a module.
-    pub node: Option<AstNode<Document>>,
+    pub node: Option<AstNode<'a, Document<'a>>>,
 
     /// The parser may still produce diagnostics for this module, and so we
     /// want to propagate this
     pub diagnostics: Vec<Report>,
 }
 
-/// An entry point for the general framework to parse a module.
-pub fn parse_source(query: ParseQuery) -> ParseQueryResult {
+/// An entry point for the general framework to parse a module, into a tree in
+/// `arena`.
+pub fn parse_source<'a>(query: ParseQuery, arena: &'a Arena) -> ParseQueryResult<'a> {
     // let mut timings = StageMetrics::default();
     let ParseQuery { id, member, options } = query;
 
@@ -107,7 +110,7 @@ pub fn parse_source(query: ParseQuery) -> ParseQueryResult {
     // Create a new import resolver in the event of more modules that
     // are encountered whilst parsing this module.
     let mut diagnostics = ParserDiagnostics::new();
-    let mut parser = Parser::new(id, spanned, &tokens, &mut diagnostics, options);
+    let mut parser = Parser::new(id, arena, spanned, &tokens, &mut diagnostics, options);
 
     // Perform the parsing operation now... and send the result through the
     // message queue, regardless of it being an error or not.
@@ -119,10 +122,9 @@ pub fn parse_source(query: ParseQuery) -> ParseQueryResult {
     }
 }
 
-pub fn emit_source_tree(member: &Member) {
-    let document = member.document();
+pub fn emit_source_tree(member: &Member, document: AstNodeRef<Document>) {
     let spanned = member.spanned();
-    let tree = AstTreePrinter::new(spanned).visit_document(document.unwrap().ast_ref()).unwrap();
+    let tree = AstTreePrinter::new(spanned).visit_document(document).unwrap();
     let config = TreeWriterConfig::unicode();
     log::info!(
         "parsed module '{}' as {}:\n{}",

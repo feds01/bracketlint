@@ -8,13 +8,14 @@ mod location;
 mod source;
 
 pub use ast::*;
+/// The arena that a tree lives in. The parser allocates each node of a tree in
+/// it, and dropping or resetting it frees the whole tree at once.
+pub use bumpalo::Bump as Arena;
 pub use dialect::Dialect;
 pub use keywords::Keyword;
 pub use location::{ByteRange, SourceId, Span, SpannedSource};
 pub use source::{HasSource, LineRanges, TempSourceMap};
 
 pub mod visitor {
-    pub use super::ast::{
-        AstVisitor, AstVisitorMut, AstVisitorMutSelf, walk, walk_mut, walk_mut_self,
-    };
+    pub use super::ast::{AstVisitor, AstVisitorMutSelf, walk, walk_mut_self};
 }

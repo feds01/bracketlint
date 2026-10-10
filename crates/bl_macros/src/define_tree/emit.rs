@@ -1,6 +1,8 @@
 //! Functions to emit tree definitions, visitors, walkers, given a parsed
 //! [`TreeDef`].
 
+use std::collections::HashSet;
+
 use convert_case::{Case, Casing};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
@@ -10,57 +12,74 @@ use super::definitions::{
     StructNodeField, TreeDef, TreeNodeDef,
 };
 
-/// Suffix the given identifier with "Mut"/"_mut" etc as appropriate depending
-/// on the flag `nodes_mut` and casing `case`.
-fn suffix_ident_mut(ident: impl ToString, emit_mut: bool, case: Case) -> syn::Ident {
-    if emit_mut {
-        let word = format!("{}_mut", ident.to_string());
-        format_ident!("{}", word.to_case(case))
-    } else {
-        format_ident!("{}", ident.to_string().to_case(case))
-    }
-}
-
-/// Suffix the given identifier as appropriate depending
-/// on the flag `nodes_mut`/`self_mut` and casing `case`.
-fn suffix_visitor_like_mut(
-    ident: impl ToString,
-    nodes_mut: bool,
-    self_mut: bool,
-    case: Case,
-) -> syn::Ident {
-    let suffix = match (nodes_mut, self_mut) {
-        (false, false) => "",
-        (false, true) => "MutSelf",
-        (true, false) => "MutNodes",
-        (true, true) => "Mut",
-    };
-
+/// Suffix the given identifier as appropriate depending on the flag
+/// `self_mut` and casing `case`.
+///
+/// ##Note: The nodes of a tree are never mutable, since they are shared
+/// references into the arena that the tree lives in. A visitor can only be.
+fn suffix_visitor_like_mut(ident: impl ToString, self_mut: bool, case: Case) -> syn::Ident {
+    let suffix = if self_mut { "MutSelf" } else { "" };
     let word = format!("{}{suffix}", ident.to_string());
     format_ident!("{}", word.to_case(case))
 }
 
-/// Get the name of the walker module with the given mutability flags.
-fn get_walker_module_name(nodes_mut: bool, self_mut: bool) -> syn::Ident {
-    suffix_visitor_like_mut("walk", nodes_mut, self_mut, Case::Snake)
-}
-
-/// Emit a `mut` if the flag is on.
-fn maybe_mut_prefix(nodes_mut: bool) -> TokenStream {
-    if nodes_mut {
-        quote! { mut }
-    } else {
-        quote! {}
-    }
+/// Get the name of the walker module with the given mutability flag.
+fn get_walker_module_name(self_mut: bool) -> syn::Ident {
+    suffix_visitor_like_mut("walk", self_mut, Case::Snake)
 }
 
 /// Emit a `&mut` if the flag is on, `&` otherwise.
-fn ref_or_mut_ref(nodes_mut: bool) -> TokenStream {
-    if nodes_mut {
+fn ref_or_mut_ref(self_mut: bool) -> TokenStream {
+    if self_mut {
         quote! { &mut }
     } else {
         quote! { & }
     }
+}
+
+/// The nodes that take the lifetime `'a` of the arena that a tree lives in,
+/// which are those that hold a child node, or hold a node that does.
+fn nodes_with_lifetime(tree_def: &TreeDef) -> HashSet<syn::Ident> {
+    let mut with_lifetime = HashSet::new();
+
+    loop {
+        let needs_lifetime = |data: &NodeFieldData| match data {
+            NodeFieldData::Child { .. }
+            | NodeFieldData::ChildList { .. }
+            | NodeFieldData::OptionalChild { .. } => true,
+            NodeFieldData::Other { ty } => {
+                is_node_ty(ty, tree_def).is_some_and(|name| with_lifetime.contains(&name))
+            }
+        };
+
+        let found: Vec<_> = tree_def
+            .nodes
+            .iter()
+            .filter(|(name, _)| !with_lifetime.contains(*name))
+            .filter(|(_, node)| match node {
+                TreeNodeDef::StructNodeDef(def) => {
+                    def.fields.iter().any(|field| needs_lifetime(&field.data))
+                }
+                TreeNodeDef::EnumNodeDef(def) => def
+                    .variants
+                    .iter()
+                    .flat_map(|variant| variant.variant_data.iter().flatten())
+                    .any(needs_lifetime),
+            })
+            .map(|(name, _)| name.clone())
+            .collect();
+
+        if found.is_empty() {
+            return with_lifetime;
+        }
+
+        with_lifetime.extend(found);
+    }
+}
+
+/// Emit the type of the node `name`, with the lifetime `'a` if it takes one.
+fn emit_node_type(name: &syn::Ident, with_lifetime: &HashSet<syn::Ident>) -> TokenStream {
+    if with_lifetime.contains(name) { quote!(#name<'a>) } else { quote!(#name) }
 }
 
 /// Emit other items given in the [define_tree!](crate::define_tree!) macro.
@@ -69,30 +88,44 @@ fn emit_other_items(def: &TreeDef) -> TokenStream {
 }
 
 /// Emit the type for the field `data`.
-fn emit_node_field_data(data: &NodeFieldData, tree_def: &TreeDef) -> TokenStream {
+fn emit_node_field_data(
+    data: &NodeFieldData,
+    tree_def: &TreeDef,
+    with_lifetime: &HashSet<syn::Ident>,
+) -> TokenStream {
     let node_type_name = &tree_def.opts.node_type_name;
     let nodes_type_name = &tree_def.opts.nodes_type_name;
     match data {
         NodeFieldData::Child { node_name } => {
-            quote!(#node_type_name<#node_name>)
+            let node = emit_node_type(node_name, with_lifetime);
+            quote!(#node_type_name<'a, #node>)
         }
         NodeFieldData::ChildList { node_name } => {
-            quote!(#nodes_type_name<#node_name>)
+            let node = emit_node_type(node_name, with_lifetime);
+            quote!(#nodes_type_name<'a, #node>)
         }
         NodeFieldData::OptionalChild { node_name } => {
-            quote!(Option<#node_type_name<#node_name>>)
+            let node = emit_node_type(node_name, with_lifetime);
+            quote!(Option<#node_type_name<'a, #node>>)
         }
-        NodeFieldData::Other { ty } => quote!(#ty),
+        NodeFieldData::Other { ty } => match is_node_ty(ty, tree_def) {
+            Some(node_name) => emit_node_type(&node_name, with_lifetime),
+            None => quote!(#ty),
+        },
     }
 }
 
 /// Emit a struct node definition.
-fn emit_struct_def(struct_def: &StructNodeDef, tree_def: &TreeDef) -> TokenStream {
+fn emit_struct_def(
+    struct_def: &StructNodeDef,
+    tree_def: &TreeDef,
+    with_lifetime: &HashSet<syn::Ident>,
+) -> TokenStream {
     let rendered_fields = struct_def
         .fields
         .iter()
         .map(|field| {
-            let field_data = emit_node_field_data(&field.data, tree_def);
+            let field_data = emit_node_field_data(&field.data, tree_def, with_lifetime);
             let StructNodeField { visibility, attrs, name, .. } = field;
             quote! {
                 #(#attrs)*
@@ -102,20 +135,25 @@ fn emit_struct_def(struct_def: &StructNodeDef, tree_def: &TreeDef) -> TokenStrea
         .collect::<Vec<_>>();
 
     let StructNodeDef { visibility, attrs, name, .. } = struct_def;
+    let node = emit_node_type(name, with_lifetime);
 
     // Remove the #[tree_node] attribute
     let filtered_attrs = attrs.iter().filter(|attr| !attr.path().is_ident(NODE_DEF_ATTR_NAME));
 
     quote! {
         #(#filtered_attrs)*
-        #visibility struct #name {
+        #visibility struct #node {
             #(#rendered_fields),*
         }
     }
 }
 
 /// Emit an enum node definition.
-fn emit_enum_def(enum_def: &EnumNodeDef, tree_def: &TreeDef) -> TokenStream {
+fn emit_enum_def(
+    enum_def: &EnumNodeDef,
+    tree_def: &TreeDef,
+    with_lifetime: &HashSet<syn::Ident>,
+) -> TokenStream {
     let rendered_variants = enum_def
         .variants
         .iter()
@@ -124,7 +162,9 @@ fn emit_enum_def(enum_def: &EnumNodeDef, tree_def: &TreeDef) -> TokenStream {
             variant_data
                 .as_ref()
                 .map(|variant_data| {
-                    let data = variant_data.iter().map(|data| emit_node_field_data(data, tree_def));
+                    let data = variant_data
+                        .iter()
+                        .map(|data| emit_node_field_data(data, tree_def, with_lifetime));
                     quote! { #(#attrs)* #name(#(#data),*) }
                 })
                 .unwrap_or_else(|| {
@@ -134,13 +174,14 @@ fn emit_enum_def(enum_def: &EnumNodeDef, tree_def: &TreeDef) -> TokenStream {
         .collect::<Vec<_>>();
 
     let EnumNodeDef { visibility, attrs, name, .. } = enum_def;
+    let node = emit_node_type(name, with_lifetime);
 
     // Remove the #[tree_node] attribute
     let filtered_attrs = attrs.iter().filter(|attr| !attr.path().is_ident(NODE_DEF_ATTR_NAME));
 
     quote! {
         #(#filtered_attrs)*
-        #visibility enum #name {
+        #visibility enum #node {
             #(#rendered_variants),*
         }
     }
@@ -148,27 +189,26 @@ fn emit_enum_def(enum_def: &EnumNodeDef, tree_def: &TreeDef) -> TokenStream {
 
 /// Emit all node definitions.
 fn emit_node_defs(tree_def: &TreeDef) -> TokenStream {
+    let with_lifetime = nodes_with_lifetime(tree_def);
     tree_def
         .nodes
         .values()
         .map(|node| match node {
-            TreeNodeDef::EnumNodeDef(enum_def) => emit_enum_def(enum_def, tree_def),
-            TreeNodeDef::StructNodeDef(struct_def) => emit_struct_def(struct_def, tree_def),
+            TreeNodeDef::EnumNodeDef(def) => emit_enum_def(def, tree_def, &with_lifetime),
+            TreeNodeDef::StructNodeDef(def) => emit_struct_def(def, tree_def, &with_lifetime),
         })
         .collect()
 }
 
-/// Emit the visitor trait, depending on options and the `nodes_mut` flag.
-fn emit_visitor(tree_def: &TreeDef, nodes_mut: bool, self_mut: bool) -> TokenStream {
+/// Emit the visitor trait, depending on options and the `self_mut` flag.
+fn emit_visitor(tree_def: &TreeDef, self_mut: bool) -> TokenStream {
     let visitor_name = suffix_visitor_like_mut(
         tree_def.opts.visitor_trait_base_name.clone(),
-        nodes_mut,
         self_mut,
         Case::Pascal,
     );
 
-    let node_ref_name =
-        suffix_ident_mut(&tree_def.opts.visitor_node_ref_base_type_name, nodes_mut, Case::Pascal);
+    let node_ref_name = &tree_def.opts.visitor_node_ref_base_type_name;
 
     let node_visitor_methods = tree_def.nodes.keys().map(|node_name| {
         let node_ret = format_ident!("{}Ret", node_name.to_string().to_case(Case::Pascal));
@@ -339,17 +379,9 @@ fn emit_walked_enum_type(
 }
 
 /// Emit all walked types for the tree definition.
-fn emit_walked_types(
-    tree_def: &TreeDef,
-    nodes_mut: bool,
-    self_mut: bool,
-) -> Result<TokenStream, syn::Error> {
-    let visitor_name = suffix_visitor_like_mut(
-        &tree_def.opts.visitor_trait_base_name,
-        nodes_mut,
-        self_mut,
-        Case::Pascal,
-    );
+fn emit_walked_types(tree_def: &TreeDef, self_mut: bool) -> Result<TokenStream, syn::Error> {
+    let visitor_name =
+        suffix_visitor_like_mut(&tree_def.opts.visitor_trait_base_name, self_mut, Case::Pascal);
     let walker_types = tree_def
         .nodes
         .values()
@@ -421,7 +453,6 @@ fn emit_walker_enum_function_same_children(
     enum_node: &EnumNodeDef,
     tree_def: &TreeDef,
     visitor_name: &syn::Ident,
-    nodes_mut: bool,
     self_mut: bool,
 ) -> Result<Option<TokenStream>, syn::Error> {
     let children = match enum_variants_as_same_children(enum_node, tree_def) {
@@ -451,9 +482,7 @@ fn emit_walker_enum_function_same_children(
     });
 
     let visitor_ref_or_mut = ref_or_mut_ref(self_mut);
-    let node_mut_var = maybe_mut_prefix(nodes_mut);
-    let node_ref_name =
-        suffix_ident_mut(&tree_def.opts.visitor_node_ref_base_type_name, nodes_mut, Case::Pascal);
+    let node_ref_name = &tree_def.opts.visitor_node_ref_base_type_name;
     let walk_node_fn_name_same_children =
         format_ident!("walk_{}_same_children", node_name.to_string().to_case(Case::Snake),);
     let walk_node_fn_name = format_ident!("walk_{}", node_name.to_string().to_case(Case::Snake),);
@@ -461,7 +490,7 @@ fn emit_walker_enum_function_same_children(
     Ok(Some(quote! {
         pub fn #walk_node_fn_name_same_children<V: super::#visitor_name, Ret>(
             visitor: #visitor_ref_or_mut V,
-            #node_mut_var node: super::#node_ref_name<super::#node_name>,
+            node: super::#node_ref_name<super::#node_name>,
         ) -> Result<Ret, V::Error>
             where
                 V: super::#visitor_name<
@@ -480,7 +509,6 @@ fn emit_walker_function(
     node_name: &syn::Ident,
     tree_def: &TreeDef,
     visitor_name: &syn::Ident,
-    nodes_mut: bool,
     self_mut: bool,
     inner_tokens: TokenStream,
 ) -> Result<TokenStream, syn::Error> {
@@ -488,15 +516,13 @@ fn emit_walker_function(
         return Ok(quote! {});
     }
     let visitor_ref_or_mut = ref_or_mut_ref(self_mut);
-    let mut_var = maybe_mut_prefix(nodes_mut);
-    let node_ref_name =
-        suffix_ident_mut(&tree_def.opts.visitor_node_ref_base_type_name, nodes_mut, Case::Pascal);
+    let node_ref_name = &tree_def.opts.visitor_node_ref_base_type_name;
     let walk_node_fn_name = format_ident!("walk_{}", node_name.to_string().to_case(Case::Snake),);
 
     Ok(quote! {
         pub fn #walk_node_fn_name<V: super::#visitor_name>(
             visitor: #visitor_ref_or_mut V,
-            #mut_var node: super::#node_ref_name<super::#node_name>,
+            node: super::#node_ref_name<super::#node_name>,
         ) -> Result<#node_name<V>, V::Error> {
             #inner_tokens
         }
@@ -508,21 +534,12 @@ fn emit_walk_node_field(
     data: &NodeFieldData,
     field_path: TokenStream,
     tree_def: &TreeDef,
-    nodes_mut: bool,
 ) -> Result<Option<TokenStream>, syn::Error> {
     let get_visit_child_function_name = |child_name: &syn::Ident| {
         format_ident!("visit_{}", child_name.to_string().to_case(Case::Snake))
     };
-    let iter_name = suffix_ident_mut("iter", nodes_mut, Case::Snake);
-    let as_ref_name = if nodes_mut { format_ident!("as_mut") } else { format_ident!("as_ref") };
     let with_body_function_name = &tree_def.opts.ref_change_body_function_base_name;
-    let ref_function_name = suffix_ident_mut(
-        &tree_def.opts.get_ref_from_node_function_base_name,
-        nodes_mut,
-        Case::Snake,
-    );
-    let node_ref_name =
-        suffix_ident_mut(&tree_def.opts.visitor_node_ref_base_type_name, nodes_mut, Case::Pascal);
+    let ref_function_name = &tree_def.opts.get_ref_from_node_function_base_name;
     match data {
         NodeFieldData::Child { node_name: child_name } => {
             // Directly call visit
@@ -536,7 +553,7 @@ fn emit_walk_node_field(
             let visit_child_function_name = get_visit_child_function_name(child_name);
             Ok(Some(quote! {
                 #field_path
-                    .#iter_name()
+                    .iter()
                     .map(|t| visitor.#visit_child_function_name(t.#ref_function_name()))
                     .collect::<Result<Vec<_>, _>>()?
             }))
@@ -546,7 +563,7 @@ fn emit_walk_node_field(
             let visit_child_function_name = get_visit_child_function_name(child_name);
             Ok(Some(quote! {
                 #field_path
-                    .#as_ref_name()
+                    .as_ref()
                     .map(|t| visitor.#visit_child_function_name(t.#ref_function_name()))
                     .transpose()?
             }))
@@ -556,19 +573,11 @@ fn emit_walk_node_field(
                 // If this is a node ty, use the parent node's location and call visit
                 let visit_child_function_name = get_visit_child_function_name(&child_name);
 
-                if nodes_mut {
-                    Ok(Some(quote! {
-                        visitor.#visit_child_function_name(
-                            super::#node_ref_name::new(#field_path, range)
-                        )?
-                    }))
-                } else {
-                    Ok(Some(quote! {
-                        visitor.#visit_child_function_name(
-                            node.#with_body_function_name(#field_path)
-                        )?
-                    }))
-                }
+                Ok(Some(quote! {
+                    visitor.#visit_child_function_name(
+                        node.#with_body_function_name(#field_path)
+                    )?
+                }))
             } else {
                 // Unrelated field, we skip it
                 Ok(None)
@@ -582,11 +591,9 @@ fn emit_walker_enum_function(
     enum_node: &EnumNodeDef,
     tree_def: &TreeDef,
     visitor_name: &syn::Ident,
-    nodes_mut: bool,
     self_mut: bool,
 ) -> Result<TokenStream, syn::Error> {
     let node_name = &enum_node.name;
-    let ref_or_mut = ref_or_mut_ref(nodes_mut);
 
     // Get the match cases
     let cases = enum_node
@@ -605,8 +612,7 @@ fn emit_walker_enum_function(
                         .enumerate()
                         .filter_map(|(i, data)| {
                             let field_name = format_ident!("arg{i}");
-                            emit_walk_node_field(data, quote! { #field_name }, tree_def, nodes_mut)
-                                .transpose()
+                            emit_walk_node_field(data, quote! { #field_name }, tree_def).transpose()
                         })
                         .collect::<Result<Vec<_>, _>>()?;
                     let field_binds =
@@ -625,11 +631,9 @@ fn emit_walker_enum_function(
         &enum_node.name,
         tree_def,
         visitor_name,
-        nodes_mut,
         self_mut,
         quote! {
-           let range = node.range();
-           Ok(match #ref_or_mut *node {
+           Ok(match &*node {
                #(#cases),*
            })
         },
@@ -641,30 +645,23 @@ fn emit_walker_struct_function(
     struct_node: &StructNodeDef,
     tree_def: &TreeDef,
     visitor_name: &syn::Ident,
-    nodes_mut: bool,
     self_mut: bool,
 ) -> Result<TokenStream, syn::Error> {
     let node_name = &struct_node.name;
-    let ref_or_mut_ref = ref_or_mut_ref(nodes_mut);
 
     let walk_fields = struct_node
         .fields
         .iter()
         .filter_map(|field| {
             let field_name = &field.name;
-            emit_walk_node_field(
-                &field.data,
-                quote! { (#ref_or_mut_ref node.#field_name) },
-                tree_def,
-                nodes_mut,
-            )
-            .transpose()
-            .map(|walk_field| -> Result<_, syn::Error> {
-                let walk_field = walk_field?;
-                Ok(quote! {
-                    #field_name: #walk_field
+            emit_walk_node_field(&field.data, quote! { (&node.#field_name) }, tree_def)
+                .transpose()
+                .map(|walk_field| -> Result<_, syn::Error> {
+                    let walk_field = walk_field?;
+                    Ok(quote! {
+                        #field_name: #walk_field
+                    })
                 })
-            })
         })
         .collect::<Result<Vec<_>, _>>()?;
 
@@ -672,10 +669,8 @@ fn emit_walker_struct_function(
         &struct_node.name,
         tree_def,
         visitor_name,
-        nodes_mut,
         self_mut,
         quote! {
-            let range = node.range();
             Ok(#node_name {
                 #(#walk_fields),*
             })
@@ -684,17 +679,9 @@ fn emit_walker_struct_function(
 }
 
 /// Emit `walk_*` functions for all the nodes in the tree.
-fn emit_walker_functions(
-    tree_def: &TreeDef,
-    nodes_mut: bool,
-    self_mut: bool,
-) -> Result<TokenStream, syn::Error> {
-    let visitor_name = suffix_visitor_like_mut(
-        &tree_def.opts.visitor_trait_base_name,
-        nodes_mut,
-        self_mut,
-        Case::Pascal,
-    );
+fn emit_walker_functions(tree_def: &TreeDef, self_mut: bool) -> Result<TokenStream, syn::Error> {
+    let visitor_name =
+        suffix_visitor_like_mut(&tree_def.opts.visitor_trait_base_name, self_mut, Case::Pascal);
     let walker_functions = tree_def
         .nodes
         .values()
@@ -706,29 +693,19 @@ fn emit_walker_functions(
                         enum_node,
                         tree_def,
                         &visitor_name,
-                        nodes_mut,
                         self_mut,
                     )?
                     .unwrap_or_else(|| quote! {});
-                    let base_function = emit_walker_enum_function(
-                        enum_node,
-                        tree_def,
-                        &visitor_name,
-                        nodes_mut,
-                        self_mut,
-                    )?;
+                    let base_function =
+                        emit_walker_enum_function(enum_node, tree_def, &visitor_name, self_mut)?;
                     Ok(quote! {
                         #same_children_function
                         #base_function
                     })
                 }
-                TreeNodeDef::StructNodeDef(struct_node) => emit_walker_struct_function(
-                    struct_node,
-                    tree_def,
-                    &visitor_name,
-                    nodes_mut,
-                    self_mut,
-                ),
+                TreeNodeDef::StructNodeDef(struct_node) => {
+                    emit_walker_struct_function(struct_node, tree_def, &visitor_name, self_mut)
+                }
             }
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -738,15 +715,11 @@ fn emit_walker_functions(
     })
 }
 
-/// Emit a `walk(_mut)?` module for the given tree.
-fn emit_walker(
-    tree_def: &TreeDef,
-    nodes_mut: bool,
-    self_mut: bool,
-) -> Result<TokenStream, syn::Error> {
-    let walker_types = emit_walked_types(tree_def, nodes_mut, self_mut)?;
-    let walker_functions = emit_walker_functions(tree_def, nodes_mut, self_mut)?;
-    let walk_mod_name = get_walker_module_name(nodes_mut, self_mut);
+/// Emit a `walk(_mut_self)?` module for the given tree.
+fn emit_walker(tree_def: &TreeDef, self_mut: bool) -> Result<TokenStream, syn::Error> {
+    let walker_types = emit_walked_types(tree_def, self_mut)?;
+    let walker_functions = emit_walker_functions(tree_def, self_mut)?;
+    let walk_mod_name = get_walker_module_name(self_mut);
 
     Ok(quote! {
         pub mod #walk_mod_name {
@@ -757,23 +730,13 @@ fn emit_walker(
 }
 
 /// Emit macros to default-impl visitor methods
-fn emit_default_impl_macros(
-    tree_def: &TreeDef,
-    nodes_mut: bool,
-    self_mut: bool,
-) -> Result<TokenStream, syn::Error> {
-    let walk_mod_name = get_walker_module_name(nodes_mut, self_mut);
+fn emit_default_impl_macros(tree_def: &TreeDef, self_mut: bool) -> Result<TokenStream, syn::Error> {
+    let walk_mod_name = get_walker_module_name(self_mut);
     let default_impl_name = format_ident!(
         "{}_default_impl",
-        suffix_visitor_like_mut(
-            &tree_def.opts.visitor_trait_base_name,
-            nodes_mut,
-            self_mut,
-            Case::Snake,
-        )
+        suffix_visitor_like_mut(&tree_def.opts.visitor_trait_base_name, self_mut, Case::Snake)
     );
-    let node_ref_name =
-        suffix_ident_mut(&tree_def.opts.visitor_node_ref_base_type_name, nodes_mut, Case::Pascal);
+    let node_ref_name = &tree_def.opts.visitor_node_ref_base_type_name;
 
     let root_module = tree_def.opts.root_module.clone();
 
@@ -862,19 +825,17 @@ fn emit_default_impl_macros(
 
 /// Emit the tree definition as Rust syntax.
 pub(crate) fn emit_tree(tree_def: &TreeDef) -> Result<TokenStream, syn::Error> {
-    let mutability_combinations = [(true, true), (false, true), (false, false)];
-
     let mut streams = vec![];
     streams.push(emit_other_items(tree_def));
     streams.push(emit_node_defs(tree_def));
     streams.extend(
-        mutability_combinations
+        [true, false]
             .iter()
-            .flat_map(|(nodes_mut, self_mut)| {
+            .flat_map(|self_mut| {
                 [
-                    Ok(emit_visitor(tree_def, *nodes_mut, *self_mut)),
-                    emit_walker(tree_def, *nodes_mut, *self_mut),
-                    emit_default_impl_macros(tree_def, *nodes_mut, *self_mut),
+                    Ok(emit_visitor(tree_def, *self_mut)),
+                    emit_walker(tree_def, *self_mut),
+                    emit_default_impl_macros(tree_def, *self_mut),
                 ]
             })
             .collect::<Result<Vec<_>, _>>()?,
