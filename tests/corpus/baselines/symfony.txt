@@ -44,7 +44,7 @@ parse-error   src/Symfony/Bundle/WebProfilerBundle/Resources/views/Profiler/_req
 parse-error   src/Symfony/Bundle/WebProfilerBundle/Resources/views/Profiler/ajax_layout.html.twig
 parse-error   src/Symfony/Bundle/WebProfilerBundle/Resources/views/Profiler/bag.html.twig
 parse-error   src/Symfony/Bundle/WebProfilerBundle/Resources/views/Profiler/base.html.twig
-fmt-error     src/Symfony/Bundle/WebProfilerBundle/Resources/views/Profiler/base_js.html.twig
+ok            src/Symfony/Bundle/WebProfilerBundle/Resources/views/Profiler/base_js.html.twig
 parse-error   src/Symfony/Bundle/WebProfilerBundle/Resources/views/Profiler/cancel.html.twig
 parse-error   src/Symfony/Bundle/WebProfilerBundle/Resources/views/Profiler/header.html.twig
 parse-error   src/Symfony/Bundle/WebProfilerBundle/Resources/views/Profiler/info.html.twig

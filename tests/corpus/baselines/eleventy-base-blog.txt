@@ -1,4 +1,4 @@
-fmt-error     _includes/layouts/base.njk
+ok            _includes/layouts/base.njk
 unstable      _includes/layouts/home.njk
 ok            _includes/layouts/post.njk
 parse-error   _includes/postslist.njk

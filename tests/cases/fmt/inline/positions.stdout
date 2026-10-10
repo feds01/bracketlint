@@ -1,4 +1,5 @@
-<p>{{ greeting }}, {{ user.name }}!</p>{{ standalone }}
+<p>{{ greeting }}, {{ user.name }}!</p>
+{{ standalone }}
 <span>before</span> {{ after_element }}
 <a href="{{ url }}">{{ label }}</a>
 

@@ -1,5 +1,5 @@
-fmt-error     sphinx/themes/basic/changes/frameset.html
-fmt-error     sphinx/themes/basic/changes/rstsource.html
+unstable      sphinx/themes/basic/changes/frameset.html
+unstable      sphinx/themes/basic/changes/rstsource.html
 parse-error   sphinx/themes/basic/changes/versionchanges.html
 parse-error   sphinx/themes/basic/defindex.html
 parse-error   sphinx/themes/basic/domainindex.html
