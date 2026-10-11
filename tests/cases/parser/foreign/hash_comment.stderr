@@ -5,5 +5,5 @@ warning: `{# #}` isn't a comment in Liquid
 3 | |    rather than left out #}
   | |__________________________-
   |
-  = note: this file is parsed as Liquid, from its `.liquid` extension
   = help: `{# #}` comments are Django, Jinja and Twig syntax, pass `--dialect` with the template's dialect if it is one of them
+  = note: this file is parsed as Liquid, from its `.liquid` extension

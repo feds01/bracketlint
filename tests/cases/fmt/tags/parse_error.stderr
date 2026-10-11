@@ -11,5 +11,5 @@ error: expected a tag, however received the keyword `endfor`
 4 | {% endfor %}
   |    ------
   |
-  = note: this file is parsed as Django, the default, since neither `--dialect` nor its extension names a dialect
   = help: expected a `identifier`
+  = note: this file is parsed as Django, the default, since neither `--dialect` nor its extension names a dialect

@@ -5,12 +5,11 @@ use bl_ast::{AstNode, AstNodeRef, AstVisitor, Dialect, Document, SourceId, Span,
 use bl_ast_utils::{AstTreePrinter, TreeWriter, TreeWriterConfig};
 use bl_lexer::{Lexer, LexerMetadata, token::Token};
 use bl_reporting::{
-    DiagnosticsMut, Report, ReportElement, Reports,
+    DiagnosticsMut, Report, Reports,
     inline::{InlineSnippet, note_on_span},
-    note,
 };
-use bl_workspace::{Member, settings::DialectSource};
-use diagnostics::ParserDiagnostics;
+use bl_workspace::Member;
+use diagnostics::{ParserDiagnostics, note_dialect};
 use parser::Parser;
 
 mod diagnostics;
@@ -119,26 +118,6 @@ pub fn parse_source<'a>(query: ParseQuery, arena: &'a Arena) -> ParseQueryResult
     reports.extend(diagnostics.into_reports(Reports::from, Reports::from));
     note_dialect(&mut reports, member);
     ParseQueryResult { node: Some(node), diagnostics: reports }
-}
-
-/// Add a note to each of `reports` that says which dialect `member` is parsed
-/// in, and how it is picked, before the other notes of the report. A template
-/// can read as another dialect's, so a diagnostic might only make sense in a
-/// dialect that it isn't parsed in.
-fn note_dialect(reports: &mut Reports, member: &Member) {
-    let dialect = member.dialect;
-    let source = match (member.dialect_source, dialect.extension()) {
-        (DialectSource::Flag, _) => format!("from `--dialect {}`", dialect.name()),
-        (DialectSource::Extension, Some(extension)) => format!("from its `.{extension}` extension"),
-        _ => "the default, since neither `--dialect` nor its extension names a dialect".to_string(),
-    };
-    let message = format!("this file is parsed as {}, {source}", dialect.title());
-
-    for report in reports {
-        let notes =
-            report.contents.iter().position(|element| matches!(element, ReportElement::Note(_)));
-        report.contents.insert(notes.unwrap_or(report.contents.len()), note!("{message}"));
-    }
 }
 
 pub fn emit_source_tree(member: &Member, document: AstNodeRef<Document>) {

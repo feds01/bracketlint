@@ -4,5 +4,5 @@ warning: `{% raw %}` isn't a tag in Twig
 1 | {% raw %}{{ x }}{% endraw %}
   |    ---
   |
-  = note: this file is parsed as Twig, from its `.twig` extension
   = help: `{% raw %}` is how Jinja and Liquid write `{% verbatim %}`, pass `--dialect` with the template's dialect if it is one of them
+  = note: this file is parsed as Twig, from its `.twig` extension

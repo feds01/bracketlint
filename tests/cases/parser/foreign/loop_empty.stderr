@@ -4,14 +4,14 @@ error: expected a tag, however received the keyword `empty`
 1 | {% for item in items %}{{ item }}{% empty %}No items{% endfor %}
   |                                     -----
   |
-  = note: this file is parsed as Jinja, from its `.jinja` extension
   = help: expected a `identifier`
   = help: `{% empty %}` in a loop is how Django writes `{% else %}`, pass `--dialect django` if this is a Django template
+  = note: this file is parsed as Jinja, from its `.jinja` extension
 error: expected a tag, however received the keyword `endfor`
  --> $DIR/loop_empty.jinja:1:56
   |
 1 | {% for item in items %}{{ item }}{% empty %}No items{% endfor %}
   |                                                        ------
   |
-  = note: this file is parsed as Jinja, from its `.jinja` extension
   = help: expected a `identifier`
+  = note: this file is parsed as Jinja, from its `.jinja` extension

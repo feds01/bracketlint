@@ -4,15 +4,15 @@ error: expected a tag, however received a `-`
 1 | {%- if user -%}<p>{{ user.name }}</p>{%- endif -%}
   |   -
   |
-  = note: this file is parsed as Django, from `--dialect django`
   = help: expected a `identifier`
   = help: the whitespace control marker `-` is Jinja, Liquid and Twig syntax, pass `--dialect` with the template's dialect if it is one of them
+  = note: this file is parsed as Django, from `--dialect django`
 error: expected a tag, however received a `-`
  --> $DIR/whitespace_control_django.html:1:40
   |
 1 | {%- if user -%}<p>{{ user.name }}</p>{%- endif -%}
   |                                        -
   |
-  = note: this file is parsed as Django, from `--dialect django`
   = help: expected a `identifier`
   = help: the whitespace control marker `-` is Jinja, Liquid and Twig syntax, pass `--dialect` with the template's dialect if it is one of them
+  = note: this file is parsed as Django, from `--dialect django`
