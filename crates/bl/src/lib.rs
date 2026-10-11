@@ -22,7 +22,8 @@ use crash::crash_handler;
 
 #[derive(Copy, Clone)]
 pub enum ExitStatus {
-    /// Linting was successful and there were no linting errors.
+    /// Linting was successful and there were no linting errors, though there
+    /// may have been warnings.
     Success,
     /// Linting was successful but there were linting errors.
     Failure,
@@ -172,9 +173,10 @@ fn consume_diagnostics(workspace: &Workspace, diagnostics: Reports) -> Result<Ex
             pluralise!(err_count),
             pluralise!(warn_count)
         );
-
-        return Ok(ExitStatus::Failure);
     }
 
-    Ok(ExitStatus::Success)
+    // A warning points out something that is likely wrong, such as another
+    // dialect's syntax, but doesn't stop a template from being checked or
+    // formatted, so only errors fail the run.
+    if err_count != 0 { Ok(ExitStatus::Failure) } else { Ok(ExitStatus::Success) }
 }
