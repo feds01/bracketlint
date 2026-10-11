@@ -14,7 +14,7 @@ ok            templates/corporate/activity/installation_activity_table.html
 ok            templates/corporate/activity/remote_activity_key.html
 ok            templates/corporate/apps.html
 ok            templates/corporate/attribution.html
-unstable      templates/corporate/billing/billing.html
+ok            templates/corporate/billing/billing.html
 ok            templates/corporate/billing/demo_organization_billing_disabled.html
 ok            templates/corporate/billing/event_status.html
 ok            templates/corporate/billing/legacy_server_login.html
@@ -73,7 +73,7 @@ ok            templates/corporate/support/demo_request.html
 ok            templates/corporate/support/next_plan_details.html
 ok            templates/corporate/support/next_plan_forms_support.html
 ok            templates/corporate/support/push_status_details.html
-unstable      templates/corporate/support/realm_details.html
+ok            templates/corporate/support/realm_details.html
 ok            templates/corporate/support/remote_realm_details.html
 ok            templates/corporate/support/remote_server_support.html
 ok            templates/corporate/support/sales_support_request.html
@@ -92,8 +92,8 @@ ok            templates/corporate/zulipchat_migration_tos.html
 ok            templates/tests/test_markdown.html
 ok            templates/two_factor/_wizard_forms.html
 ok            templates/zerver/accounts_accept_terms.html
-unstable      templates/zerver/accounts_send_confirm.html
-unstable      templates/zerver/app/index.html
+ok            templates/zerver/accounts_send_confirm.html
+ok            templates/zerver/app/index.html
 ok            templates/zerver/base.html
 ok            templates/zerver/close_window.html
 ok            templates/zerver/config_error/apple.html
@@ -120,7 +120,7 @@ ok            templates/zerver/create_realm/realm_creation_base_form_fields.html
 ok            templates/zerver/create_realm/realm_creation_import_form_field.html
 ok            templates/zerver/create_realm/realm_creation_name_form_field.html
 ok            templates/zerver/create_realm/realm_creation_subdomain_form_field.html
-unstable      templates/zerver/create_user/accounts_home.html
+ok            templates/zerver/create_user/accounts_home.html
 ok            templates/zerver/create_user/change_email_address_visibility_modal.html
 ok            templates/zerver/create_user/new_user_email_address_visibility.html
 ok            templates/zerver/create_user/register.html
@@ -130,7 +130,7 @@ ok            templates/zerver/desktop_login.html
 ok            templates/zerver/desktop_redirect.html
 ok            templates/zerver/dev_env_email_access_details.html
 ok            templates/zerver/development/dev_help.html
-unstable      templates/zerver/development/dev_login.html
+ok            templates/zerver/development/dev_login.html
 ok            templates/zerver/development/dev_tools.html
 ok            templates/zerver/development/email_log.html
 ok            templates/zerver/development/help_center_instructions_macro.html
@@ -151,7 +151,7 @@ ok            templates/zerver/emails/demo_request.html
 ok            templates/zerver/emails/digest.html
 ok            templates/zerver/emails/email_base_default.html
 ok            templates/zerver/emails/email_base_marketing.html
-unstable      templates/zerver/emails/email_base_messages.html
+ok            templates/zerver/emails/email_base_messages.html
 ok            templates/zerver/emails/error_processing_invoice.html
 ok            templates/zerver/emails/find_team.html
 ok            templates/zerver/emails/internal_billing_notice.html
@@ -184,7 +184,7 @@ ok            templates/zerver/integrations/macros.html
 ok            templates/zerver/invalid_email.html
 ok            templates/zerver/invalid_realm.html
 ok            templates/zerver/log_into_subdomain_token_invalid.html
-unstable      templates/zerver/login.html
+ok            templates/zerver/login.html
 ok            templates/zerver/marketing_nav.html
 ok            templates/zerver/marketing_page.html
 ok            templates/zerver/meta_tags.html

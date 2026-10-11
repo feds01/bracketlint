@@ -11,7 +11,7 @@ ok            _includes/cv/nested_list.liquid
 ok            _includes/cv/time_table.liquid
 ok            _includes/disqus.liquid
 ok            _includes/distill_scripts.liquid
-unstable      _includes/figure.liquid
+ok            _includes/figure.liquid
 ok            _includes/footer.liquid
 ok            _includes/giscus.liquid
 ok            _includes/head.liquid

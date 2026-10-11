@@ -1,0 +1,11 @@
+// run=pass, stage=fmt, dialect=jinja
+
+{% block content %}
+<!-- A comment that
+spans two lines -->
+<div>
+    <button onclick="
+        go(1);
+    ">Go</button>
+</div>
+{% endblock %}
