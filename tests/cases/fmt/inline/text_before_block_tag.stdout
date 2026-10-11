@@ -1,0 +1,7 @@
+<p>
+    <label>{{ date_label }}</label>
+    {% with widget=date %}
+        {% include widget.template_name %}{% endwith %}
+    <br>
+</p>
+

@@ -38,7 +38,7 @@ ok            django/contrib/admin/templates/admin/widgets/foreign_key_raw_id.ht
 ok            django/contrib/admin/templates/admin/widgets/many_to_many_raw_id.html
 ok            django/contrib/admin/templates/admin/widgets/radio.html
 ok            django/contrib/admin/templates/admin/widgets/related_widget_wrapper.html
-unstable      django/contrib/admin/templates/admin/widgets/split_datetime.html
+ok            django/contrib/admin/templates/admin/widgets/split_datetime.html
 ok            django/contrib/admin/templates/admin/widgets/time.html
 ok            django/contrib/admin/templates/admin/widgets/url.html
 ok            django/contrib/admin/templates/registration/logged_out.html
