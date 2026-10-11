@@ -1841,10 +1841,16 @@ impl<'s, 'a> Parser<'s, 'a> {
                 };
                 let (reverse_modifier, params) = g.parse_loop_modifiers()?;
 
-                let guard = if g.parse_token_fast(TokenKind::Keyword(Keyword::If)).is_some() {
-                    Some(g.parse_expr()?)
-                } else {
+                // The loop's filter can have operators in [Jinja], e.g.
+                // `{% for e in errors if e is string %}`.
+                //
+                // [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L245-L246
+                let guard = if g.parse_token_fast(TokenKind::Keyword(Keyword::If)).is_none() {
                     None
+                } else if g.options.dialect.loop_filter_takes_operators() {
+                    Some(g.parse_compound_expr(0)?)
+                } else {
+                    Some(g.parse_expr()?)
                 };
 
                 Ok((target, iterator, reverse_modifier, params, guard))
@@ -2901,7 +2907,12 @@ impl<'s, 'a> Parser<'s, 'a> {
         }
     }
 
+    /// Parse the assignments of a `{% with %}` block, which are separated by
+    /// commas in [Jinja], and by spaces in Django.
+    ///
+    /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L273-L284
     fn parse_assignments(&mut self) -> ParseResult<AstNodes<'a, ast::Assignment<'a>>> {
+        let commas = self.options.dialect.with_assignments_take_operators();
         let mut assignments = self.arena.vec();
         let start = self.current_pos();
 
@@ -2913,6 +2924,10 @@ impl<'s, 'a> Parser<'s, 'a> {
                     self.add_error(err);
                     break;
                 }
+            }
+
+            if commas && self.parse_token_fast(TokenKind::Comma).is_none() {
+                break;
             }
         }
 
@@ -2927,7 +2942,15 @@ impl<'s, 'a> Parser<'s, 'a> {
             (Some(Token { kind, .. }), Some(tok!(Eq))) if kind.is_ident_like() => {
                 let name = self.parse_name()?;
                 self.skip_fast(TokenKind::Eq); // `<eq>` Skip the assignment operator token.
-                let value = self.parse_expr()?;
+
+                // A value can have operators in [Jinja], e.g. `classes or []`.
+                //
+                // [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L273-L284
+                let value = if self.options.dialect.with_assignments_take_operators() {
+                    self.parse_compound_expr(0)?
+                } else {
+                    self.parse_expr()?
+                };
                 Ok(Some(self.node_with_joined_span(ast::Assignment { name, value }, start)))
             }
             // [Django]'s `value as name`, e.g.

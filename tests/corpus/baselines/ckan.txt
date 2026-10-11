@@ -16,7 +16,7 @@ ok            ckan/templates/development/snippets/form.html
 ok            ckan/templates/development/snippets/form_stages.html
 ok            ckan/templates/development/snippets/list.html
 ok            ckan/templates/development/snippets/media_grid.html
-parse-error   ckan/templates/development/snippets/module.html
+ok            ckan/templates/development/snippets/module.html
 ok            ckan/templates/development/snippets/nav.html
 ok            ckan/templates/development/snippets/page_header.html
 ok            ckan/templates/development/snippets/pagination.html
@@ -157,7 +157,7 @@ ok            ckan/templates/snippets/csrf_input.html
 ok            ckan/templates/snippets/custom_form_fields.html
 ok            ckan/templates/snippets/datapusher_status.html
 ok            ckan/templates/snippets/disqus_trackback.html
-parse-error   ckan/templates/snippets/facet_list.html
+ok            ckan/templates/snippets/facet_list.html
 ok            ckan/templates/snippets/follow_button.html
 ok            ckan/templates/snippets/group_item.html
 ok            ckan/templates/snippets/home_breadcrumb_item.html

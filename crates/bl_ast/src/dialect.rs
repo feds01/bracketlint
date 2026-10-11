@@ -469,6 +469,25 @@ impl Dialect {
         matches!(self, Dialect::Jinja | Dialect::Nunjucks | Dialect::Twig)
     }
 
+    /// Whether the filter of a `for` loop is an expression, which can have
+    /// operators, e.g. `{% for e in errors if e is string %}`, as in [Jinja].
+    ///
+    /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L245-L246
+    pub fn loop_filter_takes_operators(self) -> bool {
+        matches!(self, Dialect::Jinja)
+    }
+
+    /// Whether the assignments of a `{% with %}` block are separated by
+    /// commas, and their values are expressions, which can have operators,
+    /// e.g. `{% with classes = classes or [], level = 1 %}`, as in [Jinja].
+    /// Django's are separated by spaces, and their values are a value with
+    /// its filters.
+    ///
+    /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L273-L284
+    pub fn with_assignments_take_operators(self) -> bool {
+        matches!(self, Dialect::Jinja)
+    }
+
     /// Whether a block can be written as a single tag whose content is the
     /// value of an expression, e.g. `{% block title page_title|title %}`, as
     /// in [Twig].

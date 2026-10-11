@@ -1,0 +1,52 @@
+info: parsed module '$DIR/with_jinja.html' as jinja:
+body
+├─set
+│ ├─assignments
+│ │ ├─assignment
+│ │ │ ├─name "classes"
+│ │ │ └─bin_expr
+│ │ │   ├─lhs
+│ │ │   │ └─var_expr
+│ │ │   │   └─name "classes"
+│ │ │   ├─operator `or`
+│ │ │   └─rhs
+│ │ │     └─array_expr
+│ │ └─assignment
+│ │   ├─name "hn"
+│ │   └─bin_expr
+│ │     ├─lhs
+│ │     │ └─var_expr
+│ │     │   └─name "heading_level"
+│ │     ├─operator `or`
+│ │     └─rhs
+│ │       └─lit_expr
+│ │         └─int_lit 1
+│ └─body
+│   └─inline
+│     └─var_expr
+│       └─name "hn"
+└─for
+  ├─target
+  │ └─name "e"
+  ├─iterator
+  │ └─access_expr
+  │   ├─subject
+  │   │ └─var_expr
+  │   │   └─name "field"
+  │   └─field
+  │     └─name "errors"
+  ├─loop_body
+  │ └─body
+  │   └─inline
+  │     └─var_expr
+  │       └─name "e"
+  └─guard
+    └─bin_expr
+      ├─lhs
+      │ └─var_expr
+      │   └─name "e"
+      ├─operator `is`
+      └─rhs
+        └─var_expr
+          └─name "string"
+
