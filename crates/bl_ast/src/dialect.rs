@@ -7,7 +7,7 @@ use strum::{Display, EnumString, IntoStaticStr, VariantArray};
 
 use crate::{
     BinOp, UnaryOp,
-    keywords::{self, Keyword, Name},
+    keywords::{Keyword, KeywordTable},
 };
 
 /// The template language that a file is written in. It is either given with
@@ -232,7 +232,7 @@ impl Dialect {
     /// [Django]: https://docs.djangoproject.com/en/stable/ref/templates/builtins/#if
     /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#if
     /// [Twig]: https://twig.symfony.com/doc/3.x/tags/if.html
-    pub fn elif_tag(self) -> &'static str {
+    pub const fn elif_tag(self) -> &'static str {
         if self.is_liquid() { "elsif" } else { "elif" }
     }
 
@@ -251,16 +251,19 @@ impl Dialect {
     /// The keyword that the identifier `name` is in the dialect, if any.
     /// Liquid has keywords of its own, and spells `elif` as `elsif`.
     pub fn keyword(self, name: &str) -> Option<Keyword> {
-        let name = Name::new(name);
-        if name == Name::new(self.elif_tag()) {
-            return Some(Keyword::Elif);
-        }
+        // Each dialect's keywords are in a table of its own, built at compile time.
+        static DJANGO: KeywordTable = KeywordTable::of(Dialect::Django);
+        static JINJA: KeywordTable = KeywordTable::of(Dialect::Jinja);
+        static LIQUID: KeywordTable = KeywordTable::of(Dialect::Liquid);
+        static TWIG: KeywordTable = KeywordTable::of(Dialect::Twig);
 
-        match self {
-            Dialect::Liquid if name == Name::new("elif") => None,
-            Dialect::Liquid => keywords::liquid_keyword(name).or_else(|| keywords::keyword(name)),
-            _ => keywords::keyword(name),
-        }
+        let table = match self {
+            Dialect::Django => &DJANGO,
+            Dialect::Jinja => &JINJA,
+            Dialect::Liquid => &LIQUID,
+            Dialect::Twig => &TWIG,
+        };
+        table.get(name)
     }
 
     /// How tightly the binary operator `op` binds, as the binding powers of
@@ -409,8 +412,8 @@ impl Dialect {
 
     /// Check if its currently Liquid dialect.
     #[inline]
-    pub fn is_liquid(self) -> bool {
-        self == Dialect::Liquid
+    pub const fn is_liquid(self) -> bool {
+        matches!(self, Dialect::Liquid)
     }
 }
 
