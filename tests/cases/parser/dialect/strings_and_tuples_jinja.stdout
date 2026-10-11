@@ -1,0 +1,48 @@
+info: parsed module '$DIR/strings_and_tuples_jinja.html' as jinja:
+body
+├─inline
+│ └─call_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "_"
+│   └─args
+│     └─arg
+│       └─lit_expr
+│         └─str_lit "API Token created: <code>"
+     "{token}</code>"
+├─inline
+│ └─tuple_expr
+│   └─bin_expr
+│     ├─lhs
+│     │ └─call_expr
+│     │   ├─subject
+│     │   │ └─access_expr
+│     │   │   ├─subject
+│     │   │   │ └─var_expr
+│     │   │   │   └─name "h"
+│     │   │   └─field
+│     │   │     └─name "humanize_entity_type"
+│     │   └─args
+│     │     ├─arg
+│     │     │ └─lit_expr
+│     │     │   └─str_lit 'group'
+│     │     └─arg
+│     │       └─var_expr
+│     │         └─name "group_type"
+│     ├─operator `or`
+│     └─rhs
+│       └─call_expr
+│         ├─subject
+│         │ └─var_expr
+│         │   └─name "_"
+│         └─args
+│           └─arg
+│             └─lit_expr
+│               └─str_lit 'Group Form'
+└─inline
+  └─tuple_expr
+    ├─var_expr
+    │ └─name "a"
+    └─var_expr
+      └─name "b"
+

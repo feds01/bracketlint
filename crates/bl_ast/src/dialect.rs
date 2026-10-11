@@ -297,6 +297,22 @@ impl Dialect {
         matches!(self, Dialect::Jinja)
     }
 
+    /// Whether items separated by commas in `{{ }}` are a tuple without its
+    /// parentheses, e.g. `{{ a, b }}`, as in [Jinja].
+    ///
+    /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L1019-L1022
+    pub fn variables_take_bare_tuples(self) -> bool {
+        matches!(self, Dialect::Jinja)
+    }
+
+    /// Whether strings written one after another are one string, as Python's
+    /// are, e.g. `"a" "b"` is `"ab"`, as in [Jinja].
+    ///
+    /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L662-L669
+    pub fn adjacent_strings_concatenate(self) -> bool {
+        matches!(self, Dialect::Jinja)
+    }
+
     /// Whether items separated by commas in brackets are a list, e.g.
     /// `['a', 'b']`, as in [Jinja], an array in [Nunjucks], and a sequence in
     /// [Twig].
