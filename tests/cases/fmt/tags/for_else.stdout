@@ -1,8 +1,8 @@
 <ul>
-{% for item in items %}
+    {% for item in items %}
         <li>{{ item }}</li>
-        {%- else -%}
-            <li>None</li>
+    {%- else -%}
+        <li>None</li>
     {% endfor %}
-    </ul>
+</ul>
 

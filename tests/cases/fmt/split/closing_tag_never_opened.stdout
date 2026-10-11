@@ -1,0 +1,8 @@
+<div>
+    {% if x %}
+        <p>a</p>
+    {% endif %}
+    </span>
+    <p>b</p>
+</div>
+

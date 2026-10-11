@@ -1,0 +1,10 @@
+<p>
+    {% if url %}
+        <a href="{{ url }}">
+    {% endif %}
+        {{ label }}
+        {% if url %}
+        </a>
+        {% endif %}
+</p>
+

@@ -16,7 +16,7 @@
 //! request with it, and `just corpus-compare` shows it.
 #![cfg(test)]
 
-mod check;
+pub(crate) mod check;
 mod compare;
 mod report;
 mod source;

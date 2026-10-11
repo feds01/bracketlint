@@ -6,5 +6,5 @@
     echo "Free shipping"
   endif
 -%}
-    </div>
+</div>
 

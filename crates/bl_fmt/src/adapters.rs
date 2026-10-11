@@ -1,11 +1,16 @@
 #![allow(dead_code)]
 
 use core::fmt;
+use std::rc::Rc;
 
-use bl_ast::{Dialect, SourceId, SpannedSource};
+use bl_ast::{ByteRange, Dialect, SourceId, SpannedSource};
 use derive_more::Constructor;
 
-use crate::{diagnostics::FmtResult, options::FormatterOptions};
+use crate::{
+    diagnostics::FmtResult,
+    dialects::html::{implied_ends, is_verbatim, keeps_whitespace},
+    options::FormatterOptions,
+};
 
 /// The type of language that the code is written in. These can be encountered
 /// when iterating through templates that are scanned by `brackelint`.
@@ -23,11 +28,6 @@ pub enum LanguageType {
     /// Unknown language.
     Text,
 }
-
-/// The elements whose content can't be laid out as other HTML is: whitespace
-/// matters in `<pre>` and `<textarea>`, and `<script>` and `<style>` hold
-/// code. Like any element name in HTML, they are matched regardless of case.
-pub const VERBATIM_ELEMENTS: [&str; 4] = ["pre", "textarea", "script", "style"];
 
 impl LanguageType {
     /// The element that holds code in the language within HTML, e.g. `style`
@@ -113,6 +113,12 @@ pub struct FormatterContext<'s> {
     /// encountered. This is used to determine the language that
     /// the code is written in.
     pub state: TerminalState,
+
+    /// The names of the HTML elements that are open, outermost first, which
+    /// the template opened in a piece of HTML before a tag and hasn't closed
+    /// yet. Each indents what is inside it, as a block does. Each block keeps
+    /// a copy, which shares the names.
+    pub open_elements: Vec<Rc<str>>,
 }
 
 impl<'s> FormatterContext<'s> {
@@ -132,10 +138,76 @@ impl<'s> FormatterContext<'s> {
         self.state.language
     }
 
-    /// Get the current indent level.
+    /// Get the current indent level, of the blocks and the elements that are
+    /// open.
     #[inline(always)]
     pub fn indent_level(&self) -> u16 {
-        self.state.indent
+        let depth = u16::try_from(self.open_elements.len()).unwrap_or(u16::MAX);
+        self.state.indent.saturating_add(depth.saturating_mul(self.indent_step() as u16))
+    }
+
+    /// Whether the innermost open element is one whose content is kept as it
+    /// is written, see [is_verbatim], e.g. a `<script>` that a tag splits.
+    pub fn in_verbatim(&self) -> bool {
+        self.open_elements.last().is_some_and(|name| is_verbatim(name))
+    }
+
+    /// Whether the innermost open element is one whose whitespace matters, see
+    /// [keeps_whitespace].
+    pub fn keeps_whitespace(&self) -> bool {
+        self.open_elements.last().is_some_and(|name| keeps_whitespace(name))
+    }
+
+    /// Close the open element `name`, and any element opened inside it that
+    /// is still open, as HTML does, e.g. an `<li>` at a `</ul>`. A closing tag
+    /// of an element that isn't open closes nothing.
+    pub(crate) fn close_element(&mut self, name: &str) {
+        let open =
+            self.open_elements.iter().rposition(|element| element.eq_ignore_ascii_case(name));
+        if let Some(index) = open {
+            self.open_elements.truncate(index);
+        }
+
+        self.state.language = self.element_language();
+    }
+
+    /// Open the elements `names`, outermost first, each closing the elements
+    /// that it implies the end of, see [Self::close_implied].
+    pub(crate) fn open_elements(&mut self, names: impl IntoIterator<Item = String>) {
+        for name in names {
+            self.close_implied(&name);
+            self.open_elements.push(name.into());
+        }
+
+        self.state.language = self.element_language();
+    }
+
+    /// Close the open elements whose end an element `name` implies when it
+    /// opens, see [implied_ends], e.g. the `<li>` before an `<li>`.
+    pub(crate) fn close_implied(&mut self, name: &str) {
+        let ends = implied_ends(name);
+        while self
+            .open_elements
+            .last()
+            .is_some_and(|open| ends.iter().any(|end| open.eq_ignore_ascii_case(end)))
+        {
+            self.open_elements.pop();
+        }
+
+        self.state.language = self.element_language();
+    }
+
+    /// Set the open elements to `elements`, e.g. those at the start of a block
+    /// that each of its branches starts from.
+    pub(crate) fn set_open_elements(&mut self, elements: Vec<Rc<str>>) {
+        self.open_elements = elements;
+        self.state.language = self.element_language();
+    }
+
+    /// The language of the text in the innermost open element, e.g. CSS in a
+    /// `<style>` that a tag splits.
+    fn element_language(&self) -> LanguageType {
+        self.open_elements.last().map_or(LanguageType::Html, |name| LanguageType::of_element(name))
     }
 
     pub fn indent_step(&self) -> u8 {
@@ -153,14 +225,47 @@ impl<'s> FormatterContext<'s> {
     }
 }
 
+/// A part of a piece of HTML between template tags, see
+/// [HasHTMLParsing::format].
+#[derive(Debug)]
+pub enum HtmlPart {
+    /// The HTML at `range` in the piece, formatted, or `None` if it doesn't
+    /// parse, in which case it is kept as it is written. It leaves the
+    /// elements `opens` open, outermost first.
+    Html { range: ByteRange, formatted: Option<String>, opens: Vec<String> },
+
+    /// The content at `range` in the piece of one of the verbatim elements,
+    /// see [is_verbatim], e.g. the code of a `<script>`, which is kept exactly
+    /// as it is written.
+    Verbatim { range: ByteRange },
+
+    /// The closing tag at `range` in the piece of an element `name` that opens
+    /// before the piece, e.g. the `</li>` in `{% endif %}</li>`.
+    Close { range: ByteRange, name: String },
+}
+
+impl HtmlPart {
+    /// The part, with its range moved by `offset`, e.g. from a slice of its
+    /// piece to the piece.
+    pub fn shift(self, offset: usize) -> Self {
+        let shift = |range: ByteRange| ByteRange::new(range.start() + offset, range.end() + offset);
+        match self {
+            HtmlPart::Html { range, formatted, opens } => {
+                HtmlPart::Html { range: shift(range), formatted, opens }
+            }
+            HtmlPart::Verbatim { range } => HtmlPart::Verbatim { range: shift(range) },
+            HtmlPart::Close { range, name } => HtmlPart::Close { range: shift(range), name },
+        }
+    }
+}
+
 /// A trait that represents a type that has the capability to parse HTML.
 pub trait HasHTMLParsing<'ctx> {
-    /// Format `contents`, or return `None` if they don't parse, in which case
-    /// they are kept as they are written.
-    fn format(&mut self, contents: &str) -> FmtResult<Option<String>>;
-
-    /// Get the [TerminalState] of the parser.
-    fn into_state(self) -> TerminalState;
+    /// Format `contents`, a piece of HTML between template tags, in its
+    /// parts: the closing tags of elements that open before it, the content
+    /// of the verbatim elements in it, see [is_verbatim], and the HTML between
+    /// them. A part is never empty.
+    fn format(&mut self, contents: &str) -> FmtResult<Vec<HtmlPart>>;
 }
 
 /// A trait that represents a type that has the capability to parse CSS.

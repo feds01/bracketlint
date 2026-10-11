@@ -2,5 +2,5 @@
 {% comment %}Not rendered{% endcomment %}
 
     <p>{{ product.title }}</p>
-    </div>
+</div>
 

@@ -1,6 +1,6 @@
 <ul>
-{%- for item in cart.items -%}
+    {%- for item in cart.items -%}
         <li>{{- item.title -}}</li>
-        {%- endfor -%}
-        </ul>
+    {%- endfor -%}
+</ul>
 

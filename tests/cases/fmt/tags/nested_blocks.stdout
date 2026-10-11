@@ -1,8 +1,8 @@
 {% block outer %}
     <div>
-{% block inner %}    
-        <p>inner</p>
-{% endblock %}
-</div>
+        {% block inner %}
+            <p>inner</p>
+        {% endblock %}
+    </div>
 {% endblock %}
 

@@ -1,4 +1,4 @@
-unstable      _includes/disqus_comments.html
+ok            _includes/disqus_comments.html
 ok            _includes/footer.html
 ok            _includes/google-analytics.html
 ok            _includes/head.html

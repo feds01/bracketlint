@@ -123,7 +123,7 @@ fn check(dialect: Dialect, contents: &str) -> Outcome {
 }
 
 /// Parse and format `contents` in `dialect`, as `bracketlint fmt` does.
-fn format(dialect: Dialect, contents: &str) -> Result<String, Outcome> {
+pub(crate) fn format(dialect: Dialect, contents: &str) -> Result<String, Outcome> {
     let mut members = WorkspaceMembers::new();
     let id = members.reserve_member(PathBuf::from("template"), contents.to_string(), dialect);
     let member = members.member(id);
