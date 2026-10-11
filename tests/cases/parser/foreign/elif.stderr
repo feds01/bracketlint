@@ -5,4 +5,4 @@ warning: `{% elif %}` isn't a tag in Liquid
   |               ----
   |
   = note: this file is parsed as Liquid, from its `.liquid` extension
-  = help: `{% elif %}` is how Django, Jinja and Twig write `{% elsif %}`, pass `--dialect` with the template's dialect if it is one of them
+  = help: `{% elif %}` is how Django and Jinja write `{% elsif %}`, pass `--dialect` with the template's dialect if it is one of them

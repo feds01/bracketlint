@@ -1,0 +1,8 @@
+warning: `{% elif %}` isn't a tag in Twig
+ --> $DIR/elif_in_twig.twig:1:15
+  |
+1 | {% if a %}x{% elif b %}y{% endif %}
+  |               ----
+  |
+  = note: this file is parsed as Twig, from its `.twig` extension
+  = help: `{% elif %}` is how Django and Jinja write `{% elseif %}`, pass `--dialect` with the template's dialect if it is one of them

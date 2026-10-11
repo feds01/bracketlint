@@ -523,9 +523,16 @@ mod tests {
                 assert_eq!(dialect.keyword(text), expected, "{text:?} in {dialect}");
             }
 
-            let (elif, other) = if liquid { ("elsif", "elif") } else { ("elif", "elsif") };
+            // Each dialect has its own spelling of `elif`, and none of the others'.
+            let elif = match dialect {
+                Dialect::Liquid => "elsif",
+                Dialect::Twig => "elseif",
+                Dialect::Django | Dialect::Jinja => "elif",
+            };
             assert_eq!(dialect.keyword(elif), Some(Keyword::Elif), "{elif:?} in {dialect}");
-            assert_eq!(dialect.keyword(other), None, "{other:?} in {dialect}");
+            for other in ["elif", "elsif", "elseif"].into_iter().filter(|other| *other != elif) {
+                assert_eq!(dialect.keyword(other), None, "{other:?} in {dialect}");
+            }
 
             for name in ["", "item", "fors", "fo", "endforx", "a_name_that_is_long", "For"] {
                 assert_eq!(dialect.keyword(name), None, "{name:?} in {dialect}");
@@ -535,7 +542,8 @@ mod tests {
 
     #[test]
     fn names_pack_apart() {
-        let names = ["", "a", "a\0", "for", "for\0", "fo", "endtablerow", "elsif", "elif"];
+        let names =
+            ["", "a", "a\0", "for", "for\0", "fo", "endtablerow", "elsif", "elif", "elseif"];
         for (index, name) in names.iter().enumerate() {
             for other in &names[index + 1..] {
                 assert_ne!(Name::new(name), Name::new(other), "{name:?} and {other:?}");

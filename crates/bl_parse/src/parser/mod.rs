@@ -424,8 +424,8 @@ impl<'s, 'a> Parser<'s, 'a> {
     /// tags, since the template is likely written in that dialect:
     ///
     /// - The tag that starts an `elif` clause, which is `elsif` in
-    ///   [Liquid][Liquid `elsif`], and `elif` in [Django][Django `if`],
-    ///   [Jinja][Jinja `if`] and [Twig][Twig `if`].
+    ///   [Liquid][Liquid `elsif`], `elseif` in [Twig][Twig `if`], and `elif` in
+    ///   [Django][Django `if`] and [Jinja][Jinja `if`].
     /// - The tags of a block that is output as written, which are `raw` and
     ///   `endraw` in [Jinja][Jinja `raw`] and [Liquid][Liquid `raw`], and
     ///   `verbatim` and `endverbatim` in [Django][Django `verbatim`] and

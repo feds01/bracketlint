@@ -248,15 +248,19 @@ impl Dialect {
         matches!(self, Dialect::Django)
     }
 
-    /// How the dialect spells `elif`, which is `elsif` in [Liquid], and `elif`
-    /// in [Django], [Jinja] and [Twig].
+    /// How the dialect spells `elif`, which is `elsif` in [Liquid], `elseif` in
+    /// [Twig], and `elif` in [Django] and [Jinja].
     ///
     /// [Liquid]: https://shopify.github.io/liquid/tags/control-flow/#elsif--else
+    /// [Twig]: https://twig.symfony.com/doc/3.x/tags/if.html
     /// [Django]: https://docs.djangoproject.com/en/stable/ref/templates/builtins/#if
     /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#if
-    /// [Twig]: https://twig.symfony.com/doc/3.x/tags/if.html
     pub const fn elif_tag(self) -> &'static str {
-        if self.is_liquid() { "elsif" } else { "elif" }
+        match self {
+            Dialect::Liquid => "elsif",
+            Dialect::Twig => "elseif",
+            Dialect::Django | Dialect::Jinja => "elif",
+        }
     }
 
     /// The tag that starts the body of a loop for when there is nothing to
@@ -655,6 +659,8 @@ mod test_super {
         assert_eq!(Dialect::Jinja.keyword("elsif"), None);
         assert_eq!(Dialect::Liquid.keyword("elsif"), Some(Keyword::Elif));
         assert_eq!(Dialect::Liquid.keyword("elif"), None);
+        assert_eq!(Dialect::Twig.keyword("elseif"), Some(Keyword::Elif));
+        assert_eq!(Dialect::Twig.keyword("elif"), None);
 
         assert_eq!(Dialect::Liquid.keyword("unless"), Some(Keyword::Unless));
         assert_eq!(Dialect::Django.keyword("unless"), None);
@@ -730,7 +736,7 @@ mod test_super {
         );
         assert_eq!(
             help(Dialect::Liquid, Syntax::ElifTag("elif")),
-            "`{% elif %}` is how Django, Jinja and Twig write `{% elsif %}`, pass `--dialect` \
+            "`{% elif %}` is how Django and Jinja write `{% elsif %}`, pass `--dialect` \
              with the template's dialect if it is one of them"
         );
         assert_eq!(

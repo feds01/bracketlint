@@ -1,0 +1,19 @@
+info: parsed module '$DIR/elif_in_twig.twig' as twig:
+body
+└─if
+  └─clauses
+    └─if_clause
+      ├─condition
+      │ └─var_expr
+      │   └─name "a"
+      └─clause_body
+        └─body
+          ├─text
+          ├─generic_tag
+          │ ├─name "elif"
+          │ └─args
+          │   └─arg
+          │     └─var_expr
+          │       └─name "b"
+          └─text
+
