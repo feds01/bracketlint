@@ -1,0 +1,4 @@
+// run=pass, stage=fmt
+
+<textarea {%- if params.spellcheck !== undefined %} spellcheck="{{ params.spellcheck }}"{% endif %}>{{ params.value }}</textarea>
+<label {{- govukAttributes({for: id}) }}>{{ params.label }}</label>

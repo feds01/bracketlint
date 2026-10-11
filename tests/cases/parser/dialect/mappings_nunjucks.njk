@@ -1,0 +1,4 @@
+// run=pass, stage=check
+
+{{ govukAttributes({for: id, 'data-module': "govuk-input", "class": classes}) }}
+{% set item = {text: item.text, checked: item.value in values} %}

@@ -152,6 +152,10 @@ define_tree! {
         Eq,
         /// !=
         NotEq,
+        /// `===`, equal without converting either side, in Nunjucks
+        StrictEq,
+        /// `!==`, not equal without converting either side, in Nunjucks
+        StrictNotEq,
         /// `and``
         And,
         /// `or`
@@ -205,6 +209,8 @@ define_tree! {
                 BinOp::LtEq => write!(f, "<="),
                 BinOp::Eq => write!(f, "=="),
                 BinOp::NotEq => write!(f, "!="),
+                BinOp::StrictEq => write!(f, "==="),
+                BinOp::StrictNotEq => write!(f, "!=="),
                 BinOp::And => write!(f, "and"),
                 BinOp::Or => write!(f, "or"),
                 BinOp::NotIn => write!(f, "not in"),
