@@ -256,6 +256,15 @@ impl Dialect {
         matches!(self, Dialect::Twig)
     }
 
+    /// Whether an argument of a call can be unpacked into several, as in
+    /// [Jinja]: the items of `*args` into positional arguments, and the pairs of
+    /// `**kwargs` into named ones, e.g. `url_for('.export', **request.args)`.
+    ///
+    /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L899-L906
+    pub fn call_args_can_be_unpacked(self) -> bool {
+        matches!(self, Dialect::Jinja)
+    }
+
     /// Whether a filter takes its arguments in parentheses, as a call does,
     /// e.g. `join(', ')`, as in [Jinja], [Nunjucks] and [Twig]. Django and
     /// Liquid write them after a `:` instead, see

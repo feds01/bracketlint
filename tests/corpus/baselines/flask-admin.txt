@@ -13,7 +13,7 @@ ok            flask_admin/templates/bootstrap4/admin/model/edit.html
 parse-error   flask_admin/templates/bootstrap4/admin/model/inline_field_list.html
 ok            flask_admin/templates/bootstrap4/admin/model/inline_form.html
 ok            flask_admin/templates/bootstrap4/admin/model/inline_list_base.html
-parse-error   flask_admin/templates/bootstrap4/admin/model/layout.html
+ok            flask_admin/templates/bootstrap4/admin/model/layout.html
 ok            flask_admin/templates/bootstrap4/admin/model/list.html
 ok            flask_admin/templates/bootstrap4/admin/model/modals/create.html
 ok            flask_admin/templates/bootstrap4/admin/model/modals/details.html
@@ -21,4 +21,4 @@ ok            flask_admin/templates/bootstrap4/admin/model/modals/edit.html
 ok            flask_admin/templates/bootstrap4/admin/model/row_actions.html
 ok            flask_admin/templates/bootstrap4/admin/rediscli/console.html
 ok            flask_admin/templates/bootstrap4/admin/rediscli/response.html
-parse-error   flask_admin/templates/bootstrap4/admin/static.html
+ok            flask_admin/templates/bootstrap4/admin/static.html

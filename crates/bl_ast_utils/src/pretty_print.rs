@@ -73,6 +73,12 @@ impl AstVisitor for AstTreePrinter<'_> {
 
         let mut nodes = vec![];
 
+        match node.body().unpack {
+            Some(ast::Unpack::Items) => nodes.push(TreeNode::leaf("unpack `*`")),
+            Some(ast::Unpack::Pairs) => nodes.push(TreeNode::leaf("unpack `**`")),
+            None => {}
+        }
+
         if let Some(name) = name {
             nodes.push(name);
         }

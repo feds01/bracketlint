@@ -1,0 +1,4 @@
+// run=pass, stage=check, dialect=jinja
+
+{{ url_for('.export', export_type=export_type, **request.args) }}
+{{ h.snippet(form_snippet, *items, pkg_dict=pkg_dict, **form_vars) }}
