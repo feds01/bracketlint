@@ -1,0 +1,6 @@
+ok            sphinx_rtd_theme/breadcrumbs.html
+ok            sphinx_rtd_theme/footer.html
+ok            sphinx_rtd_theme/layout.html
+ok            sphinx_rtd_theme/search.html
+ok            sphinx_rtd_theme/searchbox.html
+ok            sphinx_rtd_theme/versions.html

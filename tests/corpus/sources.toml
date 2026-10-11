@@ -69,6 +69,54 @@ paths = ["share/templates/base", "share/templates/basic", "share/templates/class
 extension = "j2"
 
 [[source]]
+name = "furo"
+dialect = "jinja"
+repo = "https://github.com/pradyunsg/furo.git"
+tag = "2025.12.19"
+paths = ["src/furo/theme/furo"]
+extension = "html"
+
+[[source]]
+name = "sphinx-rtd-theme"
+dialect = "jinja"
+repo = "https://github.com/readthedocs/sphinx_rtd_theme.git"
+tag = "3.1.0"
+paths = ["sphinx_rtd_theme"]
+extension = "html"
+
+[[source]]
+name = "mkdocs-material"
+dialect = "jinja"
+repo = "https://github.com/squidfunk/mkdocs-material.git"
+tag = "9.7.7"
+paths = ["src/templates"]
+extension = "html"
+
+[[source]]
+name = "ckan"
+dialect = "jinja"
+repo = "https://github.com/ckan/ckan.git"
+tag = "ckan-2.12.0"
+paths = ["ckan/templates"]
+extension = "html"
+
+[[source]]
+name = "zulip"
+dialect = "jinja"
+repo = "https://github.com/zulip/zulip.git"
+tag = "12.3"
+paths = ["templates"]
+extension = "html"
+
+[[source]]
+name = "flask-admin"
+dialect = "jinja"
+repo = "https://github.com/pallets-eco/flask-admin.git"
+tag = "v2.2.1"
+paths = ["flask_admin/templates"]
+extension = "html"
+
+[[source]]
 name = "symfony"
 dialect = "twig"
 repo = "https://github.com/symfony/symfony.git"
