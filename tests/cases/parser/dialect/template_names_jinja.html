@@ -1,0 +1,5 @@
+// run=pass, stage=check, dialect=jinja
+
+{% extends layout if layout is defined else "base.html" %}
+{% import "partials/languages/" ~ config.theme.language ~ ".html" as lang %}
+{% include ".icons/" ~ icon ~ ".svg" %}

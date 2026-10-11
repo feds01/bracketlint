@@ -104,7 +104,7 @@ ok            templates/label/null.html.twig
 ok            templates/label/undefined.html.twig
 parse-error   templates/layout.html.twig
 parse-error   templates/menu.html.twig
-parse-error   templates/page/content.html.twig
+ok            templates/page/content.html.twig
 parse-error   templates/page/login.html.twig
 parse-error   templates/page/login_minimal.html.twig
 parse-error   templates/symfony-form-themes/bootstrap_5_layout.html.twig

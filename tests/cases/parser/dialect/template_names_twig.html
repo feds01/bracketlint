@@ -1,0 +1,5 @@
+// run=pass, stage=check, dialect=twig
+
+{% extends standalone ? "minimum.html" : "base.html" %}
+{% import _self as menus %}
+{% include 'icons/' ~ icon ~ '.svg' %}

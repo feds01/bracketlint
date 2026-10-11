@@ -656,7 +656,7 @@ define_tree! {
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct Import {
-        pub template: Child!(StrLit),
+        pub template: Child!(Expr),
         pub names: Children!(Name),
     }
 
