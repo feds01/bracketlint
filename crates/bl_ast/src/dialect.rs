@@ -363,6 +363,16 @@ impl Dialect {
         matches!(self, Dialect::Nunjucks)
     }
 
+    /// Whether a keyword is a name in an expression, e.g. `{{ for }}` or the
+    /// parameter `for` of a macro, as in [Jinja], whose keywords are names
+    /// that only its tags read as keywords. The keywords that its expressions
+    /// have, such as `and` and `if`, aren't.
+    ///
+    /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L648-L661
+    pub fn keywords_are_names(self) -> bool {
+        matches!(self, Dialect::Jinja)
+    }
+
     /// Whether a string is translated when it is written `_("...")`, as in
     /// [Django], e.g. `{{ value|default:_("None") }}`. It is a string, rather
     /// than a call.

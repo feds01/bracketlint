@@ -64,7 +64,7 @@ ok            ckan/templates/macros/form/hidden_from_list.html
 ok            ckan/templates/macros/form/image_upload.html
 ok            ckan/templates/macros/form/info.html
 ok            ckan/templates/macros/form/input.html
-parse-error   ckan/templates/macros/form/input_block.html
+ok            ckan/templates/macros/form/input_block.html
 ok            ckan/templates/macros/form/markdown.html
 ok            ckan/templates/macros/form/prepend.html
 ok            ckan/templates/macros/form/required_message.html
