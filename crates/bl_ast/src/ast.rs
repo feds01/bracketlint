@@ -166,21 +166,21 @@ define_tree! {
         IsNot,
         /// `contains`, in Liquid
         Contains,
-        /// `+`, in Jinja and Twig
+        /// `+`, in Jinja, Nunjucks and Twig
         Add,
-        /// `-`, in Jinja and Twig
+        /// `-`, in Jinja, Nunjucks and Twig
         Sub,
-        /// `*`, in Jinja and Twig
+        /// `*`, in Jinja, Nunjucks and Twig
         Mul,
-        /// `/`, in Jinja and Twig
+        /// `/`, in Jinja, Nunjucks and Twig
         Div,
-        /// `//`, in Jinja and Twig
+        /// `//`, in Jinja, Nunjucks and Twig
         FloorDiv,
-        /// `%`, in Jinja and Twig
+        /// `%`, in Jinja, Nunjucks and Twig
         Mod,
-        /// `**`, in Jinja and Twig
+        /// `**`, in Jinja, Nunjucks and Twig
         Pow,
-        /// `~`, which concatenates strings, in Jinja and Twig
+        /// `~`, which concatenates strings, in Jinja, Nunjucks and Twig
         Concat,
         /// `??`, the value on its left unless it is null or undefined, in Twig
         Coalesce,
@@ -313,7 +313,8 @@ define_tree! {
         pub lit: Lit
     }
 
-    /// A list, e.g. `['a', 'b']` in Jinja, which Twig calls a sequence.
+    /// A list, e.g. `['a', 'b']` in Jinja, which Nunjucks calls an array and
+    /// Twig a sequence.
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct ArrayExpr {
@@ -350,7 +351,8 @@ define_tree! {
         pub expr: Child!(Expr),
     }
 
-    /// A mapping, e.g. `{'a': 1, b: 2}` in Jinja, where it is a dict, and Twig.
+    /// A mapping, e.g. `{'a': 1, b: 2}` in Jinja and Nunjucks, where it is a
+    /// dict, and Twig.
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct MappingExpr {
@@ -366,8 +368,8 @@ define_tree! {
         pub value: OptionalChild!(Expr),
     }
 
-    /// An expression in parentheses, e.g. `(a or b)` in Jinja and Twig, which
-    /// groups it.
+    /// An expression in parentheses, e.g. `(a or b)` in Jinja, Nunjucks and
+    /// Twig, which groups it.
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct GroupExpr {
@@ -790,6 +792,13 @@ define_tree! {
 
         /// The whitespace control of the clause's tag.
         pub trim: TrimMarker,
+
+        /// Whether the tag of an `elif` clause is spelled `elseif`, as [Twig]
+        /// spells it, and [Nunjucks] can, which also spells it `elif`.
+        ///
+        /// [Twig]: https://twig.symfony.com/doc/3.x/tags/if.html
+        /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#if
+        pub elseif: bool,
     }
 
     /// An `if` block consisting of the condition, block and an optional else clause

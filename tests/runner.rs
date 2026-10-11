@@ -1,5 +1,5 @@
 //! UI Test runner, this file will read the `cases` directory for
-//! `.html`, `.jinja`, `.liquid` and `.twig` files.
+//! `.html`, `.jinja`, `.liquid`, `.njk` and `.twig` files.
 //!
 //! In the event of a `should_pass` case, the resultant run should not return
 //! any errors. However, it's possible for the case to generate warnings
@@ -314,4 +314,4 @@ fn assert_formats_stably(test: &TestingInput, case: &CaseCopy) {
 }
 
 // Generate all the tests
-generate_tests!("./cases/", r"\.(html|jinja|liquid|twig)$", "ui", handle_test);
+generate_tests!("./cases/", r"\.(html|jinja|liquid|njk|twig)$", "ui", handle_test);

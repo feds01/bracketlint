@@ -1,0 +1,7 @@
+{% if params.html %}
+    {{ params.html | safe }}
+{% elseif params.text %}
+    {{ params.text }}
+{%- elif params.empty -%}
+{% endif %}
+

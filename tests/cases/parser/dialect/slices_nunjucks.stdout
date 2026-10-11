@@ -1,0 +1,11 @@
+info: parsed module '$DIR/slices_nunjucks.njk' as nunjucks:
+body
+└─inline
+  └─index_expr
+    ├─subject
+    │ └─var_expr
+    │   └─name "links"
+    └─index
+      └─lit_expr
+        └─int_lit 1
+

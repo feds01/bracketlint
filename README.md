@@ -39,7 +39,7 @@ $ bracketlint check templates/   # report problems in the templates
 $ bracketlint fmt templates/     # print the formatted templates
 ```
 
-Each file is read in the dialect that its extension names: `.jinja` is Jinja, `.liquid` is Liquid and `.twig` is Twig. Any other file, such as `.html`, is read as Django. To read every file in one dialect instead, pass `--dialect`:
+Each file is read in the dialect that its extension names: `.jinja` is Jinja, `.liquid` is Liquid, `.njk` is Nunjucks and `.twig` is Twig. Any other file, such as `.html`, is read as Django. To read every file in one dialect instead, pass `--dialect`:
 
 ```bash
 $ bracketlint check --dialect liquid theme/
