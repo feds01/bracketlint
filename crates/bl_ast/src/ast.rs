@@ -186,6 +186,14 @@ define_tree! {
         Coalesce,
         /// `?:`, the value on its left if it is truthy, in Twig
         Elvis,
+        /// `..`, the integers from its left to its right, in Twig
+        Range,
+        /// `matches`, whether a string matches a regular expression, in Twig
+        Matches,
+        /// `starts with`, in Twig
+        StartsWith,
+        /// `ends with`, in Twig
+        EndsWith,
     }
 
     impl fmt::Display for BinOp {
@@ -214,6 +222,10 @@ define_tree! {
                 BinOp::Concat => write!(f, "~"),
                 BinOp::Coalesce => write!(f, "??"),
                 BinOp::Elvis => write!(f, "?:"),
+                BinOp::Range => write!(f, ".."),
+                BinOp::Matches => write!(f, "matches"),
+                BinOp::StartsWith => write!(f, "starts with"),
+                BinOp::EndsWith => write!(f, "ends with"),
             }
         }
     }
@@ -318,6 +330,14 @@ define_tree! {
         pub condition: Child!(Expr),
         pub then: Child!(Expr),
         pub otherwise: OptionalChild!(Expr),
+    }
+
+    /// An arrow function in Twig, e.g. `x => x.name` or `(a, b) => a + b`.
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct ArrowExpr {
+        pub params: Children!(Name),
+        pub expr: Child!(Expr),
     }
 
     /// A mapping, e.g. `{'a': 1, b: 2}` in Jinja, where it is a dict, and Twig.
@@ -472,6 +492,7 @@ define_tree! {
         Group(GroupExpr),
         Mapping(MappingExpr),
         Cond(CondExpr),
+        Arrow(ArrowExpr),
         Bin(BinExpr),
         Var(VarExpr),
         Call(CallExpr),
@@ -485,6 +506,15 @@ define_tree! {
         pub fn is_var(&self) -> bool {
             matches!(self, Expr::Var(_))
         }
+    }
+
+    /// A Twig block whose content is the value of an expression, e.g.
+    /// `{% block title page_title|title %}`, which has no `{% endblock %}`.
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct BlockShortcut {
+        pub label: Child!(Name),
+        pub value: Child!(Expr),
     }
 
     /// A `block` tag, which can be used to define a block of code that can be
@@ -620,6 +650,16 @@ define_tree! {
     #[node]
     pub struct With {
         pub assignments: Children!(Assignment),
+
+        /// The variables of the block in Twig, which is an expression whose
+        /// value is a mapping, e.g. `{% with {a: 1} %}`, rather than
+        /// assignments.
+        pub value: OptionalChild!(Expr),
+
+        /// Whether the block only has its own variables, as `only` makes it in
+        /// Twig, e.g. `{% with {a: 1} only %}`.
+        pub only: bool,
+
         pub block_body: Child!(Body),
         pub kind: AssignmentKind,
 
@@ -875,6 +915,9 @@ define_tree! {
         /// The `{% block name %}` tag, ending with `{% endblock %}`
         Block(Child!(Block)),
 
+        /// The Twig `{% block name value %}` tag, which has no end
+        BlockShortcut(BlockShortcut),
+
         /// The `{% with x = 10 %}` tag, ending with `{% endwith %}`
         With(Child!(With)),
 
@@ -939,7 +982,7 @@ define_tree! {
                 Tag::Unprocessable(_) => "unprocessable",
                 Tag::Generic(_) => "generic tag",
                 Tag::Assignment(_) => "assignment",
-                Tag::Block(_) => "block",
+                Tag::Block(_) | Tag::BlockShortcut(_) => "block",
                 Tag::With(_) => "with",
                 Tag::MacroDef(_) => "macro",
                 Tag::Include(_) => "include",
@@ -958,7 +1001,7 @@ define_tree! {
         }
 
         pub fn is_inline(&self) -> bool {
-            matches!(self, Tag::Unprocessable(_) | Tag::Assignment(_) | Tag::Continue(_) | Tag::Break(_) | Tag::Generic(_) | Tag::Render(_) | Tag::Capture(_) | Tag::Liquid(_) )
+            matches!(self, Tag::Unprocessable(_) | Tag::Assignment(_) | Tag::Continue(_) | Tag::Break(_) | Tag::Generic(_) | Tag::Render(_) | Tag::Capture(_) | Tag::Liquid(_) | Tag::BlockShortcut(_) )
         }
 
     }

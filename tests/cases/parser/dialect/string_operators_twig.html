@@ -1,0 +1,7 @@
+// run=pass, stage=check, dialect=twig
+
+{% if name starts with 'F' %}{% endif %}
+{% if name ends with 'n' %}{% endif %}
+{% if phone matches '/^[\\d\\.]+$/' %}{% endif %}
+{% for i in 1..pages %}{% endfor %}
+{% for key, value in options ?? [] %}{% endfor %}

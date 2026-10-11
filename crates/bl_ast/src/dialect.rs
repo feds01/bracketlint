@@ -321,6 +321,51 @@ impl Dialect {
         matches!(self, Dialect::Twig)
     }
 
+    /// Whether a value can be an arrow function, as in [Twig], e.g.
+    /// `x => x.name` or `(a, b) => a + b`, which filters such as `map` take.
+    ///
+    /// [Twig]: https://github.com/twigphp/Twig/blob/v3.30.0/src/ExpressionParser/Infix/ArrowExpressionParser.php#L28-L32
+    pub fn has_arrow_functions(self) -> bool {
+        matches!(self, Dialect::Twig)
+    }
+
+    /// Whether the name of a test can be two words, as Twig's [`same as`] and
+    /// [`divisible by`] are, e.g. `x is same as(false)`.
+    ///
+    /// [`same as`]: https://twig.symfony.com/doc/3.x/tests/sameas.html
+    /// [`divisible by`]: https://twig.symfony.com/doc/3.x/tests/divisibleby.html
+    pub fn has_two_word_tests(self) -> bool {
+        matches!(self, Dialect::Twig)
+    }
+
+    /// Whether the iterator of a `for` loop is an expression, which can have
+    /// operators, e.g. `{% for i in 1..n %}`, as in [Jinja] and [Twig]. Django
+    /// and Liquid read a value with its filters.
+    ///
+    /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L240-L243
+    /// [Twig]: https://github.com/twigphp/Twig/blob/v3.30.0/src/TokenParser/ForTokenParser.php#L39-L40
+    pub fn loop_iterator_takes_operators(self) -> bool {
+        matches!(self, Dialect::Jinja | Dialect::Twig)
+    }
+
+    /// Whether a block can be written as a single tag whose content is the
+    /// value of an expression, e.g. `{% block title page_title|title %}`, as
+    /// in [Twig].
+    ///
+    /// [Twig]: https://twig.symfony.com/doc/3.x/tags/extends.html#block-shortcuts
+    pub fn has_block_shortcuts(self) -> bool {
+        matches!(self, Dialect::Twig)
+    }
+
+    /// Whether a `{% with %}` block takes an expression whose value is a
+    /// mapping of its variables, e.g. `{% with {a: 1} only %}`, as in [Twig],
+    /// rather than assignments, as in Django and Jinja.
+    ///
+    /// [Twig]: https://twig.symfony.com/doc/3.x/tags/with.html
+    pub fn with_takes_an_expression(self) -> bool {
+        matches!(self, Dialect::Twig)
+    }
+
     /// Whether [`nil`], `null`, `blank` and [`empty`] are literals, along with
     /// `true` and `false`, e.g. `{% if items == empty %}`. The other dialects
     /// read them as names like any other.
@@ -430,7 +475,11 @@ impl Dialect {
                 | BinOp::Pow
                 | BinOp::Concat
                 | BinOp::Coalesce
-                | BinOp::Elvis => return None,
+                | BinOp::Elvis
+                | BinOp::Range
+                | BinOp::Matches
+                | BinOp::StartsWith
+                | BinOp::EndsWith => return None,
             },
 
             // [Jinja's parser] has a function for each level, from `parse_or`
@@ -457,7 +506,13 @@ impl Dialect {
                 BinOp::Mul | BinOp::Div | BinOp::FloorDiv | BinOp::Mod => left_assoc(70),
                 BinOp::Pow => left_assoc(80),
                 BinOp::Is | BinOp::IsNot => left_assoc(100),
-                BinOp::Contains | BinOp::Coalesce | BinOp::Elvis => return None,
+                BinOp::Contains
+                | BinOp::Coalesce
+                | BinOp::Elvis
+                | BinOp::Range
+                | BinOp::Matches
+                | BinOp::StartsWith
+                | BinOp::EndsWith => return None,
             },
 
             // Liquid has no precedence between `and` and `or`, and evaluates
@@ -482,7 +537,11 @@ impl Dialect {
                 | BinOp::Pow
                 | BinOp::Concat
                 | BinOp::Coalesce
-                | BinOp::Elvis => return None,
+                | BinOp::Elvis
+                | BinOp::Range
+                | BinOp::Matches
+                | BinOp::StartsWith
+                | BinOp::EndsWith => return None,
             },
 
             // Twig's own precedences, from [`CoreExtension`]. A test binds
@@ -504,7 +563,11 @@ impl Dialect {
                 | BinOp::Gt
                 | BinOp::GtEq
                 | BinOp::In
-                | BinOp::NotIn => left_assoc(20),
+                | BinOp::NotIn
+                | BinOp::Matches
+                | BinOp::StartsWith
+                | BinOp::EndsWith => left_assoc(20),
+                BinOp::Range => left_assoc(25),
                 BinOp::Add | BinOp::Sub => left_assoc(30),
                 BinOp::Concat => left_assoc(40),
                 BinOp::Mul | BinOp::Div | BinOp::FloorDiv | BinOp::Mod => left_assoc(60),
@@ -832,7 +895,15 @@ mod test_super {
             let power = dialect.infix_binding_power(BinOp::Contains);
             assert_eq!(power.is_some(), dialect.is_liquid(), "`contains` in {dialect}");
 
-            for op in [BinOp::Coalesce, BinOp::Elvis] {
+            let twig = [
+                BinOp::Coalesce,
+                BinOp::Elvis,
+                BinOp::Range,
+                BinOp::Matches,
+                BinOp::StartsWith,
+                BinOp::EndsWith,
+            ];
+            for op in twig {
                 let power = dialect.infix_binding_power(op);
                 assert_eq!(power.is_some(), dialect == Dialect::Twig, "`{op}` in {dialect}");
             }

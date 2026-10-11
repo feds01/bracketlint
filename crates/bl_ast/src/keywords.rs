@@ -269,6 +269,7 @@ impl Keyword {
         matches!(
             self,
             Keyword::Block
+                | Keyword::Raw
                 | Keyword::Empty
                 | Keyword::Load
                 | Keyword::Import

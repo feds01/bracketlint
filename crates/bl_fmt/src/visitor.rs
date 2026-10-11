@@ -511,6 +511,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             bl_ast::Tag::Case(case) => self.visit_case(case.ast_ref()),
             bl_ast::Tag::Generic(_)
             | bl_ast::Tag::Unprocessable(_)
+            | bl_ast::Tag::BlockShortcut(_)
             | bl_ast::Tag::Assignment(_)
             | bl_ast::Tag::MacroDef(_)
             | bl_ast::Tag::Include(_)
@@ -582,14 +583,20 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         &mut self,
         node: bl_ast::AstNodeRef<bl_ast::With>,
     ) -> Result<Self::WithRet, Self::Error> {
-        let bl_ast::With { assignments, block_body, trim, .. } = node.body();
+        let bl_ast::With { assignments, value, only, block_body, trim, .. } = node.body();
         let open = self.ctx.open_elements.clone();
 
         // Keep the assignments as they are written, e.g. `a=1 b=2` or `x as y`.
         self.start_item(node.range().start());
         self.within_tag(TagKind::Block, trim.start, |this| {
             this.push_hunk("with");
-            if !assignments.is_empty() {
+            if let Some(value) = value {
+                this.push_hunk(" ");
+                this.push_source(value.range());
+                if *only {
+                    this.push_hunk(" only");
+                }
+            } else if !assignments.is_empty() {
                 this.push_hunk(" ");
                 this.push_source(assignments.range());
             }

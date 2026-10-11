@@ -1,0 +1,34 @@
+info: parsed module '$DIR/with_twig.html' as twig:
+body
+├─set
+│ ├─assignments
+│ ├─value
+│ │ └─mapping_expr
+│ │   └─pair
+│ │     ├─key
+│ │     │ └─var_expr
+│ │     │   └─name "attr"
+│ │     └─value
+│ │       └─var_expr
+│ │         └─name "row_attr"
+│ ├─only
+│ └─body
+│   └─inline
+│     └─call_expr
+│       ├─subject
+│       │ └─var_expr
+│       │   └─name "block"
+│       └─args
+│         └─arg
+│           └─lit_expr
+│             └─str_lit 'attributes'
+├─set
+│ ├─assignments
+│ ├─value
+│ │ └─var_expr
+│ │   └─name "vars"
+│ └─body
+└─set
+  ├─assignments
+  └─body
+

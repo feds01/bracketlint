@@ -111,6 +111,9 @@ pub enum TokenKind {
     /// Two question marks, `??`, in Twig, e.g. `a ?? b`
     QuestionQuestion,
 
+    /// The arrow, `=>`, of an arrow function in Twig, e.g. `x => x.name`
+    Arrow,
+
     /// Dot, `.`
     Dot,
 
@@ -304,6 +307,7 @@ impl fmt::Display for TokenKind {
             TokenKind::Comma => write!(f, ","),
             TokenKind::Question => write!(f, "?"),
             TokenKind::QuestionQuestion => write!(f, "??"),
+            TokenKind::Arrow => write!(f, "=>"),
             TokenKind::Pipe => write!(f, "|"),
             TokenKind::LeftDelim(delim) => write!(f, "{}", delim.left()),
             TokenKind::RightDelim(delim) => write!(f, "{}", delim.right()),

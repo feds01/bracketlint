@@ -380,6 +380,13 @@ impl<'lex> Lexer<'lex> {
                         self.skip_ascii();
                         TokenKind::EqEq
                     }
+                    // The arrow of an arrow function in [Twig], e.g. `x => x.name`.
+                    //
+                    // [Twig]: https://github.com/twigphp/Twig/blob/v3.30.0/src/ExpressionParser/Infix/ArrowExpressionParser.php#L28-L32
+                    '>' if self.dialect.has_arrow_functions() => {
+                        self.skip_ascii();
+                        TokenKind::Arrow
+                    }
                     _ => TokenKind::Eq,
                 },
                 '>' => match self.peek() {

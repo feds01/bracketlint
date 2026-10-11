@@ -936,7 +936,12 @@ impl<'s, 'a> Parser<'s, 'a> {
             self.skip(consumed_tokens);
 
             let op_span = op_start.join(self.current_pos());
-            let rhs = self.parse_compound_expr(r_precedence)?;
+            let rhs = match op {
+                ast::BinOp::Is | ast::BinOp::IsNot if self.at_two_word_test() => {
+                    self.parse_two_word_test()?
+                }
+                _ => self.parse_compound_expr(r_precedence)?,
+            };
 
             //v transform the operator into an `BinaryExpr`
             let op = self.node_with_span(op, op_span);
@@ -1027,6 +1032,16 @@ impl<'s, 'a> Parser<'s, 'a> {
             _ if let Some(lit) = self.liquid_literal(token) => {
                 self.skip_fast(token.kind); // `<lit>` Skip the literal token.
                 self.node_with_span(ast::Expr::Lit(ast::LitExpr { lit }), token.span)
+            }
+            // An arrow function in [Twig], e.g. `x => x.name`, or
+            // `(a, b) => a + b`.
+            //
+            // [Twig]: https://github.com/twigphp/Twig/blob/v3.30.0/src/ExpressionParser/Infix/ArrowExpressionParser.php#L28-L32
+            TokenKind::Ident | TokenKind::Tree(Delimiter::Paren, _)
+                if self.options.dialect.has_arrow_functions()
+                    && matches!(self.peek_second(), Some(tok!(Arrow))) =>
+            {
+                return self.parse_arrow_function(token);
             }
             // A [Liquid] range, e.g. `(1..n)`.
             //
@@ -1135,6 +1150,86 @@ impl<'s, 'a> Parser<'s, 'a> {
         })?;
 
         Ok(self.node_with_span(ast::Expr::Range(ast::RangeExpr { start, end }), token.span))
+    }
+
+    /// Parse an arrow function, e.g. `x => x.name`, or `(a, b) => a + b`
+    /// with its parameters in parentheses.
+    fn parse_arrow_function(&mut self, token: Token) -> ParseResult<AstNode<'a, ast::Expr<'a>>> {
+        let params = if token.kind == TokenKind::Ident {
+            let mut params = self.arena.vec();
+            params.push(self.parse_name()?);
+            self.nodes_with_span(params, token.span)
+        } else {
+            self.in_tree(Delimiter::Paren, None, |g| {
+                let start = g.current_pos();
+                let mut params = g.arena.vec();
+
+                while !g.exhausted() {
+                    params.push(g.parse_name()?);
+
+                    if g.parse_token_fast(TokenKind::Comma).is_none() {
+                        break;
+                    }
+                }
+
+                Ok(g.nodes_with_joined_span(params, start))
+            })?
+        };
+
+        self.parse_token(TokenKind::Arrow)?;
+        let expr = self.parse_compound_expr(0)?;
+        Ok(self
+            .node_with_joined_span(ast::Expr::Arrow(ast::ArrowExpr { params, expr }), token.span))
+    }
+
+    /// Whether the next tokens are the name of a test that is two words, as
+    /// Twig's [`same as`] and [`divisible by`] are.
+    ///
+    /// [`same as`]: https://twig.symfony.com/doc/3.x/tests/sameas.html
+    /// [`divisible by`]: https://twig.symfony.com/doc/3.x/tests/divisibleby.html
+    fn at_two_word_test(&self) -> bool {
+        let (Some(first), Some(second)) = (self.peek(), self.peek_second()) else {
+            return false;
+        };
+
+        self.options.dialect.has_two_word_tests()
+            && first.kind == TokenKind::Ident
+            && matches!(
+                (self._source.hunk(first.span), self._source.hunk(second.span)),
+                ("same", "as") | ("divisible", "by")
+            )
+    }
+
+    /// Parse a test whose name is two words, see [Self::at_two_word_test],
+    /// with its argument, which [Twig] takes in parentheses, e.g.
+    /// `same as(false)`, or else after it, e.g. `same as false`.
+    ///
+    /// [Twig]: https://github.com/twigphp/Twig/blob/v3.30.0/src/ExpressionParser/Infix/IsExpressionParser.php#L43-L47
+    fn parse_two_word_test(&mut self) -> ParseResult<AstNode<'a, ast::Expr<'a>>> {
+        let start = self.current_pos();
+        self.skip_token(); // `same` | `divisible` Skip the first word.
+        self.skip_token(); // `as` | `by` Skip the second word.
+
+        let name = ast::Name::new(ast::Identifier::from(0u32));
+        let test = self.node_with_joined_span(ast::Expr::Var(ast::VarExpr { name }), start);
+        if matches!(self.peek_kind(), Some(TokenKind::Tree(Delimiter::Paren, _))) {
+            return self.parse_singular_expr(test, start.join(self.previous_pos()));
+        }
+
+        // A test binds as tightly as `is`, so its argument takes the operators
+        // that bind tighter.
+        let arg_start = self.current_pos();
+        let value = self.parse_compound_expr(
+            self.options.dialect.infix_binding_power(ast::BinOp::Is).map_or(0, |(_, right)| right),
+        )?;
+        let mut args = self.arena.vec();
+        args.push(
+            self.node_with_joined_span(ast::Arg { name: None, value: Some(value) }, arg_start),
+        );
+        let args = self.nodes_with_joined_span(args, arg_start);
+
+        Ok(self
+            .node_with_joined_span(ast::Expr::Call(ast::CallExpr { subject: test, args }), start))
     }
 
     /// Parse an expression in parentheses, e.g. `(a or b)`, which groups it.
@@ -1502,7 +1597,8 @@ impl<'s, 'a> Parser<'s, 'a> {
             return (None, 0);
         }
 
-        match &(token.unwrap()).kind {
+        let token = token.unwrap();
+        match &token.kind {
             TokenKind::Keyword(Keyword::Contains) => (Some(ast::BinOp::Contains), 1),
             TokenKind::EqEq => (Some(ast::BinOp::Eq), 1),
             TokenKind::NotEq => (Some(ast::BinOp::NotEq), 1),
@@ -1520,6 +1616,13 @@ impl<'s, 'a> Parser<'s, 'a> {
             TokenKind::StarStar => (Some(ast::BinOp::Pow), 1),
             TokenKind::Tilde => (Some(ast::BinOp::Concat), 1),
             TokenKind::QuestionQuestion => (Some(ast::BinOp::Coalesce), 1),
+            TokenKind::DotDot => (Some(ast::BinOp::Range), 1),
+            TokenKind::Ident => match (self._source.hunk(token.span), self.peek_second()) {
+                ("matches", _) => (Some(ast::BinOp::Matches), 1),
+                ("starts", Some(kw!(With))) => (Some(ast::BinOp::StartsWith), 2),
+                ("ends", Some(kw!(With))) => (Some(ast::BinOp::EndsWith), 2),
+                _ => (None, 0),
+            },
             TokenKind::Question => match self.peek_second() {
                 Some(tok!(Colon)) => (Some(ast::BinOp::Elvis), 2),
                 _ => (None, 0),
@@ -1604,7 +1707,18 @@ impl<'s, 'a> Parser<'s, 'a> {
                 let target = g.parse_for_target()?;
 
                 g.parse_token(TokenKind::Keyword(Keyword::In))?;
-                let iterator = g.parse_expr()?;
+
+                // The iterator can have operators in [Jinja] and [Twig], e.g.
+                // `{% for i in 1..n %}`, but isn't a conditional expression,
+                // since an `if` after it is the loop's filter in Jinja.
+                //
+                // [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L240-L243
+                // [Twig]: https://github.com/twigphp/Twig/blob/v3.30.0/src/TokenParser/ForTokenParser.php#L39-L40
+                let iterator = if g.options.dialect.loop_iterator_takes_operators() {
+                    g.parse_compound_expr(ast::Dialect::CONDITIONAL_BINDING_POWER + 1)?
+                } else {
+                    g.parse_expr()?
+                };
                 let (reverse_modifier, params) = g.parse_loop_modifiers()?;
 
                 let guard = if g.parse_token_fast(TokenKind::Keyword(Keyword::If)).is_some() {
@@ -2022,10 +2136,28 @@ impl<'s, 'a> Parser<'s, 'a> {
     fn parse_with_block(&mut self) -> ParseResult<AstNode<'a, ast::Statement<'a>>> {
         let token = *self.current_token();
 
-        // Parse the header first, we should get `block <name>`.
-        let (assignments, trim) = self.in_tag(Delimiter::Percent, |g| {
+        // Parse the header first, we should get `with <assignments>`.
+        let ((assignments, value, only), trim) = self.in_tag(Delimiter::Percent, |g| {
             g.parse_token(TokenKind::Keyword(Keyword::With))?;
-            g.parse_assignments()
+
+            // A [Twig] `with` takes an expression whose value is a mapping of
+            // its variables, which `only` makes the only ones there are, e.g.
+            // `{% with {a: 1} only %}`.
+            //
+            // [Twig]: https://github.com/twigphp/Twig/blob/v3.30.0/src/TokenParser/WithTokenParser.php#L33-L36
+            if g.options.dialect.with_takes_an_expression() {
+                let value = if g.exhausted() { None } else { Some(g.parse_compound_expr(0)?) };
+                let only = g.peek().is_some_and(|token| {
+                    token.kind == TokenKind::Ident && g._source.hunk(token.span) == "only"
+                });
+                if only {
+                    g.skip_fast(TokenKind::Ident); // `only` Skip the modifier.
+                }
+
+                return Ok((g.nodes_with_span(g.arena.vec(), g.range()), value, only));
+            }
+
+            Ok((g.parse_assignments()?, None, false))
         })?;
 
         // Now parse a bunch of general statements until we reach the end of the block.
@@ -2043,6 +2175,8 @@ impl<'s, 'a> Parser<'s, 'a> {
         let with = self.node_with_joined_span(
             ast::With {
                 assignments,
+                value,
+                only,
                 block_body,
                 kind: ast::AssignmentKind::With,
                 trim: ast::TrimTag { start: trim, end: end_trim },
@@ -2056,7 +2190,7 @@ impl<'s, 'a> Parser<'s, 'a> {
         let token = *self.current_token();
 
         // Parse the header first, we should get `block <name>`.
-        let (label, trim) = self.in_tag(Delimiter::Percent, |g| {
+        let ((label, value), trim) = self.in_tag(Delimiter::Percent, |g| {
             g.parse_token(TokenKind::Keyword(Keyword::Block))?;
 
             // If the next token is a string literal, we still accept it but
@@ -2069,8 +2203,25 @@ impl<'s, 'a> Parser<'s, 'a> {
                 ));
             }
 
-            g.parse_name_or_string()
+            let label = g.parse_name_or_string()?;
+
+            // A [Twig] block can be a single tag whose content is the value of
+            // an expression, e.g. `{% block title page_title|title %}`.
+            //
+            // [Twig]: https://twig.symfony.com/doc/3.x/tags/extends.html#block-shortcuts
+            let value = if g.options.dialect.has_block_shortcuts() && !g.exhausted() {
+                Some(g.parse_compound_expr(0)?)
+            } else {
+                None
+            };
+
+            Ok((label, value))
         })?;
+
+        if let Some(value) = value {
+            let shortcut = ast::Tag::BlockShortcut(ast::BlockShortcut { label, value });
+            return Ok(self.node_with_joined_span(ast::Statement::Tag(shortcut), token.span));
+        }
 
         // Now parse a bunch of general statements until we reach the end of the block.
         let (block_body, _, (end_label, end_trim)) = self.parse_body_until_block_footer(
