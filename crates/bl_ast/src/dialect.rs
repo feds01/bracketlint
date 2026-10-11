@@ -401,6 +401,28 @@ impl Dialect {
         matches!(self, Dialect::Jinja | Dialect::Nunjucks | Dialect::Twig)
     }
 
+    /// Whether `import` can end with `with context` or `without context`, which
+    /// decides whether the template that it imports sees this one's variables,
+    /// as in [Jinja] and [Nunjucks], e.g.
+    /// `{% import "forms.html" as forms with context %}`. Jinja's `include`
+    /// takes them too, see [Dialect::include_takes_context].
+    ///
+    /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#import-context-behavior
+    /// [Nunjucks]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/parser.js#L263-L302
+    pub fn import_takes_context(self) -> bool {
+        matches!(self, Dialect::Jinja | Dialect::Nunjucks)
+    }
+
+    /// Whether `include` can end with `with context` or `without context`, as
+    /// in [Jinja], e.g. `{% include "header.html" without context %}`. Twig's
+    /// `with` takes the variables to pass instead, so `with context` passes
+    /// the variable `context` there.
+    ///
+    /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#import-context-behavior
+    pub fn include_takes_context(self) -> bool {
+        matches!(self, Dialect::Jinja)
+    }
+
     /// Whether a block can be `scoped`, which gives it the variables of the
     /// scope that it is in, or `required`, which a child template has to
     /// override, as in [Jinja], e.g. `{% block item scoped required %}`.

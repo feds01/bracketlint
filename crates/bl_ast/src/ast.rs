@@ -585,6 +585,10 @@ define_tree! {
         /// {% include "file" with x = 10 %}
         /// ```
         pub context: Children!(Arg),
+
+        /// Whether the template sees this one's variables, when the tag says
+        /// so with `with context` or `without context`, as in Jinja.
+        pub with_context: Option<bool>,
     }
 
     /// A Liquid [`render`] tag, which renders another template with variables of
@@ -658,6 +662,11 @@ define_tree! {
     pub struct Import {
         pub template: Child!(Expr),
         pub names: Children!(Name),
+
+        /// Whether the template sees this one's variables, when the tag says
+        /// so with `with context` or `without context`, as in Jinja and
+        /// Nunjucks.
+        pub with_context: Option<bool>,
     }
 
     /// A tag to set a value in place, i.e.

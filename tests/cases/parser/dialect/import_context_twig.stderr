@@ -1,0 +1,7 @@
+error: unexpectedly encountered the keyword `with`
+ --> $DIR/import_context_twig.html:1:33
+  |
+1 | {% import "forms.html" as forms with context %}
+  |                                 ----
+  |
+  = note: this file is parsed as Twig, from `--dialect twig`

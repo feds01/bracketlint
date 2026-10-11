@@ -20,6 +20,12 @@ fn labelled(label: impl ToString, contents: impl ToString, quote_str: &str) -> S
     format!("{} {quote_str}{}{quote_str}", label.to_string(), contents.to_string())
 }
 
+/// The leaf for an `import` or `include` that says whether the template sees
+/// the variables of the one that names it, if it says so.
+fn context_leaf(with_context: Option<bool>) -> Option<TreeNode> {
+    with_context.map(|with| TreeNode::leaf(if with { "with context" } else { "without context" }))
+}
+
 impl AstVisitor for AstTreePrinter<'_> {
     type Error = Infallible;
 
@@ -207,10 +213,10 @@ impl AstVisitor for AstTreePrinter<'_> {
     ) -> Result<Self::ImportRet, Self::Error> {
         let walk::Import { template, names } = walk::walk_import(self, node)?;
 
-        Ok(TreeNode::branch(
-            "import",
-            vec![TreeNode::branch("template", vec![template]), TreeNode::branch("names", names)],
-        ))
+        let mut children =
+            vec![TreeNode::branch("template", vec![template]), TreeNode::branch("names", names)];
+        children.extend(context_leaf(node.body().with_context));
+        Ok(TreeNode::branch("import", children))
     }
 
     type FilteredExprRet = TreeNode;
@@ -299,7 +305,9 @@ impl AstVisitor for AstTreePrinter<'_> {
     ) -> Result<Self::IncludeRet, Self::Error> {
         let walk::Include { template, context } = walk::walk_include(self, node)?;
 
-        Ok(TreeNode::branch("include", vec![template, TreeNode::branch("context", context)]))
+        let mut children = vec![template, TreeNode::branch("context", context)];
+        children.extend(context_leaf(node.body().with_context));
+        Ok(TreeNode::branch("include", children))
     }
 
     type IntLitRet = TreeNode;

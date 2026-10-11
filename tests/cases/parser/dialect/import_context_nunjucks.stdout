@@ -1,0 +1,10 @@
+info: parsed module '$DIR/import_context_nunjucks.njk' as nunjucks:
+body
+└─import
+  ├─template
+  │ └─lit_expr
+  │   └─str_lit "forms.njk"
+  ├─names
+  │ └─name "forms"
+  └─with context
+

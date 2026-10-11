@@ -1,0 +1,6 @@
+// run=pass, stage=check, dialect=jinja
+
+{% import 'admin/lib.html' as lib with context %}
+{% import "forms.html" as forms without context %}
+{% include "header.html" with context %}
+{% include "footer.html" without context %}

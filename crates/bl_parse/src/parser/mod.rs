@@ -2630,12 +2630,24 @@ impl<'s, 'a> Parser<'s, 'a> {
             g.parse_token(TokenKind::Keyword(Keyword::Include))?;
             let template = g.parse_template_name()?;
 
+            // A [Jinja] `include` can end with `with context` or
+            // `without context`, rather than the variables to pass.
+            //
+            // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#import-context-behavior
+            let with_context = if g.options.dialect.include_takes_context() {
+                g.parse_import_context()
+            } else {
+                None
+            };
+
             // With comma separated arguments, the comma after the template
             // starts them rather than `with`, as in Liquid's [`render`], e.g.
             // `{% include "card", product: product %}`.
             //
             // [`render`]: https://shopify.github.io/liquid/tags/template/#render-parameters
-            let context = if g.parse_token_fast(TokenKind::Keyword(Keyword::With)).is_some()
+            let context = if with_context.is_some() {
+                g.nodes_with_span(g.arena.vec(), g.range())
+            } else if g.parse_token_fast(TokenKind::Keyword(Keyword::With)).is_some()
                 || g.options.dialect.requires_comma_separated_args()
             {
                 g.parse_args()?
@@ -2645,7 +2657,11 @@ impl<'s, 'a> Parser<'s, 'a> {
             };
 
             Ok(g.node_with_span(
-                ast::Statement::Tag(ast::Tag::Include(ast::Include { template, context })),
+                ast::Statement::Tag(ast::Tag::Include(ast::Include {
+                    template,
+                    context,
+                    with_context,
+                })),
                 g.range(),
             ))
         })
@@ -2704,18 +2720,63 @@ impl<'s, 'a> Parser<'s, 'a> {
                 g.nodes_with_span(g.arena.vec(), g.range())
             };
 
+            // An `import` can end with `with context` or `without context` in
+            // [Jinja] and [Nunjucks].
+            //
+            // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#import-context-behavior
+            // [Nunjucks]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/parser.js#L263-L302
+            let with_context = if g.options.dialect.import_takes_context() {
+                g.parse_import_context()
+            } else {
+                None
+            };
+
             Ok(g.node_with_span(
-                ast::Statement::Tag(ast::Tag::Import(ast::Import { template, names })),
+                ast::Statement::Tag(ast::Tag::Import(ast::Import {
+                    template,
+                    names,
+                    with_context,
+                })),
                 g.range(),
             ))
         })
     }
 
+    /// Parse the `with context` or `without context` that an `import` or an
+    /// `include` can end with, which says whether the template that it names
+    /// sees this one's variables, see [ast::Dialect::import_takes_context].
+    fn parse_import_context(&mut self) -> Option<bool> {
+        let with_context = self.at_import_context()?;
+        self.skip(2); // `with context` or `without context`.
+        Some(with_context)
+    }
+
+    /// Whether `with context` or `without context` is next, as `Some` of
+    /// whether it is `with`, see [Parser::parse_import_context].
+    fn at_import_context(&self) -> Option<bool> {
+        let with_context = match self.peek()? {
+            Token { kind: TokenKind::Keyword(Keyword::With), .. } => true,
+            Token { kind: TokenKind::Ident, span } if self._source.hunk(*span) == "without" => {
+                false
+            }
+            _ => return None,
+        };
+
+        match self.peek_second()? {
+            Token { kind: TokenKind::Ident, span } if self._source.hunk(*span) == "context" => {
+                Some(with_context)
+            }
+            _ => None,
+        }
+    }
+
+    /// Parse the names after `as` in an `import`, up to the end of the tag or
+    /// its `with context` or `without context`.
     fn parse_names(&mut self) -> ParseResult<AstNodes<'a, ast::Name>> {
         let mut names = self.arena.vec();
         let start = self.current_pos();
 
-        while self.peek().is_some() {
+        while self.peek().is_some() && self.at_import_context().is_none() {
             match self.parse_name() {
                 Ok(name) => names.push(name),
                 Err(err) => {
