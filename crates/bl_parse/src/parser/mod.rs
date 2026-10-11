@@ -879,13 +879,33 @@ impl<'s, 'a> Parser<'s, 'a> {
             // [`Parser.subparse`]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L1019-L1022
             // [`Parser.parseNodes`]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/parser.js#L1317-L1318
             // [`Parser::subparse`]: https://github.com/twigphp/Twig/blob/v3.30.0/src/Parser.php#L187-L190
-            let (subject, subject_span) = g.track_span(|g| {
+            let (mut subject, subject_span) = g.track_span(|g| {
                 if g.options.dialect.variable_supports_operators() {
                     g.parse_compound_expr(0)
                 } else {
                     g.parse_expr()
                 }
             })?;
+
+            // Items separated by commas are a tuple without its parentheses in
+            // [Jinja], e.g. `{{ a, b }}`.
+            //
+            // [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L1019-L1022
+            if g.options.dialect.variables_take_bare_tuples()
+                && g.peek_kind() == Some(TokenKind::Comma)
+            {
+                let mut items = g.arena.vec();
+                items.push(subject);
+                while g.parse_token_fast(TokenKind::Comma).is_some() && !g.exhausted() {
+                    items.push(g.parse_compound_expr(0)?);
+                }
+
+                let children = g.nodes_with_joined_span(items, subject_span);
+                subject = g.node_with_joined_span(
+                    ast::Expr::Tuple(ast::TupleExpr { children }),
+                    subject_span,
+                );
+            }
 
             // A name that is followed by anything other than an operator, e.g.
             // `{{ x "a" b=c }}`, is called with the rest as its arguments.
@@ -1810,6 +1830,17 @@ impl<'s, 'a> Parser<'s, 'a> {
             }
             TokenKind::Str => {
                 self.skip_fast(TokenKind::Str); // `<string>` Skip the string token.
+
+                // Strings written one after another are one string in [Jinja],
+                // e.g. `"a" "b"`.
+                //
+                // [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L662-L669
+                if self.options.dialect.adjacent_strings_concatenate() {
+                    while self.peek_kind() == Some(TokenKind::Str) {
+                        self.skip_fast(TokenKind::Str); // `<string>` Skip the next string.
+                    }
+                }
+
                 Ok(ast::Lit::Str(ast::StrLit {}))
             }
             TokenKind::Number(flags) => {

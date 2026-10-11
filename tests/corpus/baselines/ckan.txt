@@ -25,7 +25,7 @@ ok            ckan/templates/error_document_template.html
 ok            ckan/templates/footer.html
 ok            ckan/templates/group/about.html
 ok            ckan/templates/group/admins.html
-parse-error   ckan/templates/group/base_form_page.html
+ok            ckan/templates/group/base_form_page.html
 ok            ckan/templates/group/confirm_delete.html
 ok            ckan/templates/group/confirm_delete_member.html
 ok            ckan/templates/group/edit.html
@@ -202,7 +202,7 @@ ok            ckan/templates/user/read_base.html
 ok            ckan/templates/user/read_groups.html
 ok            ckan/templates/user/read_organizations.html
 ok            ckan/templates/user/request_reset.html
-parse-error   ckan/templates/user/snippets/api_token_create_form.html
+ok            ckan/templates/user/snippets/api_token_create_form.html
 ok            ckan/templates/user/snippets/api_token_list.html
 ok            ckan/templates/user/snippets/api_tokens_revoke.html
 ok            ckan/templates/user/snippets/followers.html
