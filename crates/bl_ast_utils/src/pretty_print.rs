@@ -347,6 +347,25 @@ impl AstVisitor for AstTreePrinter<'_> {
         Ok(TreeNode::branch("array_expr", children))
     }
 
+    type CondExprRet = TreeNode;
+
+    fn visit_cond_expr(
+        &self,
+        node: ast::AstNodeRef<ast::CondExpr>,
+    ) -> Result<Self::CondExprRet, Self::Error> {
+        let walk::CondExpr { condition, then, otherwise } = walk::walk_cond_expr(self, node)?;
+
+        let mut children = vec![
+            TreeNode::branch("condition", vec![condition]),
+            TreeNode::branch("then", vec![then]),
+        ];
+        if let Some(otherwise) = otherwise {
+            children.push(TreeNode::branch("otherwise", vec![otherwise]));
+        }
+
+        Ok(TreeNode::branch("cond_expr", children))
+    }
+
     type MappingExprRet = TreeNode;
 
     fn visit_mapping_expr(

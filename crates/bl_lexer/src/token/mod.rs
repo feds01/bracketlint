@@ -105,6 +105,12 @@ pub enum TokenKind {
     /// Comma, `,`
     Comma,
 
+    /// Question mark, `?`, of a conditional in Twig, e.g. `a ? b : c`
+    Question,
+
+    /// Two question marks, `??`, in Twig, e.g. `a ?? b`
+    QuestionQuestion,
+
     /// Dot, `.`
     Dot,
 
@@ -296,6 +302,8 @@ impl fmt::Display for TokenKind {
             TokenKind::Colon => write!(f, ":"),
             TokenKind::Pound => write!(f, "#"),
             TokenKind::Comma => write!(f, ","),
+            TokenKind::Question => write!(f, "?"),
+            TokenKind::QuestionQuestion => write!(f, "??"),
             TokenKind::Pipe => write!(f, "|"),
             TokenKind::LeftDelim(delim) => write!(f, "{}", delim.left()),
             TokenKind::RightDelim(delim) => write!(f, "{}", delim.right()),

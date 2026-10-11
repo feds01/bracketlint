@@ -4,12 +4,12 @@ parse-error   templates/admin/blog/edit.html.twig
 parse-error   templates/admin/blog/index.html.twig
 parse-error   templates/admin/blog/new.html.twig
 parse-error   templates/admin/blog/show.html.twig
-parse-error   templates/admin/layout.html.twig
-parse-error   templates/base.html.twig
+ok            templates/admin/layout.html.twig
+ok            templates/base.html.twig
 ok            templates/blog/_comment_form.html.twig
 ok            templates/blog/_delete_post_confirmation.html.twig
 ok            templates/blog/_post.html.twig
-parse-error   templates/blog/_post_tags.html.twig
+ok            templates/blog/_post_tags.html.twig
 ok            templates/blog/_rss.html.twig
 parse-error   templates/blog/about.html.twig
 parse-error   templates/blog/comment_form_error.html.twig
@@ -24,7 +24,7 @@ parse-error   templates/bundles/TwigBundle/Exception/error500.html.twig
 ok            templates/components/blog_search.html.twig
 parse-error   templates/debug/source_code.html.twig
 ok            templates/default/_flash_messages.html.twig
-parse-error   templates/default/_language_selector.html.twig
+ok            templates/default/_language_selector.html.twig
 parse-error   templates/default/homepage.html.twig
 ok            templates/form/fields.html.twig
 parse-error   templates/security/login.html.twig
