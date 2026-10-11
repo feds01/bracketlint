@@ -986,6 +986,14 @@ impl<'s, 'a> Parser<'s, 'a> {
             TokenKind::Tree(Delimiter::Bracket, _) if self.options.dialect.has_lists() => {
                 return self.parse_list_literal(token);
             }
+            // A mapping in [Jinja], where it is a dict, and [Twig], e.g.
+            // `{'a': 1}`.
+            //
+            // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#literals
+            // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#literals
+            TokenKind::Tree(Delimiter::Curly, _) if self.options.dialect.has_mappings() => {
+                return self.parse_mapping(token);
+            }
             // A string that [Django] translates, e.g. `_("Name")`, which is a
             // string rather than a call.
             //
@@ -1120,6 +1128,56 @@ impl<'s, 'a> Parser<'s, 'a> {
         })?;
 
         Ok(self.node_with_span(ast::Expr::Array(ast::ArrayExpr { children }), token.span))
+    }
+
+    /// Parse a mapping in braces, e.g. `{'a': 1, b: 2}`, whose pairs are
+    /// separated by commas, with an optional comma after the last.
+    fn parse_mapping(&mut self, token: Token) -> ParseResult<AstNode<'a, ast::Expr<'a>>> {
+        let names = self.options.dialect.mapping_keys_can_be_names();
+
+        let pairs = self.in_tree(Delimiter::Curly, None, |g| {
+            let start = g.current_pos();
+            let mut pairs = g.arena.vec();
+
+            while let Some(first) = g.peek().copied() {
+                // A key can be any name in [Twig], even a keyword, e.g.
+                // `{for: id}`, and the variable of that name is its value when
+                // it has none, e.g. `{post}`.
+                //
+                // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#literals
+                let name = names
+                    && matches!(first.kind, TokenKind::Ident | TokenKind::Keyword(_))
+                    && matches!(
+                        g.peek_second().map(|token| token.kind),
+                        None | Some(TokenKind::Colon | TokenKind::Comma)
+                    );
+
+                let key = if name {
+                    g.skip_token(); // `<name>` Skip the name.
+                    let name = ast::Name::new(ast::Identifier::from(0u32));
+                    g.node_with_span(ast::Expr::Var(ast::VarExpr { name }), first.span)
+                } else {
+                    g.parse_compound_expr(0)?
+                };
+
+                let value = if name && g.peek_kind() != Some(TokenKind::Colon) {
+                    None
+                } else {
+                    g.parse_token(TokenKind::Colon)?;
+                    Some(g.parse_compound_expr(0)?)
+                };
+
+                pairs.push(g.node_with_joined_span(ast::Pair { key, value }, first.span));
+
+                if g.parse_token_fast(TokenKind::Comma).is_none() {
+                    break;
+                }
+            }
+
+            Ok(g.nodes_with_joined_span(pairs, start))
+        })?;
+
+        Ok(self.node_with_span(ast::Expr::Mapping(ast::MappingExpr { pairs }), token.span))
     }
 
     /// Parse the arguments of a call in parentheses, e.g. `(user, full=true)`,
@@ -2403,8 +2461,9 @@ impl<'s, 'a> Parser<'s, 'a> {
         }
     }
 
-    /// Whether `kind` starts an expression. A group or a tuple in parentheses
-    /// and a list in brackets, in [Jinja] and [Twig], do too.
+    /// Whether `kind` starts an expression. A group or a tuple in parentheses,
+    /// a list in brackets and a mapping in braces, in [Jinja] and [Twig], do
+    /// too.
     ///
     /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#literals
     /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#literals
@@ -2412,6 +2471,7 @@ impl<'s, 'a> Parser<'s, 'a> {
         match kind {
             TokenKind::Tree(Delimiter::Paren, _) => self.options.dialect.has_grouping(),
             TokenKind::Tree(Delimiter::Bracket, _) => self.options.dialect.has_lists(),
+            TokenKind::Tree(Delimiter::Curly, _) => self.options.dialect.has_mappings(),
             kind => kind.starts_expr(),
         }
     }

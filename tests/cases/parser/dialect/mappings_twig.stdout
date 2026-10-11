@@ -1,0 +1,93 @@
+info: parsed module '$DIR/mappings_twig.html' as twig:
+body
+├─inline
+│ └─call_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "form_widget"
+│   └─args
+│     ├─arg
+│     │ └─var_expr
+│     │   └─name "form"
+│     └─arg
+│       └─mapping_expr
+│         └─pair
+│           ├─key
+│           │ └─var_expr
+│           │   └─name "attr"
+│           └─value
+│             └─mapping_expr
+│               └─pair
+│                 ├─key
+│                 │ └─var_expr
+│                 │   └─name "rows"
+│                 └─value
+│                   └─lit_expr
+│                     └─int_lit 10
+├─generic_tag
+│ ├─name "set"
+│ └─args
+│   └─arg
+│     ├─name "label_attr"
+│     └─filtered_expr
+│       ├─subject
+│       │ └─var_expr
+│       │   └─name "label_attr"
+│       └─filter
+│         ├─name "merge"
+│         └─args
+│           └─arg
+│             └─mapping_expr
+│               ├─pair
+│               │ ├─key
+│               │ │ └─var_expr
+│               │ │   └─name "for"
+│               │ └─value
+│               │   └─var_expr
+│               │     └─name "id"
+│               └─pair
+│                 ├─key
+│                 │ └─lit_expr
+│                 │   └─str_lit 'class'
+│                 └─value
+│                   └─lit_expr
+│                     └─str_lit 'label'
+├─inline
+│ └─call_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "render"
+│   └─args
+│     └─arg
+│       └─call_expr
+│         ├─subject
+│         │ └─var_expr
+│         │   └─name "controller"
+│         └─args
+│           ├─arg
+│           │ └─lit_expr
+│           │   └─str_lit 'comment_form'
+│           └─arg
+│             └─mapping_expr
+│               └─pair
+│                 └─key
+│                   └─var_expr
+│                     └─name "post"
+└─inline
+  └─mapping_expr
+    ├─pair
+    │ ├─key
+    │ │ └─group_expr
+    │ │   └─var_expr
+    │ │     └─name "key"
+    │ └─value
+    │   └─lit_expr
+    │     └─str_lit 'value'
+    └─pair
+      ├─key
+      │ └─lit_expr
+      │   └─int_lit 2
+      └─value
+        └─lit_expr
+          └─str_lit 'two'
+

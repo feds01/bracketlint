@@ -29,7 +29,10 @@ struct TreeInfo {
     /// An index into the stream of tokens, pointing to where the tree begins.
     start: usize,
 
-    /// The kind of [Delimiter] that the tree is.
+    /// The [Delimiter] that opens the tree.
+    opener: Delimiter,
+
+    /// The [Delimiter] that closes the tree, once one does.
     delimiter: Option<Delimiter>,
 }
 
@@ -306,6 +309,12 @@ impl<'lex> Lexer<'lex> {
                     }
                     _ => TokenKind::Percent,
                 },
+                // A `}` closes a mapping, e.g. the first in `{a: {b: 1}}`.
+                '}' if info.opener == Delimiter::Curly => {
+                    info.delimiter = Some(Delimiter::Curly);
+                    self.tree.set(Some(info));
+                    return None;
+                }
                 '}' => match self.peek() {
                     '}' => {
                         info.delimiter = Some(Delimiter::Brace);
@@ -322,6 +331,13 @@ impl<'lex> Lexer<'lex> {
                 }
                 ch @ ('(' | '[') => {
                     return on_tree(self, Delimiter::try_from(ch).unwrap());
+                }
+                // A mapping in [Jinja] and [Twig], e.g. `{'a': 1}`.
+                //
+                // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#literals
+                // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#literals
+                '{' if self.dialect.has_mappings() => {
+                    return on_tree(self, Delimiter::Curly);
                 }
                 // A whitespace control marker belongs to the delimiter after
                 // it, e.g. the `-` in `-%}`.
@@ -461,7 +477,11 @@ impl<'lex> Lexer<'lex> {
 
         // we need to reset self.prev here as it might be polluted with previous token
         // trees
-        let tree = Cell::new(Some(TreeInfo { start: self.tokens.len(), delimiter: None }));
+        let tree = Cell::new(Some(TreeInfo {
+            start: self.tokens.len(),
+            opener: delimiter,
+            delimiter: None,
+        }));
         self.tree.swap(&tree);
 
         // `None` here doesn't just mean EOF, it could also be that
@@ -472,7 +492,8 @@ impl<'lex> Lexer<'lex> {
                 // A closing delimiter in a line closes nothing, e.g. the `)` in
                 // `echo total)`, and the rest of the line is still lexed.
                 None if delimiter == Delimiter::Line => {
-                    let Some(TreeInfo { delimiter: Some(closer), start }) = self.tree.get() else {
+                    let Some(TreeInfo { delimiter: Some(closer), start, opener }) = self.tree.get()
+                    else {
                         break;
                     };
 
@@ -480,7 +501,7 @@ impl<'lex> Lexer<'lex> {
                         ByteRange::new(self.offset.get() - closer.width(), self.len_consumed());
                     let kind = self.emit_error(LexerErrorKind::UnexpectedClose(closer), span);
                     self.tokens.push(Token::new(kind, span));
-                    self.tree.set(Some(TreeInfo { start, delimiter: None }));
+                    self.tree.set(Some(TreeInfo { start, opener, delimiter: None }));
                 }
                 None => break,
             }
@@ -501,7 +522,7 @@ impl<'lex> Lexer<'lex> {
 
         match tree.get() {
             // A line closes at its end, rather than at a delimiter.
-            Some(TreeInfo { delimiter: closer, start })
+            Some(TreeInfo { delimiter: closer, start, .. })
                 if closer == Some(delimiter)
                     || (closer.is_none() && delimiter == Delimiter::Line) =>
             {
@@ -1020,6 +1041,45 @@ mod tests {
                 matches!(
                     lex("{% a -1 %}", dialect)[..],
                     tree!(Percent, [tok!(Ident), tok!(Number(_))])
+                ),
+                "{dialect}"
+            );
+        }
+    }
+
+    #[test]
+    fn braces_hold_a_mapping_in_jinja_and_twig() {
+        use crate::token::Delimiter::{Brace, Curly};
+
+        // Each `}` closes a mapping before `}}` can close the tag, so the tag
+        // here ends at the last two.
+        for dialect in [Dialect::Jinja, Dialect::Twig] {
+            assert!(
+                matches!(
+                    lex("{{ {a: {b: 1}}}}", dialect)[..],
+                    tree!(
+                        Brace,
+                        [
+                            tok!(Tree(Curly, 6)),
+                            tok!(Ident),
+                            tok!(Colon),
+                            tok!(Tree(Curly, 3)),
+                            tok!(Ident),
+                            tok!(Colon),
+                            tok!(Number(_)),
+                        ]
+                    )
+                ),
+                "{dialect}"
+            );
+        }
+
+        // Django and Liquid have no mappings.
+        for dialect in [Dialect::Django, Dialect::Liquid] {
+            assert!(
+                matches!(
+                    lex("{{ {a} }}", dialect)[..],
+                    tree!(Brace, [tok!(Unexpected('{')), tok!(Ident), tok!(RightDelim(Brace))])
                 ),
                 "{dialect}"
             );

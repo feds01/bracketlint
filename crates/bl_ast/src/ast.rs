@@ -302,6 +302,22 @@ define_tree! {
         pub children: Children!(Expr),
     }
 
+    /// A mapping, e.g. `{'a': 1, b: 2}` in Jinja, where it is a dict, and Twig.
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct MappingExpr {
+        pub pairs: Children!(Pair),
+    }
+
+    /// A key and its value in a mapping, e.g. `'a': 1`. In Twig, the value of a
+    /// name is left out when it is the variable of the same name, e.g. `{post}`.
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct Pair {
+        pub key: Child!(Expr),
+        pub value: OptionalChild!(Expr),
+    }
+
     /// An expression in parentheses, e.g. `(a or b)` in Jinja and Twig, which
     /// groups it.
     #[derive(Clone, Debug, PartialEq)]
@@ -436,6 +452,7 @@ define_tree! {
         Array(ArrayExpr),
         Tuple(TupleExpr),
         Group(GroupExpr),
+        Mapping(MappingExpr),
         Bin(BinExpr),
         Var(VarExpr),
         Call(CallExpr),

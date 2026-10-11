@@ -33,7 +33,7 @@ parse-error   packages/govuk-frontend/src/govuk/components/footer/template.njk
 ok            packages/govuk-frontend/src/govuk/components/generic-header/macro.njk
 parse-error   packages/govuk-frontend/src/govuk/components/generic-header/template.njk
 ok            packages/govuk-frontend/src/govuk/components/header/macro.njk
-parse-error   packages/govuk-frontend/src/govuk/components/header/template.njk
+ok            packages/govuk-frontend/src/govuk/components/header/template.njk
 ok            packages/govuk-frontend/src/govuk/components/hint/macro.njk
 parse-error   packages/govuk-frontend/src/govuk/components/hint/template.njk
 ok            packages/govuk-frontend/src/govuk/components/input/macro.njk
@@ -79,4 +79,4 @@ parse-error   packages/govuk-frontend/src/govuk/components/warning-text/template
 parse-error   packages/govuk-frontend/src/govuk/macros/attributes.njk
 ok            packages/govuk-frontend/src/govuk/macros/i18n.njk
 parse-error   packages/govuk-frontend/src/govuk/macros/logo.njk
-parse-error   packages/govuk-frontend/src/govuk/template.njk
+ok            packages/govuk-frontend/src/govuk/template.njk

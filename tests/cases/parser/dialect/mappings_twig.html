@@ -1,0 +1,6 @@
+// run=pass, stage=check, dialect=twig
+
+{{ form_widget(form, {attr: {rows: 10}}) }}
+{% set label_attr = label_attr|merge({for: id, 'class': 'label'}) %}
+{{ render(controller('comment_form', {post})) }}
+{{ {(key): 'value', 2: 'two'} }}
