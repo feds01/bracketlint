@@ -1,4 +1,4 @@
-<li class="item 
+<li class="item
 {% if active %}
     active
 {% endif %}

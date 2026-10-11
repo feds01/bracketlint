@@ -1,2 +1,4 @@
 <script>
-const data = {{ data }}
+const data = {{ data }};
+    </script>
+

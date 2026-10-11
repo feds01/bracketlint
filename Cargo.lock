@@ -662,7 +662,6 @@ dependencies = [
  "biome_console",
  "biome_css_formatter",
  "biome_css_parser",
- "biome_diagnostics",
  "biome_formatter",
  "biome_html_formatter",
  "biome_html_parser",

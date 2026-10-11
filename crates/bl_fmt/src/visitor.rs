@@ -7,7 +7,7 @@ use bl_reporting::inline::{InlineSnippet, note_on_span};
 use crate::{
     adapters::{
         ExternalLanguagesEngineAdaptor, FormatterContext, HasCSSParsing, HasHTMLParsing,
-        HasJSParsing, LanguageType, TerminalState,
+        LanguageType, TerminalState,
     },
     diagnostics::FmtError,
     options::FormatterOptions,
@@ -214,6 +214,89 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         }
     }
 
+    /// Push `text`, which starts at `start` in the source, formatted in the
+    /// current language, or as it is written if it doesn't parse.
+    fn push_text(&mut self, start: usize, text: &str) -> Result<(), FmtError> {
+        // We need to check which language engine to use for the formatting.
+        let (result, state) = match self.ctx.state.language {
+            LanguageType::Html => {
+                let mut engine = self.adaptor.html_engine(&self.ctx);
+                let result = engine.format(text)?;
+                (result, engine.into_state())
+            }
+            LanguageType::Css => {
+                let engine = self.adaptor.css_engine(&self.ctx);
+                let result = engine.format(text)?;
+                (result, engine.into_state())
+            }
+            // The text is only JavaScript when a tag splits a `<script>` element,
+            // and a piece of a script can't be formatted on its own without
+            // changing it. Biome drops the `;` of `{{ data }};`, and makes
+            // `{{ f }}\n(x)`, a call, into `{{ f }}\nx;`.
+            LanguageType::Js => (None, self.ctx.state),
+            LanguageType::Text => (Some(text.to_string()), self.ctx.state),
+        };
+
+        let start = start + (text.len() - text.trim_start().len());
+        self.space_from_previous(start);
+
+        match result {
+            Some(formatted) => self.push_lines(&formatted),
+            // Text that is only whitespace, e.g. the indent of a `</script>`,
+            // has nothing to keep.
+            None => {
+                let text = text.trim();
+                if !text.is_empty() && self.at_line_start() {
+                    self.indent_kept_source(start, text);
+                }
+
+                self.push_hunk(text);
+            }
+        }
+
+        self.ctx.state = state;
+        Ok(())
+    }
+
+    /// Push the lines of `formatted`, each at the current indent, without its
+    /// empty lines at the end.
+    ///
+    /// The last line is left open so that a following inline tag can continue
+    /// it. Any line that starts a new line in the buffer gets the current
+    /// indent, the first one may instead continue a line that an inline tag
+    /// left open.
+    fn push_lines(&mut self, formatted: &str) {
+        let mut lines: Vec<_> = formatted.lines().collect();
+        while lines.last().is_some_and(|line| line.trim().is_empty()) {
+            lines.pop();
+        }
+
+        for (index, line) in lines.into_iter().enumerate() {
+            if index > 0 {
+                self.end_line();
+            }
+
+            if self.at_line_start() && !line.is_empty() {
+                self.add_indent();
+            }
+
+            self.push_hunk(line);
+        }
+    }
+
+    /// Indent `source`, which starts at `start` and a line, and which is kept
+    /// as it is written. When it spans several lines, it keeps its column, so
+    /// that its other lines still line up with it. Otherwise, it gets the
+    /// current indent.
+    fn indent_kept_source(&mut self, start: usize, source: &str) {
+        let whitespace = self.whitespace_before(start);
+
+        match whitespace.rfind('\n') {
+            Some(newline) if source.contains('\n') => self.push_hunk(&whitespace[newline + 1..]),
+            _ => self.add_indent(),
+        }
+    }
+
     // Extract the inline check into a separate function
     fn check_inline_statement_newline(
         &mut self,
@@ -318,16 +401,8 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
                     self.end_line();
                 }
 
-                // A tag that spans several lines keeps its column, so that its other
-                // lines, which are kept as they are written, still line up with it.
-                // Any other tag at the start of a line is indented.
                 if self.at_line_start() {
-                    match whitespace.rfind('\n') {
-                        Some(newline) if self.ctx.source.hunk(range).contains('\n') => {
-                            self.push_hunk(&whitespace[newline + 1..]);
-                        }
-                        _ => self.add_indent(),
-                    }
+                    self.indent_kept_source(range.start(), self.ctx.source.hunk(range));
                 } else {
                     self.space_from_previous(range.start());
                 }
@@ -608,63 +683,24 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         &mut self,
         node: bl_ast::AstNodeRef<bl_ast::Text>,
     ) -> Result<Self::TextRet, Self::Error> {
+        let start = node.range().start();
         let text = self.ctx.source.hunk(node.range());
 
-        // We need to check which language engine to use for the formatting.
-        let (result, state) = match self.ctx.state.language {
-            LanguageType::Html => {
-                let mut engine = self.adaptor.html_engine(&self.ctx);
-                let result = engine.format(text)?;
-                let new_state = engine.into_state();
-                (result, new_state)
-            }
-            LanguageType::Css => {
-                let engine = self.adaptor.css_engine(&self.ctx);
-                let result = engine.format(text)?;
-                let new_state = engine.into_state();
-                (result, new_state)
-            }
-            LanguageType::Js => {
-                let engine = self.adaptor.js_engine(&self.ctx);
-                let result = engine.format(text)?;
-                let new_state = engine.into_state();
-                (result, new_state)
-            }
-            LanguageType::Text => (text.to_string(), self.ctx.state),
-        };
+        // A `<style>` or `<script>` element that a tag splits ends in a later
+        // text, at its closing tag, after which the text is HTML again.
+        if let Some(end) = self.ctx.language().end_in(text) {
+            self.push_text(start, &text[..end])?;
+            self.ctx.state.language = LanguageType::Html;
 
-        let mut lines: Vec<_> = result.lines().collect();
-
-        // Remove empty lines at the end
-        while let Some(last) = lines.last() {
-            if last.trim().is_empty() {
-                lines.pop();
-            } else {
-                break;
-            }
-        }
-
-        let start = node.range().start() + (text.len() - text.trim_start().len());
-        self.space_from_previous(start);
-
-        // The last line is left open so that a following inline tag can
-        // continue it. Any line that starts a new line in the buffer gets the
-        // current indent, the first one may instead continue a line that an
-        // inline tag left open.
-        for (index, line) in lines.iter().enumerate() {
-            if index > 0 {
+            // The closing tag starts a line when the source starts one with it.
+            if self.whitespace_before(start + end).contains('\n') && !self.at_line_start() {
                 self.end_line();
             }
 
-            if self.at_line_start() && !line.is_empty() {
-                self.add_indent();
-            }
-
-            self.push_hunk(line);
+            return self.push_text(start + end, &text[end..]);
         }
 
-        self.ctx.state = state;
-        Ok(())
+        self.push_text(start, text)
     }
 
     type CommentRet = ();
@@ -691,8 +727,15 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         node: bl_ast::AstNodeRef<bl_ast::Inline>,
     ) -> Result<Self::InlineRet, Self::Error> {
         let bl_ast::Inline { expr, trim } = node.body();
+        let start = node.range().start();
 
-        self.space_from_previous(node.range().start());
+        // The tag starts a line when the source starts one with it, since the
+        // line break can matter, e.g. after a `//` comment in a script.
+        if self.whitespace_before(start).contains('\n') && !self.at_line_start() {
+            self.end_line();
+        }
+
+        self.space_from_previous(start);
         self.within_tag(TagKind::Inline, *trim, |this| {
             this.visit_expr(expr.ast_ref())?;
             Ok(())

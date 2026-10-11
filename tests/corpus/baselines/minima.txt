@@ -1,12 +1,12 @@
-fmt-error     _includes/disqus_comments.html
+unstable      _includes/disqus_comments.html
 ok            _includes/footer.html
-fmt-error     _includes/google-analytics.html
+ok            _includes/google-analytics.html
 ok            _includes/head.html
 ok            _includes/header.html
 ok            _includes/icon-github.html
 ok            _includes/icon-twitter.html
 ok            _includes/social.html
 ok            _layouts/default.html
-unstable      _layouts/home.html
+ok            _layouts/home.html
 ok            _layouts/page.html
 ok            _layouts/post.html

@@ -17,7 +17,6 @@ bl_macros = { workspace = true }
 biome_console = { git = "https://github.com/feds01/biome.git", rev = "c116a292ccb679c61c0d7c255ee8ccb79f5866ce", package = "biome_console" }
 biome_css_formatter = { git = "https://github.com/feds01/biome.git", rev = "c116a292ccb679c61c0d7c255ee8ccb79f5866ce", package = "biome_css_formatter" }
 biome_css_parser = { git = "https://github.com/feds01/biome.git", rev = "c116a292ccb679c61c0d7c255ee8ccb79f5866ce", package = "biome_css_parser" }
-biome_diagnostics = { git = "https://github.com/feds01/biome.git", rev = "c116a292ccb679c61c0d7c255ee8ccb79f5866ce", package = "biome_diagnostics" }
 biome_html_formatter = { git = "https://github.com/feds01/biome.git", rev = "c116a292ccb679c61c0d7c255ee8ccb79f5866ce", package = "biome_html_formatter" }
 biome_html_parser = { git = "https://github.com/feds01/biome.git", rev = "c116a292ccb679c61c0d7c255ee8ccb79f5866ce", package = "biome_html_parser" }
 biome_html_syntax = { git = "https://github.com/feds01/biome.git", rev = "c116a292ccb679c61c0d7c255ee8ccb79f5866ce", package = "biome_html_syntax" }
