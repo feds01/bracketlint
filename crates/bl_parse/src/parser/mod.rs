@@ -962,6 +962,11 @@ impl<'s, 'a> Parser<'s, 'a> {
                 ast::BinOp::Is | ast::BinOp::IsNot if self.at_two_word_test() => {
                     self.parse_two_word_test()?
                 }
+                ast::BinOp::Is | ast::BinOp::IsNot
+                    if self.options.dialect.test_arg_needs_no_parentheses() =>
+                {
+                    self.parse_test()?
+                }
                 _ => self.parse_compound_expr(r_precedence)?,
             };
 
@@ -1291,6 +1296,37 @@ impl<'s, 'a> Parser<'s, 'a> {
             arg_start,
         ));
         let args = self.nodes_with_joined_span(args, arg_start);
+
+        Ok(self
+            .node_with_joined_span(ast::Expr::Call(ast::CallExpr { subject: test, args }), start))
+    }
+
+    /// Parse the test after `is`, e.g. `defined` or `divisibleby(3)`, whose
+    /// argument [Jinja] also takes after it without parentheses, as a single
+    /// value, e.g. `divisibleby 3`, which is a call of the test too.
+    ///
+    /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L971-L986
+    fn parse_test(&mut self) -> ParseResult<AstNode<'a, ast::Expr<'a>>> {
+        let start = self.current_pos();
+        let test = self.parse_value()?;
+
+        let arg = match self.peek_kind() {
+            Some(
+                TokenKind::Ident
+                | TokenKind::Str
+                | TokenKind::Number(_)
+                | TokenKind::Keyword(Keyword::True | Keyword::False)
+                | TokenKind::Tree(Delimiter::Paren | Delimiter::Bracket | Delimiter::Curly, _),
+            ) => self.parse_value()?,
+            _ => return Ok(test),
+        };
+
+        let mut args = self.arena.vec();
+        let arg_span = arg.range();
+        args.push(
+            self.node_with_span(ast::Arg { name: None, value: Some(arg), unpack: None }, arg_span),
+        );
+        let args = self.nodes_with_span(args, arg_span);
 
         Ok(self
             .node_with_joined_span(ast::Expr::Call(ast::CallExpr { subject: test, args }), start))

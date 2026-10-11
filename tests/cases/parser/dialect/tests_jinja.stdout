@@ -1,0 +1,79 @@
+info: parsed module '$DIR/tests_jinja.html' as jinja:
+body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─var_expr
+│     │   │   └─name "position"
+│     │   ├─operator `is`
+│     │   └─rhs
+│     │     └─call_expr
+│     │       ├─subject
+│     │       │ └─var_expr
+│     │       │   └─name "divisibleby"
+│     │       └─args
+│     │         └─arg
+│     │           └─lit_expr
+│     │             └─int_lit 3
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─bin_expr
+│     │   │   ├─lhs
+│     │   │   │ └─var_expr
+│     │   │   │   └─name "value"
+│     │   │   ├─operator `is not`
+│     │   │   └─rhs
+│     │   │     └─call_expr
+│     │   │       ├─subject
+│     │   │       │ └─var_expr
+│     │   │       │   └─name "sameas"
+│     │   │       └─args
+│     │   │         └─arg
+│     │   │           └─var_expr
+│     │   │             └─name "false"
+│     │   ├─operator `and`
+│     │   └─rhs
+│     │     └─bin_expr
+│     │       ├─lhs
+│     │       │ └─var_expr
+│     │       │   └─name "value"
+│     │       ├─operator `is`
+│     │       └─rhs
+│     │         └─var_expr
+│     │           └─name "defined"
+│     └─clause_body
+│       └─body
+└─if
+  └─clauses
+    └─if_clause
+      ├─condition
+      │ └─bin_expr
+      │   ├─lhs
+      │   │ └─access_expr
+      │   │   ├─subject
+      │   │   │ └─var_expr
+      │   │   │   └─name "loop"
+      │   │   └─field
+      │   │     └─name "index"
+      │   ├─operator `is`
+      │   └─rhs
+      │     └─call_expr
+      │       ├─subject
+      │       │ └─var_expr
+      │       │   └─name "divisibleby"
+      │       └─args
+      │         └─arg
+      │           └─lit_expr
+      │             └─int_lit 2
+      └─clause_body
+        └─body
+

@@ -1,0 +1,5 @@
+// run=pass, stage=check, dialect=jinja
+
+{% if position is divisibleby 3 %}{% endif %}
+{% if value is not sameas false and value is defined %}{% endif %}
+{% if loop.index is divisibleby(2) %}{% endif %}

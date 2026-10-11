@@ -41,7 +41,7 @@ ok            ckan/templates/group/read.html
 ok            ckan/templates/group/read_base.html
 ok            ckan/templates/group/snippets/feeds.html
 ok            ckan/templates/group/snippets/group_form.html
-parse-error   ckan/templates/group/snippets/group_item.html
+ok            ckan/templates/group/snippets/group_item.html
 ok            ckan/templates/group/snippets/group_list.html
 ok            ckan/templates/group/snippets/helper.html
 ok            ckan/templates/group/snippets/info.html
@@ -90,7 +90,7 @@ ok            ckan/templates/organization/snippets/feeds.html
 ok            ckan/templates/organization/snippets/helper.html
 ok            ckan/templates/organization/snippets/info.html
 ok            ckan/templates/organization/snippets/organization_form.html
-parse-error   ckan/templates/organization/snippets/organization_item.html
+ok            ckan/templates/organization/snippets/organization_item.html
 ok            ckan/templates/organization/snippets/organization_list.html
 ok            ckan/templates/package/base.html
 ok            ckan/templates/package/base_form_page.html
