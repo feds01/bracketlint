@@ -220,3 +220,27 @@ repo = "https://github.com/jekyll/minima.git"
 tag = "v2.5.2"
 paths = ["_layouts", "_includes"]
 extension = "html"
+
+[[source]]
+name = "minimal-mistakes"
+dialect = "liquid"
+repo = "https://github.com/mmistakes/minimal-mistakes.git"
+tag = "4.28.1"
+paths = ["_includes", "_layouts"]
+extension = "html"
+
+[[source]]
+name = "just-the-docs"
+dialect = "liquid"
+repo = "https://github.com/just-the-docs/just-the-docs.git"
+tag = "v0.12.0"
+paths = ["_includes", "_layouts"]
+extension = "html"
+
+[[source]]
+name = "al-folio"
+dialect = "liquid"
+repo = "https://github.com/alshedivat/al-folio.git"
+tag = "v0.16.3"
+paths = ["_includes", "_layouts"]
+extension = "liquid"
