@@ -1,0 +1,5 @@
+// run=pass, stage=check, dialect=twig
+
+{% with {attr: row_attr} only %}{{ block('attributes') }}{% endwith %}
+{% with vars %}{% endwith %}
+{% with %}{% endwith %}

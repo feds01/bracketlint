@@ -1,0 +1,8 @@
+// run=pass, stage=fmt, dialect=twig
+
+{% block title page_title|title %}
+{% block body %}
+{% with {attr: row_attr} only %}
+<div>{{ items|map(p => p.name)|join(', ') }}</div>
+{% endwith %}
+{% endblock %}

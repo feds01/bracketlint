@@ -94,16 +94,17 @@ impl AstVisitor for AstTreePrinter<'_> {
     type WithRet = TreeNode;
 
     fn visit_with(&self, node: ast::AstNodeRef<ast::With>) -> Result<Self::WithRet, Self::Error> {
-        let walk::With { assignments, block_body } = walk::walk_with(self, node)?;
+        let walk::With { assignments, value, block_body } = walk::walk_with(self, node)?;
 
-        Ok(TreeNode::branch(
-            "set",
-            vec![
-                TreeNode::branch("assignments", assignments),
-                // @@Todo: we should probably not show these if the `kind` is `Set`.
-                block_body,
-            ],
-        ))
+        let mut children = vec![TreeNode::branch("assignments", assignments)];
+        children.extend(value.map(|value| TreeNode::branch("value", vec![value])));
+        if node.body().only {
+            children.push(TreeNode::leaf("only"));
+        }
+        // @@Todo: we should probably not show these if the `kind` is `Set`.
+        children.push(block_body);
+
+        Ok(TreeNode::branch("set", children))
     }
 
     type TextRet = TreeNode;
@@ -347,6 +348,20 @@ impl AstVisitor for AstTreePrinter<'_> {
         Ok(TreeNode::branch("array_expr", children))
     }
 
+    type ArrowExprRet = TreeNode;
+
+    fn visit_arrow_expr(
+        &self,
+        node: ast::AstNodeRef<ast::ArrowExpr>,
+    ) -> Result<Self::ArrowExprRet, Self::Error> {
+        let walk::ArrowExpr { params, expr } = walk::walk_arrow_expr(self, node)?;
+
+        Ok(TreeNode::branch(
+            "arrow_expr",
+            vec![TreeNode::branch("params", params), TreeNode::branch("expr", vec![expr])],
+        ))
+    }
+
     type CondExprRet = TreeNode;
 
     fn visit_cond_expr(
@@ -445,6 +460,17 @@ impl AstVisitor for AstTreePrinter<'_> {
         children.extend(end_label.map(|name| TreeNode::branch("end_label", vec![name])));
 
         Ok(TreeNode::branch("block", children))
+    }
+
+    type BlockShortcutRet = TreeNode;
+
+    fn visit_block_shortcut(
+        &self,
+        node: ast::AstNodeRef<ast::BlockShortcut>,
+    ) -> Result<Self::BlockShortcutRet, Self::Error> {
+        let walk::BlockShortcut { label, value } = walk::walk_block_shortcut(self, node)?;
+
+        Ok(TreeNode::branch("block_shortcut", vec![label, TreeNode::branch("value", vec![value])]))
     }
 
     type BinOpRet = TreeNode;

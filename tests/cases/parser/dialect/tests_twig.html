@@ -1,0 +1,7 @@
+// run=pass, stage=check, dialect=twig
+
+{% if value is same as(false) %}{% endif %}
+{% if value is not same as(other) %}{% endif %}
+{% if value is same as true %}{% endif %}
+{% if loop.index is divisible by(3) %}{% endif %}
+{{ html|raw }}

@@ -1,0 +1,95 @@
+info: parsed module '$DIR/tests_twig.html' as twig:
+body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─var_expr
+│     │   │   └─name "value"
+│     │   ├─operator `is`
+│     │   └─rhs
+│     │     └─call_expr
+│     │       ├─subject
+│     │       │ └─var_expr
+│     │       │   └─name "same as"
+│     │       └─args
+│     │         └─arg
+│     │           └─var_expr
+│     │             └─name "false"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─var_expr
+│     │   │   └─name "value"
+│     │   ├─operator `is not`
+│     │   └─rhs
+│     │     └─call_expr
+│     │       ├─subject
+│     │       │ └─var_expr
+│     │       │   └─name "same as"
+│     │       └─args
+│     │         └─arg
+│     │           └─var_expr
+│     │             └─name "other"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─var_expr
+│     │   │   └─name "value"
+│     │   ├─operator `is`
+│     │   └─rhs
+│     │     └─call_expr
+│     │       ├─subject
+│     │       │ └─var_expr
+│     │       │   └─name "same as"
+│     │       └─args
+│     │         └─arg
+│     │           └─var_expr
+│     │             └─name "true"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─access_expr
+│     │   │   ├─subject
+│     │   │   │ └─var_expr
+│     │   │   │   └─name "loop"
+│     │   │   └─field
+│     │   │     └─name "index"
+│     │   ├─operator `is`
+│     │   └─rhs
+│     │     └─call_expr
+│     │       ├─subject
+│     │       │ └─var_expr
+│     │       │   └─name "divisible by"
+│     │       └─args
+│     │         └─arg
+│     │           └─lit_expr
+│     │             └─int_lit 3
+│     └─clause_body
+│       └─body
+└─inline
+  └─filtered_expr
+    ├─subject
+    │ └─var_expr
+    │   └─name "html"
+    └─filter
+      ├─name "raw"
+      └─args
+

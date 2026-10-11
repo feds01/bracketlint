@@ -1,0 +1,5 @@
+// run=pass, stage=check, dialect=twig
+
+{% block title page_title|title %}
+{% block body_id 'admin_post_edit' %}
+{% block body %}{{ block('title') }}{% endblock %}

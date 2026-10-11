@@ -1,7 +1,7 @@
-error: unexpectedly encountered an identifier
- --> $DIR/with_as_twig.html:1:9
+error: unexpectedly encountered the keyword `as`
+ --> $DIR/with_as_twig.html:1:19
   |
 1 | {% with user.name as name %}<p>{{ name }}</p>{% endwith %}
-  |         ----
+  |                   --
   |
   = note: this file is parsed as Twig, from `--dialect twig`

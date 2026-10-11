@@ -1,0 +1,86 @@
+info: parsed module '$DIR/arrow_functions_twig.html' as twig:
+body
+├─inline
+│ └─filtered_expr
+│   ├─subject
+│   │ └─filtered_expr
+│   │   ├─subject
+│   │   │ └─var_expr
+│   │   │   └─name "people"
+│   │   └─filter
+│   │     ├─name "map"
+│   │     └─args
+│   │       └─arg
+│   │         └─arrow_expr
+│   │           ├─params
+│   │           │ └─name "p"
+│   │           └─expr
+│   │             └─access_expr
+│   │               ├─subject
+│   │               │ └─var_expr
+│   │               │   └─name "p"
+│   │               └─field
+│   │                 └─name "first_name"
+│   └─filter
+│     ├─name "join"
+│     └─args
+│       └─arg
+│         └─lit_expr
+│           └─str_lit ', '
+├─inline
+│ └─filtered_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "items"
+│   └─filter
+│     ├─name "reduce"
+│     └─args
+│       ├─arg
+│       │ └─arrow_expr
+│       │   ├─params
+│       │   │ ├─name "total"
+│       │   │ └─name "item"
+│       │   └─expr
+│       │     └─bin_expr
+│       │       ├─lhs
+│       │       │ └─var_expr
+│       │       │   └─name "total"
+│       │       ├─operator `+`
+│       │       └─rhs
+│       │         └─access_expr
+│       │           ├─subject
+│       │           │ └─var_expr
+│       │           │   └─name "item"
+│       │           └─field
+│       │             └─name "size"
+│       └─arg
+│         └─lit_expr
+│           └─int_lit 0
+└─inline
+  └─filtered_expr
+    ├─subject
+    │ └─filtered_expr
+    │   ├─subject
+    │   │ └─var_expr
+    │   │   └─name "vars"
+    │   └─filter
+    │     ├─name "filter"
+    │     └─args
+    │       └─arg
+    │         └─arrow_expr
+    │           ├─params
+    │           │ ├─name "_"
+    │           │ └─name "key"
+    │           └─expr
+    │             └─bin_expr
+    │               ├─lhs
+    │               │ └─var_expr
+    │               │   └─name "key"
+    │               ├─operator `not in`
+    │               └─rhs
+    │                 └─var_expr
+    │                   └─name "excluded"
+    └─filter
+      ├─name "length"
+      └─args
+

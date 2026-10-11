@@ -1,0 +1,74 @@
+info: parsed module '$DIR/string_operators_twig.html' as twig:
+body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─var_expr
+│     │   │   └─name "name"
+│     │   ├─operator `starts with`
+│     │   └─rhs
+│     │     └─lit_expr
+│     │       └─str_lit 'F'
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─var_expr
+│     │   │   └─name "name"
+│     │   ├─operator `ends with`
+│     │   └─rhs
+│     │     └─lit_expr
+│     │       └─str_lit 'n'
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─var_expr
+│     │   │   └─name "phone"
+│     │   ├─operator `matches`
+│     │   └─rhs
+│     │     └─lit_expr
+│     │       └─str_lit '/^[\\d\\.]+$/'
+│     └─clause_body
+│       └─body
+├─for
+│ ├─target
+│ │ └─name "i"
+│ ├─iterator
+│ │ └─bin_expr
+│ │   ├─lhs
+│ │   │ └─lit_expr
+│ │   │   └─int_lit 1
+│ │   ├─operator `..`
+│ │   └─rhs
+│ │     └─var_expr
+│ │       └─name "pages"
+│ └─loop_body
+│   └─body
+└─for
+  ├─target
+  │ └─for_target
+  │   ├─name "key"
+  │   └─name "value"
+  ├─iterator
+  │ └─bin_expr
+  │   ├─lhs
+  │   │ └─var_expr
+  │   │   └─name "options"
+  │   ├─operator `??`
+  │   └─rhs
+  │     └─array_expr
+  └─loop_body
+    └─body
+

@@ -1,0 +1,30 @@
+info: parsed module '$DIR/block_shortcuts_twig.html' as twig:
+body
+├─block_shortcut
+│ ├─name "title"
+│ └─value
+│   └─filtered_expr
+│     ├─subject
+│     │ └─var_expr
+│     │   └─name "page_title"
+│     └─filter
+│       ├─name "title"
+│       └─args
+├─block_shortcut
+│ ├─name "body_id"
+│ └─value
+│   └─lit_expr
+│     └─str_lit 'admin_post_edit'
+└─block
+  ├─name "body"
+  └─body
+    └─inline
+      └─call_expr
+        ├─subject
+        │ └─var_expr
+        │   └─name "block"
+        └─args
+          └─arg
+            └─lit_expr
+              └─str_lit 'title'
+

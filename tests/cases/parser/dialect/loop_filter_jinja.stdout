@@ -1,0 +1,24 @@
+info: parsed module '$DIR/loop_filter_jinja.html' as jinja:
+body
+└─for
+  ├─target
+  │ └─name "item"
+  ├─iterator
+  │ └─bin_expr
+  │   ├─lhs
+  │   │ └─var_expr
+  │   │   └─name "items"
+  │   ├─operator `+`
+  │   └─rhs
+  │     └─var_expr
+  │       └─name "extra"
+  ├─loop_body
+  │ └─body
+  └─guard
+    └─access_expr
+      ├─subject
+      │ └─var_expr
+      │   └─name "item"
+      └─field
+        └─name "visible"
+

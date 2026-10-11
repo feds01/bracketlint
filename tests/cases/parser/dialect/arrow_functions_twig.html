@@ -1,0 +1,5 @@
+// run=pass, stage=check, dialect=twig
+
+{{ people|map(p => p.first_name)|join(', ') }}
+{{ items|reduce((total, item) => total + item.size, 0) }}
+{{ vars|filter((_, key) => key not in excluded)|length }}
