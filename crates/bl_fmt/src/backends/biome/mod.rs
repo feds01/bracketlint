@@ -1,29 +1,25 @@
 //! The Biome backend, which utilises the `biome` crate to parse and format
 //! code.
 
-use std::{
-    cell::RefCell,
-    convert::Infallible,
-    ops::{FromResidual, Residual, Try},
-    rc::Rc,
-};
+use std::{cell::RefCell, ops::Range, rc::Rc};
 
 use biome_css_formatter::{self as css_formatter, context::CssFormatOptions};
 use biome_css_parser::{self as css_parser, CssParserOptions};
 use biome_formatter::{FormatError, IndentStyle};
 use biome_html_formatter::{HtmlFormatOptions, format_node};
-use biome_html_parser::{HtmlParserOptions, parse_html_with_cache};
-use biome_html_syntax::{HtmlElementList, HtmlRoot, HtmlSyntaxNode, T};
+use biome_html_parser::{HtmlParse, HtmlParserOptions, parse_html_with_cache};
+use biome_html_syntax::{
+    AnyHtmlElement, HtmlElement, HtmlElementList, HtmlSyntaxNode, T, VOID_ELEMENTS,
+};
 use biome_js_formatter::{self as js_formatter, context::JsFormatOptions};
 use biome_js_parser::{self as js_parser, JsParserOptions};
 use biome_languages::{CssFileSource, HtmlFileSource, JsFileSource};
 use biome_rowan::{AstNode, AstNodeList, Direction, NodeCache, SyntaxKind};
-use bl_ast::SpannedSource;
 
 use crate::{
     adapters::{
         ExternalLanguagesEngineAdaptor, FormatterContext, HasCSSParsing, HasHTMLParsing,
-        HasJSParsing, LanguageType, TerminalState, VERBATIM_ELEMENTS,
+        HasJSParsing, HtmlPart, LanguageType, TerminalState, is_verbatim,
     },
     diagnostics::{FmtError, FmtErrorKind, FmtResult},
 };
@@ -75,108 +71,195 @@ impl BiomeFormatter {
     }
 }
 
-struct HTMLBiomeFormatter<'ctx> {
-    context: &'ctx FormatterContext<'ctx>,
-
+struct HTMLBiomeFormatter {
     /// The options for the formatter, encapsulating backend specific options.
     options: BiomeFormatterOptions,
 
     /// The cache of the nodes and tokens that the HTML parser makes.
     cache: Rc<RefCell<NodeCache>>,
-
-    /// The state of the formatter, which is used to determine the
-    /// terminal state of the formatter.
-    state: TerminalState,
 }
 
-impl<'ctx> HTMLBiomeFormatter<'ctx> {
-    /// A utility function to get the rightmost child of a node.
-    ///
-    /// This is used to determine the last child of a node, which is useful for
-    /// determining the terminal state of the parser.
-    fn apply_state_from_tree(&mut self, tree: &HtmlRoot) {
-        let options = &self.options.html;
-        let html = tree.html();
+impl HTMLBiomeFormatter {
+    fn parse(&self, contents: &str) -> HtmlParse {
+        let options = HtmlParserOptions::from(&HtmlFileSource::html());
+        parse_html_with_cache(contents, &mut self.cache.borrow_mut(), options)
+    }
 
-        // If we don't have any children, but we do have an EOF token, we can
-        // try and infer some context from the EOF token.
-        if html.iter().last().is_none()
-            && let Ok(_) = tree.eof_token()
-        {
-            let end: usize = html.range().end().into();
-            let contents_line_end = self.context.source().line_ranges.line_end(end);
-            if end != contents_line_end {
-                return;
-            }
+    /// The part of HTML at `range` in its piece, which `parsed` is, with the
+    /// elements it leaves open. It is kept as it is written if Biome can't
+    /// format it.
+    fn html_part(&self, range: Range<usize>, parsed: &HtmlParse) -> FmtResult<HtmlPart> {
+        let root = parsed.syntax();
+        let opens = open_elements(parsed.tree().html());
 
-            self.state.indent = self.state.indent.saturating_sub(self.context.indent_step() as u16);
-            return;
+        if has_broken_tag(&root) {
+            return Ok(HtmlPart::Html { range, formatted: None, opens });
         }
 
-        let TerminalCalculationState::Some { language, indent } =
-            find_rightmost_child_and_extract_state(options, &html, self.context.source())
-        else {
-            return;
+        let language = LanguageType::Html;
+        let options = self.options.html.clone();
+
+        let formatted = match format_node(options, &root, vec![]) {
+            Ok(formatted) => formatted.print().unwrap().into_code(),
+            // A tag without its `>`, e.g. `<div ` before `{{ attributes }}`,
+            // has no node that Biome can format.
+            Err(FormatError::SyntaxError) => {
+                return Ok(HtmlPart::Html { range, formatted: None, opens });
+            }
+            Err(_) => {
+                return Err(FmtError::new(FmtErrorKind::ExternalLanguageFormatError { language }));
+            }
         };
 
-        // If we've got an indent to apply, we need to apply it to the
-        // formatter state.
-        if let Some(indent) = indent {
-            self.state.indent = self.state.indent.saturating_add_signed(indent.into());
-        }
-
-        self.state.language = language;
+        Ok(HtmlPart::Html { range, formatted: Some(formatted), opens })
     }
 }
 
-impl<'ctx> HasHTMLParsing<'ctx> for HTMLBiomeFormatter<'ctx> {
+impl<'ctx> HasHTMLParsing<'ctx> for HTMLBiomeFormatter {
     /// Format the HTML contents using the Biome formatter, by parsing them
     /// with `biome_html_parser` and formatting the tree with
     /// `biome_html_formatter`.
     ///
     /// ##Note: The contents are a piece of the template between its tags,
     /// which often isn't valid HTML on its own. Elements that the piece opens
-    /// or closes without the other are formatted all the same, but a piece
-    /// where a template tag cuts an HTML tag, e.g. `<li class="`, is kept as
-    /// it is written, see [has_broken_tag].
-    fn format(&mut self, contents: &str) -> FmtResult<Option<String>> {
-        let options = HtmlParserOptions::from(&HtmlFileSource::html());
-        let parsed = parse_html_with_cache(contents, &mut self.cache.borrow_mut(), options);
-        let tree = parsed.tree();
+    /// without closing them are formatted all the same. The closing tags of
+    /// elements that open before the piece are its own parts, so that each is
+    /// indented by the elements that are still open. A part where a template
+    /// tag cuts an HTML tag, e.g. `<li class="`, is kept as it is written, see
+    /// [has_broken_tag].
+    fn format(&mut self, contents: &str) -> FmtResult<Vec<HtmlPart>> {
+        let parsed = self.parse(contents);
 
-        // In order to compute the terminal state, we're going to check
-        // the top most node of the HTML document, and remember the value
-        // so that we can inspect, the following traits:
-        //
-        // - What language did we "finish" with?
-        //    - If `style``, then we must be in a CSS block.
-        //    - If `script`, then we must be in a JS block.
-        //    - Otherwise, we are in a HTML block.
-        self.apply_state_from_tree(&tree);
+        // The content of a `<pre>`, `<textarea>`, `<script>` or `<style>` is
+        // its own part, which is kept exactly as it is written. Biome would
+        // print it as it is written too, but among the HTML that it indents,
+        // which the formatter would then indent again.
+        if let Some(content) = verbatim_content(&parsed.syntax(), contents.len()) {
+            let mut parts = self.format(&contents[..content.start])?;
+            parts.push(HtmlPart::Verbatim { range: content.clone() });
 
-        if has_broken_tag(&parsed.syntax()) {
-            return Ok(None);
+            let rest = self.format(&contents[content.end..])?;
+            parts.extend(rest.into_iter().map(|part| part.shift(content.end)));
+            return Ok(parts);
         }
 
-        let language = LanguageType::Html;
-        let options = self.options.html.clone();
+        let closes = closing_tags(parsed.tree().html());
+        if closes.is_empty() {
+            return Ok(vec![self.html_part(0..contents.len(), &parsed)?]);
+        }
 
-        match format_node(options, &parsed.syntax(), vec![]) {
-            Ok(formatted) => {
-                let printed = formatted.print().unwrap();
-                Ok(Some(printed.into_code()))
+        let mut parts = vec![];
+        let mut start = 0;
+        for (range, name) in closes {
+            // What comes before the closing tag of a `<pre>`, `<textarea>`,
+            // `<script>` or `<style>` is its content, which Biome would lay out
+            // as other HTML, since it doesn't see its opening tag.
+            let html = start..range.start;
+            if is_verbatim(&name) {
+                parts.push(HtmlPart::Verbatim { range: html });
+            } else {
+                parts.push(self.html_part(html.clone(), &self.parse(&contents[html]))?);
             }
-            // A tag without its `>`, e.g. `<div ` before `{{ attributes }}`,
-            // has no node that Biome can format.
-            Err(FormatError::SyntaxError) => Ok(None),
-            Err(_) => Err(FmtError::new(FmtErrorKind::ExternalLanguageFormatError { language })),
+
+            start = range.end;
+            parts.push(HtmlPart::Close { range, name });
+        }
+
+        let rest = start..contents.len();
+        parts.push(self.html_part(rest.clone(), &self.parse(&contents[rest]))?);
+        Ok(parts)
+    }
+}
+
+/// The content of the first of the
+/// [VERBATIM_ELEMENTS](crate::adapters::VERBATIM_ELEMENTS) in `root`, which
+/// isn't empty: from the end of its opening tag to the start of its closing
+/// tag, or to the end of the piece, `len`, if it has none. An opening tag that
+/// a template tag cuts before its `>`, e.g. `<pre ` in `<pre {% if x %}`, has
+/// no content in the piece, as the rest of it is the rest of the tag.
+fn verbatim_content(root: &HtmlSyntaxNode, len: usize) -> Option<Range<usize>> {
+    let content = |element: HtmlElement| {
+        let opening = element.opening_element().ok()?;
+        let name = opening.tag_name()?;
+        if !is_verbatim(name.text()) || opening.r_angle_token().is_err() {
+            return None;
+        }
+
+        let start = opening.syntax().text_trimmed_range().end().into();
+        let end = element
+            .closing_element()
+            .map_or(len, |closing| closing.syntax().text_trimmed_range().start().into());
+        (start < end).then_some(start..end)
+    };
+
+    root.descendants().filter_map(HtmlElement::cast).find_map(content)
+}
+
+/// The name of the closing tag `node`, if it is one.
+fn closing_tag_name(node: &HtmlSyntaxNode) -> Option<String> {
+    let mut tokens = node.descendants_tokens(Direction::Next);
+    let (open, slash, name) = (tokens.next()?, tokens.next()?, tokens.next()?);
+    let is_closing_tag = open.kind() == T![<] && slash.kind() == T![/];
+    is_closing_tag.then(|| name.text_trimmed().to_string())
+}
+
+/// The closing tags in `list` of elements that open before it, by their range
+/// and name. Biome parses each into a bogus element, as it has no element to
+/// close.
+fn closing_tags(list: HtmlElementList) -> Vec<(Range<usize>, String)> {
+    let closing_tag = |element: AnyHtmlElement| {
+        let AnyHtmlElement::HtmlBogusElement(bogus) = element else {
+            return None;
+        };
+
+        let range = bogus.syntax().text_trimmed_range();
+        let name = closing_tag_name(bogus.syntax())?;
+        Some((range.start().into()..range.end().into(), name))
+    };
+
+    list.iter().filter_map(closing_tag).collect()
+}
+
+/// The elements that `list` leaves open, outermost first. An element without
+/// its closing tag holds the rest of the list, so it is the last element of
+/// the list, and the elements open inside it are the last of its children.
+fn open_elements(mut list: HtmlElementList) -> Vec<String> {
+    let mut opens = vec![];
+
+    loop {
+        match list.iter().last() {
+            Some(AnyHtmlElement::HtmlElement(element)) if element.closing_element().is_none() => {
+                let Some(name) = element.opening_element().ok().and_then(|tag| tag.tag_name())
+                else {
+                    break;
+                };
+
+                opens.push(name.text().to_string());
+                list = element.children();
+            }
+            // A start tag that a template tag cuts in a value, e.g. `<a href="`
+            // before `{{ url }}`, is a bogus element, and its element opens
+            // once a later piece ends the tag.
+            Some(AnyHtmlElement::HtmlBogusElement(bogus)) => {
+                opens.extend(cut_start_tag(bogus.syntax()));
+                break;
+            }
+            _ => break,
         }
     }
 
-    /// Returns the terminal state of the HTML formatter.
-    fn into_state(self) -> TerminalState {
-        self.state
-    }
+    opens
+}
+
+/// The name of the element that `node` starts, if it is a start tag that a
+/// template tag cuts, e.g. `<a href="`, of an element that isn't void, i.e.
+/// one that has content and a closing tag, unlike `<img>`.
+fn cut_start_tag(node: &HtmlSyntaxNode) -> Option<String> {
+    let mut tokens = node.descendants_tokens(Direction::Next);
+    let (open, name) = (tokens.next()?, tokens.next()?);
+    let is_start_tag =
+        open.kind() == T![<] && name.kind() != T![/] && !VOID_ELEMENTS.contains(name.kind());
+    is_start_tag.then(|| name.text_trimmed().to_string())
 }
 
 /// Whether Biome couldn't parse a tag in the HTML of `root`, e.g. `<li class="`
@@ -188,8 +271,9 @@ impl<'ctx> HasHTMLParsing<'ctx> for HTMLBiomeFormatter<'ctx> {
 /// A closing tag whose element opens before a template tag, e.g. the `</li>` in
 /// `{% endif %}</li>`, is parsed into a bogus element as well. It is printed as
 /// any other closing tag, unless it spans several lines, e.g. `</li\n>`, or it
-/// closes one of the [VERBATIM_ELEMENTS], whose content Biome would then lay
-/// out as other HTML, since it only knows it from their opening tag.
+/// closes one of the [VERBATIM_ELEMENTS](crate::adapters::VERBATIM_ELEMENTS),
+/// whose content Biome would then lay out as other HTML, since it only knows it
+/// from their opening tag.
 fn has_broken_tag(root: &HtmlSyntaxNode) -> bool {
     let is_closing_tag = |node: &HtmlSyntaxNode| {
         let mut tokens = node.descendants_tokens(Direction::Next);
@@ -201,130 +285,11 @@ fn has_broken_tag(root: &HtmlSyntaxNode) -> bool {
         let name = name.text_trimmed();
         open.kind() == T![<]
             && slash.kind() == T![/]
-            && !VERBATIM_ELEMENTS.iter().any(|element| name.eq_ignore_ascii_case(element))
+            && !is_verbatim(name)
             && !node.text_trimmed().contains_char('\n')
     };
 
     root.descendants().any(|node| node.kind().is_bogus() && !is_closing_tag(&node))
-}
-
-enum TerminalCalculationState {
-    None,
-    Some {
-        language: LanguageType,
-
-        /// Any indentation that was pending.
-        indent: Option<i8>,
-    },
-    UseParent,
-}
-
-impl Try for TerminalCalculationState {
-    type Output = TerminalCalculationState;
-    type Residual = TerminalCalculationState;
-
-    fn from_output(output: Self::Output) -> Self {
-        output
-    }
-
-    fn branch(self) -> std::ops::ControlFlow<Self::Residual, Self::Output> {
-        match self {
-            // Define which values should short-circuit when using ?
-            TerminalCalculationState::UseParent => std::ops::ControlFlow::Break(self),
-
-            // Define which values represent "success" and should continue execution
-            val @ (TerminalCalculationState::None | TerminalCalculationState::Some { .. }) => {
-                std::ops::ControlFlow::Continue(val)
-            }
-        }
-    }
-}
-
-impl FromResidual for TerminalCalculationState {
-    fn from_residual(residual: <Self as Try>::Residual) -> Self {
-        residual
-    }
-}
-
-impl Residual<TerminalCalculationState> for TerminalCalculationState {
-    type TryType = TerminalCalculationState;
-}
-
-impl<E> FromResidual<Result<Infallible, E>> for TerminalCalculationState {
-    fn from_residual(_: Result<Infallible, E>) -> Self {
-        // When Result::Err is encountered with ?, return TerminalCalculationState::None
-        TerminalCalculationState::None
-    }
-}
-
-fn find_rightmost_child_and_extract_state(
-    options: &HtmlFormatOptions,
-    node: &HtmlElementList,
-    spanned: SpannedSource<'_>,
-) -> TerminalCalculationState {
-    if let Some(child) = node.into_iter().last() {
-        let html_element = match child {
-            // If the child is an HTML element, we need to check if it has any
-            // children.
-            biome_html_syntax::AnyHtmlElement::HtmlElement(e) => e,
-
-            // biome_html_syntax::AnyHtmlElement::HtmlSelfClosingElement(e) => {
-            //     let indent = options.indent_width().value().wrapping_sub(2); // @@Temp: Hardcoded
-            //     return TerminalCalculationState::Some {
-            //         language: LanguageType::Html,
-            //         indent: Some(indent),
-            //     };
-            // }
-
-            // If we get an element that is auxiliary, it means that we can
-            // backtrack and in fact use the parent element which should be
-            // the last "tag" child.
-            _ => return TerminalCalculationState::UseParent,
-        };
-
-        let nodes = html_element.children();
-
-        if !nodes.is_empty() {
-            // Handle the case where the child is an HTML element, and it has
-            // children.
-            match find_rightmost_child_and_extract_state(options, &nodes, spanned) {
-                TerminalCalculationState::UseParent => {}
-                state => return state,
-            }
-        }
-
-        let opening_element = html_element.opening_element()?;
-        let Some(name) = opening_element.tag_name() else {
-            return TerminalCalculationState::None;
-        };
-
-        let size = options.indent_width().value() as i8;
-
-        let indent = match html_element.closing_element() {
-            Some(_) => Some(-size),
-            None => {
-                // @@CrazyHeuristic: if the name is not a self-closing element, and it uses all
-                // of the space on the current line, we can assume that we should
-                // increase the indent level by 1.
-                let range = opening_element.range();
-                let end: usize = range.end().into();
-                let contents_line_end = spanned.line_ranges.line_end(end);
-
-                if end == contents_line_end { Some(size) } else { None }
-            }
-        };
-
-        // The text after a `<style>` or `<script>` element is CSS or JavaScript
-        // only while the element is open, e.g. when a tag in its body splits
-        // it. Once it is closed, the text after it is HTML again.
-        let element = name.text();
-        let is_open = html_element.closing_element().is_none();
-        let language = if is_open { LanguageType::of_element(element) } else { LanguageType::Html };
-
-        TerminalCalculationState::Some { language, indent }
-    } else {
-        TerminalCalculationState::None
-    }
 }
 
 struct CSSBiomeFormatter<'ctx> {
@@ -422,13 +387,8 @@ impl ExternalLanguagesEngineAdaptor for BiomeFormatter {
     type HTMLEngine<'ctx> = impl HasHTMLParsing<'ctx>;
     type JSEngine<'ctx> = impl HasJSParsing<'ctx>;
 
-    fn html_engine<'ctx>(&self, context: &'ctx FormatterContext<'ctx>) -> Self::HTMLEngine<'ctx> {
-        HTMLBiomeFormatter {
-            context,
-            options: self.options.clone(),
-            cache: self.html_cache.clone(),
-            state: context.state,
-        }
+    fn html_engine<'ctx>(&self, _: &'ctx FormatterContext<'ctx>) -> Self::HTMLEngine<'ctx> {
+        HTMLBiomeFormatter { options: self.options.clone(), cache: self.html_cache.clone() }
     }
 
     fn css_engine<'ctx>(&self, context: &'ctx FormatterContext<'ctx>) -> Self::CSSEngine<'ctx> {

@@ -1,6 +1,6 @@
 //! The bracketlint formatter.
 
-#![feature(impl_trait_in_assoc_type, try_trait_v2, try_trait_v2_residual)]
+#![feature(impl_trait_in_assoc_type)]
 
 use adapters::ExternalLanguagesEngineAdaptor;
 use bl_ast::{AstNodeRef, AstVisitorMutSelf, Document, SourceId};

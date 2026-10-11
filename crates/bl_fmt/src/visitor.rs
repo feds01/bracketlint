@@ -6,7 +6,7 @@ use bl_reporting::inline::{InlineSnippet, note_on_span};
 
 use crate::{
     adapters::{
-        ExternalLanguagesEngineAdaptor, FormatterContext, HasCSSParsing, HasHTMLParsing,
+        ExternalLanguagesEngineAdaptor, FormatterContext, HasCSSParsing, HasHTMLParsing, HtmlPart,
         LanguageType, TerminalState,
     },
     diagnostics::FmtError,
@@ -24,6 +24,12 @@ pub(crate) struct Formatter<'fmt, EngineAdaptor: ExternalLanguagesEngineAdaptor>
 
     /// The context of the formatter.
     ctx: FormatterContext<'fmt>,
+
+    /// Where the source that the buffer ends with ends, when the buffer ends
+    /// with source that is pushed exactly as it is written, with the length of
+    /// the buffer then. In a `<pre>` or `<textarea>`, the source after it is
+    /// pushed exactly as it is written too, from there.
+    exact: Option<(usize, usize)>,
 }
 
 impl<EngineAdaptor: ExternalLanguagesEngineAdaptor> Formatter<'_, EngineAdaptor> {
@@ -80,7 +86,9 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
                 options,
                 dialect,
                 state: TerminalState { language: LanguageType::Html, indent: 0 },
+                open_elements: vec![],
             },
+            exact: None,
         }
     }
 
@@ -95,14 +103,6 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         let size = self.ctx.indent_level();
 
         self.buffer.push_str(" ".repeat(size as usize).as_str());
-    }
-
-    /// Push a line into the buffer.
-    #[inline(always)]
-    pub fn push_line(&mut self, line: &str) {
-        self.add_indent();
-        self.buffer.push_str(line);
-        self.buffer.push('\n');
     }
 
     /// Whether the next hunk would start a new line in the buffer.
@@ -171,6 +171,54 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         Ok(())
     }
 
+    /// Indent a tag of a block, when it starts a line, so that the tags of the
+    /// block line up. One that continues a line, e.g. the `{% endif %}` of
+    /// `{% if a %}b{% endif %}`, isn't indented.
+    fn indent_tag(&mut self) {
+        if self.at_line_start() {
+            self.add_indent();
+        }
+    }
+
+    /// Start an item that starts at `start` in the source, e.g. a `{{ }}` tag:
+    /// on a line of its own, at the current indent, when the source starts one
+    /// with it, and otherwise after a space when the source has one.
+    fn start_item(&mut self, start: usize) {
+        if self.whitespace_before(start).contains('\n') && !self.at_line_start() {
+            self.end_line();
+        }
+
+        if self.at_line_start() {
+            self.add_indent();
+        } else {
+            self.space_from_previous(start);
+        }
+    }
+
+    /// Start a branch of a block, e.g. the `{% else %}` of an if block, with
+    /// the elements `open` at the start of the block. Each branch opens and
+    /// closes its own, and the tags of the block line up with its start.
+    fn start_branch(&mut self, open: &[String]) {
+        self.ctx.set_open_elements(open.to_vec());
+    }
+
+    /// End a block with its end tag, at the elements `open` at its start, after
+    /// which the elements `after` are open: those that its first branch leaves
+    /// open, as the template would be if it took it.
+    fn end_block(
+        &mut self,
+        end: &str,
+        trim: bl_ast::TrimMarker,
+        open: &[String],
+        after: Vec<String>,
+    ) -> Result<(), FmtError> {
+        self.start_branch(open);
+        self.push_tag_line(end, trim)?;
+        self.ctx.set_open_elements(after);
+
+        Ok(())
+    }
+
     /// Push a tag whose contents `f` pushes, with the whitespace control
     /// markers of `trim` next to its delimiters.
     fn within_tag<F: FnOnce(&mut Self) -> Result<(), FmtError>>(
@@ -197,7 +245,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
     /// Push a line with a `{% ... %}` tag that holds `contents`, e.g. the
     /// `{% endif %}` of an if block.
     fn push_tag_line(&mut self, contents: &str, trim: bl_ast::TrimMarker) -> Result<(), FmtError> {
-        self.add_indent();
+        self.indent_tag();
         self.within_tag(TagKind::Block, trim, |this| {
             this.push_hunk(contents);
             Ok(())
@@ -219,11 +267,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
     fn push_text(&mut self, start: usize, text: &str) -> Result<(), FmtError> {
         // We need to check which language engine to use for the formatting.
         let (result, state) = match self.ctx.state.language {
-            LanguageType::Html => {
-                let mut engine = self.adaptor.html_engine(&self.ctx);
-                let result = engine.format(text)?;
-                (result, engine.into_state())
-            }
+            LanguageType::Html => return self.push_html(start, text),
             LanguageType::Css => {
                 let engine = self.adaptor.css_engine(&self.ctx);
                 let result = engine.format(text)?;
@@ -237,10 +281,109 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
             LanguageType::Text => (Some(text.to_string()), self.ctx.state),
         };
 
+        self.push_piece(start, text, result);
+        self.ctx.state = state;
+        Ok(())
+    }
+
+    /// Push the piece of HTML `text`, which starts at `start` in the source,
+    /// part by part, and open and close the elements that it does.
+    fn push_html(&mut self, start: usize, text: &str) -> Result<(), FmtError> {
+        let parts = self.adaptor.html_engine(&self.ctx).format(text)?;
+
+        for part in parts {
+            match part {
+                HtmlPart::Html { range, formatted, opens } => {
+                    // The element that the part opens may end one that is open,
+                    // e.g. an `<li>` the `<li>` before it, so the part is outside
+                    // of that.
+                    if let Some(name) = opens.first() {
+                        self.ctx.close_implied(name);
+                    }
+
+                    // The content of a `<pre>` or `<textarea>` that a tag splits
+                    // is kept exactly as it is written, since its whitespace
+                    // matters.
+                    if self.ctx.keeps_whitespace() {
+                        self.push_exact(start + range.start, &text[range]);
+                    } else {
+                        self.push_piece(start + range.start, &text[range], formatted);
+                    }
+
+                    self.ctx.open_elements(opens);
+                }
+                HtmlPart::Verbatim { range } => self.push_exact(start + range.start, &text[range]),
+                HtmlPart::Close { range, name } => {
+                    // The closing tag of a `<pre>` or `<textarea>` stays where it
+                    // is, as the whitespace before it is its content. Any other
+                    // is at the indent of the elements that are still open.
+                    let tag_start = start + range.start;
+                    if self.ctx.keeps_whitespace() {
+                        self.push_exact(tag_start, &text[range]);
+                        self.ctx.close_element(&name);
+                    } else {
+                        self.ctx.close_element(&name);
+                        self.start_item(tag_start);
+                        self.push_hunk(&text[range]);
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Push `text`, which starts at `start` in the source, exactly as it is
+    /// written, e.g. the content of a `<pre>`, but for the whitespace at its
+    /// end when it ends a line, which the formatter lays out with what comes
+    /// next, e.g. a `</script>`. The last line is left open, as
+    /// [Self::push_lines] leaves it. In a `<pre>` or `<textarea>`, what comes
+    /// next is pushed exactly too, from the whitespace before it, see
+    /// [Self::push_exact_gap].
+    fn push_exact(&mut self, start: usize, text: &str) {
+        self.push_exact_gap(start);
+
+        let trimmed = text.trim_end();
+        let text = if text[trimmed.len()..].contains('\n') { trimmed } else { text };
+        self.push_hunk(text);
+        self.exact = Some((start + text.len(), self.buffer.len()));
+    }
+
+    /// Push the source before `start` exactly as it is written, in a `<pre>`
+    /// or `<textarea>`: the whitespace from where the buffer ends with source
+    /// pushed exactly, or else the whitespace right before `start`.
+    fn push_exact_gap(&mut self, start: usize) {
+        if !self.ctx.keeps_whitespace() {
+            return;
+        }
+
+        let exact_end = self.exact.filter(|&(_, len)| len == self.buffer.len());
+        let from = match exact_end {
+            Some((end, _)) => end,
+            None => start - self.whitespace_before(start).len(),
+        };
+
+        if from < start {
+            self.push_hunk(&self.ctx.source.source[from..start]);
+        }
+    }
+
+    /// Push `text`, which starts at `start` in the source, as `formatted`, or
+    /// as it is written if that is `None`.
+    fn push_piece(&mut self, start: usize, text: &str, formatted: Option<String>) {
         let start = start + (text.len() - text.trim_start().len());
+
+        // The text starts a line when the source starts one with it.
+        if !text.trim().is_empty()
+            && self.whitespace_before(start).contains('\n')
+            && !self.at_line_start()
+        {
+            self.end_line();
+        }
+
         self.space_from_previous(start);
 
-        match result {
+        match formatted {
             Some(formatted) => self.push_lines(&formatted),
             // Text that is only whitespace, e.g. the indent of a `</script>`,
             // has nothing to keep.
@@ -253,9 +396,6 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
                 self.push_hunk(text);
             }
         }
-
-        self.ctx.state = state;
-        Ok(())
     }
 
     /// Push the lines of `formatted`, each at the current indent, without its
@@ -335,7 +475,6 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
                 // Check if the next line is the end of the line, otherwise the
                 // following text continues the line.
                 if span.end() + 1 == line_end {
-                    self.ctx.decrement_indent();
                     self.push_hunk("\n");
                 }
 
@@ -420,7 +559,9 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         node: bl_ast::AstNodeRef<bl_ast::Block>,
     ) -> Result<Self::BlockRet, Self::Error> {
         let bl_ast::Block { label, block_body, end_label, trim } = node.body();
+        let open = self.ctx.open_elements.clone();
 
+        self.indent_tag();
         self.within_tag(TagKind::Block, trim.start, |this| {
             this.push_hunk("block");
             if let Some(label) = label {
@@ -430,18 +571,19 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
 
             Ok(())
         })?;
-        self.push_line("");
+        self.end_line();
 
         // Now visit the block body.
         self.with_block(|formatter| formatter.visit_body(block_body.ast_ref()))?;
+        let after = self.ctx.open_elements.clone();
 
-        match end_label {
+        let end = match end_label {
             Some(end_label) => {
-                let end_label = self.ctx.source.hunk(end_label.ast_ref().range());
-                self.push_tag_line(&format!("endblock {end_label}"), trim.end)
+                format!("endblock {}", self.ctx.source.hunk(end_label.ast_ref().range()))
             }
-            None => self.push_tag_line("endblock", trim.end),
-        }
+            None => "endblock".to_string(),
+        };
+        self.end_block(&end, trim.end, &open, after)
     }
 
     type WithRet = ();
@@ -451,8 +593,10 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         node: bl_ast::AstNodeRef<bl_ast::With>,
     ) -> Result<Self::WithRet, Self::Error> {
         let bl_ast::With { assignments, block_body, trim, .. } = node.body();
+        let open = self.ctx.open_elements.clone();
 
         // Keep the assignments as they are written, e.g. `a=1 b=2` or `x as y`.
+        self.indent_tag();
         self.within_tag(TagKind::Block, trim.start, |this| {
             this.push_hunk("with");
             if !assignments.is_empty() {
@@ -467,8 +611,8 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         // Now visit the block body.
         self.with_block(|formatter| formatter.visit_body(block_body.ast_ref()))?;
 
-        self.push_tag_line("endwith", trim.end)?;
-        Ok(())
+        let after = self.ctx.open_elements.clone();
+        self.end_block("endwith", trim.end, &open, after)
     }
 
     type ForRet = ();
@@ -494,8 +638,10 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             bl_ast::LoopKind::For => ("for", "endfor"),
             bl_ast::LoopKind::TableRow => ("tablerow", "endtablerow"),
         };
+        let open = self.ctx.open_elements.clone();
 
         // @@ Proof of concept: for now, we will just push a for loop into the buffer.
+        self.indent_tag();
         self.within_tag(TagKind::Block, trim.start, |this| {
             this.push_hunk(opening);
             this.push_hunk(" ");
@@ -530,6 +676,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
 
         // Now visit the loop body.
         self.with_block(|formatter| formatter.visit_body(loop_body.ast_ref()))?;
+        let after = self.ctx.open_elements.clone();
 
         // Check if we have an empty loop body, which comes after `{% empty %}`
         // in [Django] and `{% else %}` in [Jinja], [Liquid] and [Twig].
@@ -539,11 +686,12 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         // [Liquid]: https://shopify.github.io/liquid/tags/iteration/#else
         // [Twig]: https://twig.symfony.com/doc/3.x/tags/for.html#the-else-clause
         if let Some(loop_empty) = loop_empty {
+            self.start_branch(&open);
             self.push_tag_line(self.ctx.dialect.empty_loop_tag(), *empty_trim)?;
             self.with_block(|formatter| formatter.visit_body(loop_empty.ast_ref()))?;
         }
 
-        self.push_tag_line(end, trim.end)
+        self.end_block(end, trim.end, &open, after)
     }
 
     type IfRet = ();
@@ -553,13 +701,18 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         node: bl_ast::AstNodeRef<bl_ast::If>,
     ) -> Result<Self::IfRet, Self::Error> {
         let bl_ast::If { clauses, otherwise, else_trim, end_trim } = node.body();
+        let open = self.ctx.open_elements.clone();
+        let mut after = None;
 
         // Walk the clauses, and format each one of them.
         for clause in clauses.iter() {
+            self.start_branch(&open);
             self.visit_if_clause(clause.ast_ref())?;
+            after.get_or_insert_with(|| self.ctx.open_elements.clone());
         }
 
         if let Some(otherwise) = otherwise {
+            self.start_branch(&open);
             self.push_tag_line("else", *else_trim)?;
             self.with_block(|formatter| formatter.visit_body(otherwise.ast_ref()))?;
         }
@@ -569,7 +722,8 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             Some(bl_ast::ClauseKind::Unless) => "endunless",
             _ => "endif",
         };
-        self.push_tag_line(end, *end_trim)
+        let after = after.unwrap_or_else(|| open.clone());
+        self.end_block(end, *end_trim, &open, after)
     }
 
     type IfClauseRet = ();
@@ -580,7 +734,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
     ) -> Result<Self::IfClauseRet, Self::Error> {
         let bl_ast::IfClause { kind, condition, clause_body, trim } = node.body();
 
-        self.add_indent();
+        self.indent_tag();
         self.within_tag(TagKind::Block, *trim, |this| {
             match kind {
                 bl_ast::ClauseKind::If => this.push_hunk("if "),
@@ -610,8 +764,10 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         node: bl_ast::AstNodeRef<bl_ast::Case>,
     ) -> Result<Self::CaseRet, Self::Error> {
         let bl_ast::Case { subject, leading, branches, otherwise, trim, else_trim } = node.body();
+        let open = self.ctx.open_elements.clone();
+        let mut after = None;
 
-        self.add_indent();
+        self.indent_tag();
         self.within_tag(TagKind::Block, trim.start, |this| {
             this.push_hunk("case ");
             this.visit_expr(subject.ast_ref())
@@ -623,15 +779,20 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         self.with_block(|formatter| formatter.visit_body(leading.ast_ref()))?;
 
         for branch in branches.iter() {
+            self.start_branch(&open);
             self.visit_when(branch.ast_ref())?;
+            after.get_or_insert_with(|| self.ctx.open_elements.clone());
         }
 
         if let Some(otherwise) = otherwise {
+            self.start_branch(&open);
             self.push_tag_line("else", *else_trim)?;
             self.with_block(|formatter| formatter.visit_body(otherwise.ast_ref()))?;
+            after.get_or_insert_with(|| self.ctx.open_elements.clone());
         }
 
-        self.push_tag_line("endcase", trim.end)
+        let after = after.unwrap_or_else(|| open.clone());
+        self.end_block("endcase", trim.end, &open, after)
     }
 
     type WhenRet = ();
@@ -644,7 +805,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
 
         // The values are separated by either `,` or `or`, so keep them as they
         // are written.
-        self.add_indent();
+        self.indent_tag();
         self.within_tag(TagKind::Block, *trim, |this| {
             this.push_hunk("when ");
             this.push_source(values.range());
@@ -666,7 +827,26 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
 
         // Visit the body of the document
         for (i, item) in statements.iter().enumerate() {
+            // The tags in a `<pre>` or `<textarea>` are kept exactly as they
+            // are written, with the whitespace around them, since it is the
+            // element's content. A block in one is kept whole, so a closing
+            // tag in it doesn't close the element.
+            let statement = item.ast_ref();
+            if self.ctx.keeps_whitespace()
+                && !matches!(statement.body(), bl_ast::Statement::Text(_))
+            {
+                let range = statement.range();
+                self.push_exact(range.start(), self.ctx.source.hunk(range));
+                continue;
+            }
+
             walk_mut_self::walk_statement(self, item.ast_ref())?;
+
+            // The whitespace after a statement in a `<pre>` or `<textarea>` is
+            // kept as it is written, before what comes next.
+            if self.ctx.keeps_whitespace() {
+                continue;
+            }
 
             // Get optional next statement if it exists
             let next_statement =
@@ -690,14 +870,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         // text, at its closing tag, after which the text is HTML again.
         if let Some(end) = self.ctx.language().end_in(text) {
             self.push_text(start, &text[..end])?;
-            self.ctx.state.language = LanguageType::Html;
-
-            // The closing tag starts a line when the source starts one with it.
-            if self.whitespace_before(start + end).contains('\n') && !self.at_line_start() {
-                self.end_line();
-            }
-
-            return self.push_text(start + end, &text[end..]);
+            return self.push_html(start + end, &text[end..]);
         }
 
         self.push_text(start, text)
@@ -731,11 +904,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
 
         // The tag starts a line when the source starts one with it, since the
         // line break can matter, e.g. after a `//` comment in a script.
-        if self.whitespace_before(start).contains('\n') && !self.at_line_start() {
-            self.end_line();
-        }
-
-        self.space_from_previous(start);
+        self.start_item(start);
         self.within_tag(TagKind::Inline, *trim, |this| {
             this.visit_expr(expr.ast_ref())?;
             Ok(())

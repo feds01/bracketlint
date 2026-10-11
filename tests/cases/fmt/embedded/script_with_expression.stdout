@@ -1,4 +1,4 @@
 <script>
 const data = {{ data }};
-    </script>
+</script>
 

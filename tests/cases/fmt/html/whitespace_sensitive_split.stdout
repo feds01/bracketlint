@@ -1,0 +1,10 @@
+<div>
+    <pre>
+{{ x }}
+  line two
+</pre>
+    <textarea>{{ v }} more</textarea>
+    <textarea name="message">
+{% if value %}{{ value }}{% endif %}</textarea>
+</div>
+

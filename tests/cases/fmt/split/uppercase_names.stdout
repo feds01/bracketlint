@@ -1,0 +1,6 @@
+<div class="outer">
+    {% if x %}
+        <p>shown</p>
+    {% endif %}
+</div>
+

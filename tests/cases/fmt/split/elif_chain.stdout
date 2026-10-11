@@ -1,10 +1,10 @@
 <div>
     {% if a %}
         <span>a</span>
-{% elif b %}
-    <span>b</span>
-{% else %}
-    <span>neither</span>
-{% endif %}
+    {% elif b %}
+        <span>b</span>
+    {% else %}
+        <span>neither</span>
+    {% endif %}
 </div>
 

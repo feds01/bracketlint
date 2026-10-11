@@ -1,8 +1,8 @@
 <div class="outer">
     <div class="inner">
-    {% if show %}
-        <p>shown</p>
-{% endif %}
-</div>
+        {% if show %}
+            <p>shown</p>
+        {% endif %}
+    </div>
 </div>
 
