@@ -4,11 +4,11 @@ error: expected a tag, however received a `-`
 1 | {%- if user -%}<p>{{ user.name }}</p>{%- endif -%}
   |   -
   |
-  = info: expected a `identifier`
+  = help: expected a `identifier`
 error: expected a tag, however received a `-`
  --> $DIR/whitespace_control_django.html:1:40
   |
 1 | {%- if user -%}<p>{{ user.name }}</p>{%- endif -%}
   |                                        -
   |
-  = info: expected a `identifier`
+  = help: expected a `identifier`

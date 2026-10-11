@@ -9,4 +9,4 @@ error: expected a tag, however received the keyword `endunless`
 1 | {% unless a %}A{% else %}B{% elsif c %}C{% endunless %}
   |                                            ---------
   |
-  = info: expected a `identifier`
+  = help: expected a `identifier`

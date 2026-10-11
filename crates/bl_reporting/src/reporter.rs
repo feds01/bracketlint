@@ -68,7 +68,8 @@ impl<S: HasSource> fmt::Display for Reporter<'_, S> {
                         }
                     }
                     ReportElement::Note(report_note) => {
-                        elements.push(Level::INFO.message(&report_note.message).into());
+                        let level = Level::from(&report_note.label);
+                        elements.push(level.message(&report_note.message).into());
                     }
                 }
             }

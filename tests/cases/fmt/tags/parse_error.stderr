@@ -9,4 +9,4 @@ error: expected a tag, however received the keyword `endfor`
 4 | {% endfor %}
   |    ------
   |
-  = info: expected a `identifier`
+  = help: expected a `identifier`
