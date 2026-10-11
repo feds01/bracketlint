@@ -1379,14 +1379,17 @@ impl<'s, 'a> Parser<'s, 'a> {
 
     /// Parse an expression in parentheses, e.g. `(a or b)`, which groups it.
     /// In [Jinja], items separated by commas are a tuple instead, e.g.
-    /// `('a', 'b')`, as are `()` and a single item with a comma after it.
+    /// `('a', 'b')`, as are `()` and a single item with a comma after it. In
+    /// [Nunjucks], they are a group of several expressions, e.g.
+    /// `(rows.unshift(row), rows)`, which is a tuple here too.
     ///
     /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L685-L752
+    /// [Nunjucks]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/parser.js#L1147-L1176
     fn parse_parenthesised_expr(
         &mut self,
         token: Token,
     ) -> ParseResult<AstNode<'a, ast::Expr<'a>>> {
-        let tuples = self.options.dialect.has_tuples();
+        let tuples = self.options.dialect.has_tuples() || self.options.dialect.has_comma_groups();
 
         self.in_tree(Delimiter::Paren, None, |g| {
             let start = g.current_pos();

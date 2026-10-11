@@ -1,0 +1,8 @@
+error: unexpectedly encountered a `(...)`
+ --> $DIR/loop_tuples_nunjucks.njk:1:7
+  |
+1 | {% for (a, b), c in items %}{% endfor %}
+  |       -
+  |
+  = help: expected a `identifier`
+  = note: this file is parsed as Nunjucks, from its `.njk` extension

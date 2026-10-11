@@ -313,6 +313,17 @@ impl Dialect {
         matches!(self, Dialect::Jinja)
     }
 
+    /// Whether items separated by commas in parentheses are a group of several
+    /// expressions, e.g. `(rows.unshift(row), rows)`, as in [Nunjucks], which
+    /// [compiles] it to JavaScript's, whose value is the last item's. Jinja's
+    /// are a tuple, see [Dialect::has_tuples].
+    ///
+    /// [Nunjucks]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/parser.js#L1147-L1176
+    /// [compiles]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/compiler.js#L302-L304
+    pub fn has_comma_groups(self) -> bool {
+        matches!(self, Dialect::Nunjucks)
+    }
+
     /// Whether items separated by commas in brackets are a list, e.g.
     /// `['a', 'b']`, as in [Jinja], an array in [Nunjucks], and a sequence in
     /// [Twig].
