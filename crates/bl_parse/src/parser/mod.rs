@@ -344,7 +344,7 @@ impl<'s, 'a> Parser<'s, 'a> {
             || after.starts_with(b"}}");
 
         next_to_delimiter
-            .then(|| self.options.dialect.foreign(Syntax::TrimMarker(char::from(marker))))
+            .then(|| self.options.dialect.foreign(Syntax::TrimMarker(marker)))
             .flatten()
     }
 
@@ -399,12 +399,19 @@ impl<'s, 'a> Parser<'s, 'a> {
             return;
         }
 
-        // A comment can end after the text, e.g. `{# {{ x }} #}`, so its end is
+        // Each `{` is found by a search for a byte, rather than each `{#` by a
+        // search for a string, which costs more to set up for each text. A
+        // comment can end after the text, e.g. `{# {{ x }} #}`, so its end is
         // looked for in the rest of the source.
         let source = self._source.source;
         let mut start = range.start();
-        while let Some(index) = source[start..=range.end()].find("{#") {
+        while let Some(index) = source[start..=range.end()].find('{') {
             let open = start + index;
+            start = open + 1;
+            if source.as_bytes().get(start) != Some(&b'#') {
+                continue;
+            }
+
             let Some(len) = source[open + "{#".len()..].find("#}") else {
                 return;
             };
