@@ -6,7 +6,6 @@ edition = { workspace = true }
 
 [dependencies]
 bl_arena = { workspace = true }
-bl_utils = { workspace = true }
 bl_macros = { workspace = true }
 
 bytecount = { workspace = true }

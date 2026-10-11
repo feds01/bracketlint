@@ -626,7 +626,6 @@ version = "0.1.0"
 dependencies = [
  "bl_arena",
  "bl_macros",
- "bl_utils",
  "bytecount",
  "derive_more",
  "index_vec",

@@ -218,8 +218,8 @@ impl<'s> SpannedSource<'s> {
     /// ```
     pub fn trimmed_range(&self, line: usize) -> ByteRange {
         let range = self.line_ranges.range_for_line(line);
-        let start = range.start();
-        let end = range.end();
+        let start = range.start;
+        let end = range.end;
 
         let line = self.source[start..end].trim();
         let start = line.as_ptr() as usize - self.source.as_ptr() as usize;
