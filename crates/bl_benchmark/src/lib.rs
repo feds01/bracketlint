@@ -4,7 +4,7 @@
 use std::{fmt, path::PathBuf};
 
 use bl_ast::{Dialect, SourceId};
-use bl_workspace::WorkspaceMembers;
+use bl_workspace::{WorkspaceMembers, settings::DialectSource};
 
 /// A template that a benchmark lexes, parses or formats.
 pub struct TestCase {
@@ -67,7 +67,8 @@ impl TestCase {
     pub fn to_member(&self) -> (SourceId, WorkspaceMembers) {
         let mut members = WorkspaceMembers::new();
         let path = PathBuf::from(self.name);
-        let id = members.reserve_member(path, self.contents.clone(), self.dialect);
+        let id =
+            members.reserve_member(path, self.contents.clone(), self.dialect, DialectSource::Flag);
         (id, members)
     }
 }

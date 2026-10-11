@@ -3,22 +3,28 @@ error: unexpectedly encountered the keyword `else`
   |
 1 | {% case size %}{% when "s" %}Small{% else %}Other{% else %}Again{% endcase %}
   |                                                     ----
+  |
+  = note: this file is parsed as Liquid, from `--dialect liquid`
 error: expected a tag, however received the keyword `endcase`
  --> $DIR/case_misplaced_clauses.html:1:68
   |
 1 | {% case size %}{% when "s" %}Small{% else %}Other{% else %}Again{% endcase %}
   |                                                                    -------
   |
+  = note: this file is parsed as Liquid, from `--dialect liquid`
   = help: expected a `identifier`
 error: unexpectedly encountered the keyword `when`
  --> $DIR/case_misplaced_clauses.html:2:53
   |
 2 | {% case size %}{% when "s" %}Small{% else %}Other{% when "m" %}Medium{% endcase %}
   |                                                     ----
+  |
+  = note: this file is parsed as Liquid, from `--dialect liquid`
 error: expected a tag, however received the keyword `endcase`
  --> $DIR/case_misplaced_clauses.html:2:73
   |
 2 | {% case size %}{% when "s" %}Small{% else %}Other{% when "m" %}Medium{% endcase %}
   |                                                                         -------
   |
+  = note: this file is parsed as Liquid, from `--dialect liquid`
   = help: expected a `identifier`

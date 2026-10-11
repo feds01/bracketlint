@@ -5,10 +5,11 @@ use bl_ast::{AstNode, AstNodeRef, AstVisitor, Dialect, Document, SourceId, Span,
 use bl_ast_utils::{AstTreePrinter, TreeWriter, TreeWriterConfig};
 use bl_lexer::{Lexer, LexerMetadata, token::Token};
 use bl_reporting::{
-    DiagnosticsMut, Report, Reports,
+    DiagnosticsMut, Report, ReportElement, Reports,
     inline::{InlineSnippet, note_on_span},
+    note,
 };
-use bl_workspace::Member;
+use bl_workspace::{Member, settings::DialectSource};
 use diagnostics::ParserDiagnostics;
 use parser::Parser;
 
@@ -90,6 +91,8 @@ pub fn parse_source<'a>(query: ParseQuery, arena: &'a Arena) -> ParseQueryResult
     // Lex the contents of the module or interactive block
     let LexerMetadata { tokens, mut diagnostics } =
         Lexer::new(spanned, id, member.dialect).tokenise();
+    let has_lexer_errors = diagnostics.has_errors();
+    let mut reports = diagnostics.into_reports(Reports::from, Reports::from);
 
     // @@Todo: Make this a query instead so that we can call it as a debugging
     // tool.
@@ -99,11 +102,9 @@ pub fn parse_source<'a>(query: ParseQuery, arena: &'a Arena) -> ParseQueryResult
     // emit_tokens(id, member, &tokens);
 
     // Check if the lexer has errors...
-    if diagnostics.has_errors() {
-        return ParseQueryResult {
-            node: None,
-            diagnostics: diagnostics.into_reports(Reports::from, Reports::from),
-        };
+    if has_lexer_errors {
+        note_dialect(&mut reports, member);
+        return ParseQueryResult { node: None, diagnostics: reports };
     }
 
     // Create a new import resolver in the event of more modules that
@@ -115,9 +116,28 @@ pub fn parse_source<'a>(query: ParseQuery, arena: &'a Arena) -> ParseQueryResult
     // message queue, regardless of it being an error or not.
     let node = parser.parse_document();
 
-    ParseQueryResult {
-        node: Some(node),
-        diagnostics: diagnostics.into_reports(Reports::from, Reports::from),
+    reports.extend(diagnostics.into_reports(Reports::from, Reports::from));
+    note_dialect(&mut reports, member);
+    ParseQueryResult { node: Some(node), diagnostics: reports }
+}
+
+/// Add a note to each of `reports` that says which dialect `member` is parsed
+/// in, and how it is picked, before the other notes of the report. A template
+/// can read as another dialect's, so a diagnostic might only make sense in a
+/// dialect that it isn't parsed in.
+fn note_dialect(reports: &mut Reports, member: &Member) {
+    let dialect = member.dialect;
+    let source = match (member.dialect_source, dialect.extension()) {
+        (DialectSource::Flag, _) => format!("from `--dialect {}`", dialect.name()),
+        (DialectSource::Extension, Some(extension)) => format!("from its `.{extension}` extension"),
+        _ => "the default, since neither `--dialect` nor its extension names a dialect".to_string(),
+    };
+    let message = format!("this file is parsed as {}, {source}", dialect.title());
+
+    for report in reports {
+        let notes =
+            report.contents.iter().position(|element| matches!(element, ReportElement::Note(_)));
+        report.contents.insert(notes.unwrap_or(report.contents.len()), note!("{message}"));
     }
 }
 

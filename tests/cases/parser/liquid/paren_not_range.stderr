@@ -4,6 +4,7 @@ error: unexpectedly encountered the keyword `or`
 1 | {% if (product.available or product.preorder) %}<button>Buy</button>{% endif %}
   |                          --
   |
+  = note: this file is parsed as Liquid, from `--dialect liquid`
   = help: expected a `..`
 error: expected a tag, however received the keyword `endif`
  --> $DIR/paren_not_range.html:1:72
@@ -11,4 +12,5 @@ error: expected a tag, however received the keyword `endif`
 1 | {% if (product.available or product.preorder) %}<button>Buy</button>{% endif %}
   |                                                                        -----
   |
+  = note: this file is parsed as Liquid, from `--dialect liquid`
   = help: expected a `identifier`

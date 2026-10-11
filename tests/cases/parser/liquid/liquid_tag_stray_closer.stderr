@@ -3,3 +3,5 @@ error: unexpected `)`, which doesn't close anything
   |
 2 |   echo total) junk
   |             -
+  |
+  = note: this file is parsed as Liquid, from `--dialect liquid`

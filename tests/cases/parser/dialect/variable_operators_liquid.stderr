@@ -3,13 +3,19 @@ error: unexpectedly encountered the keyword `is`
   |
 1 | {{ x is not defined }}
   |      --
+  |
+  = note: this file is parsed as Liquid, from `--dialect liquid`
 error: unexpectedly encountered a `==`
  --> $DIR/variable_operators_liquid.html:2:6
   |
 2 | {{ a == b }}
   |      --
+  |
+  = note: this file is parsed as Liquid, from `--dialect liquid`
 error: unexpectedly encountered the keyword `and`
  --> $DIR/variable_operators_liquid.html:3:6
   |
 3 | {{ a and b }}
   |      ---
+  |
+  = note: this file is parsed as Liquid, from `--dialect liquid`

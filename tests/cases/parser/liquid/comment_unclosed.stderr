@@ -3,3 +3,5 @@ error: expected a closing `{% endcomment %}` tag
   |
 2 | <p>{{ product.title }}</p>
   |                           -
+  |
+  = note: this file is parsed as Liquid, from `--dialect liquid`

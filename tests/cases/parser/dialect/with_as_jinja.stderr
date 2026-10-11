@@ -3,3 +3,5 @@ error: unexpectedly encountered an identifier
   |
 1 | {% with user.name as name %}<p>{{ name }}</p>{% endwith %}
   |         ----
+  |
+  = note: this file is parsed as Jinja, from `--dialect jinja`

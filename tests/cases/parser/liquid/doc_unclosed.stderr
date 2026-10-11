@@ -3,3 +3,5 @@ error: expected a closing `{% enddoc %}` tag
   |
 3 | <p>Hello {{ name }}</p>
   |                        -
+  |
+  = note: this file is parsed as Liquid, from `--dialect liquid`

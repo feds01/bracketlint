@@ -3,3 +3,5 @@ error: expected a closing `{% endcase %}` tag
   |
 1 | {% case size %}{% when "s" %}Small
   |                                   -
+  |
+  = note: this file is parsed as Liquid, from `--dialect liquid`

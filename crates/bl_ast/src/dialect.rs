@@ -58,6 +58,16 @@ impl Dialect {
         self.into()
     }
 
+    /// The name of the dialect as it is written in prose, e.g. `Liquid`.
+    pub const fn title(self) -> &'static str {
+        match self {
+            Dialect::Django => "Django",
+            Dialect::Jinja => "Jinja",
+            Dialect::Liquid => "Liquid",
+            Dialect::Twig => "Twig",
+        }
+    }
+
     /// The file extension that identifies the dialect, if it has its own.
     /// Django templates use `.html`, which every dialect uses.
     pub const fn extension(self) -> Option<&'static str> {

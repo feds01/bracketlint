@@ -3,3 +3,5 @@ error: unexpectedly encountered an unknown character `?`
   |
 1 | {{ product.gift_card? }}
   |                     -
+  |
+  = note: this file is parsed as Jinja, from `--dialect jinja`
