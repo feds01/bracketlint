@@ -1,6 +1,6 @@
 ok            templates/changelog.twig
 ok            templates/columns_definitions/column_attribute.twig
-parse-error   templates/columns_definitions/column_attributes.twig
+ok            templates/columns_definitions/column_attributes.twig
 ok            templates/columns_definitions/column_definitions_form.twig
 ok            templates/columns_definitions/column_name.twig
 ok            templates/columns_definitions/partitions.twig

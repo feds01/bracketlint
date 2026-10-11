@@ -373,13 +373,14 @@ impl Dialect {
     }
 
     /// Whether a keyword is a name in an expression, e.g. `{{ for }}` or the
-    /// parameter `for` of a macro, as in [Jinja], whose keywords are names
-    /// that only its tags read as keywords. The keywords that its expressions
-    /// have, such as `and` and `if`, aren't.
+    /// parameter `for` of a macro, as in [Jinja] and [Twig], whose keywords
+    /// are names that only their tags read as keywords. The keywords that
+    /// their expressions have, such as `and`, aren't.
     ///
     /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L648-L661
+    /// [Twig]: https://github.com/twigphp/Twig/blob/v3.30.0/src/ExpressionParser/Prefix/LiteralExpressionParser.php#L37-L56
     pub fn keywords_are_names(self) -> bool {
-        matches!(self, Dialect::Jinja)
+        matches!(self, Dialect::Jinja | Dialect::Twig)
     }
 
     /// Whether a string is translated when it is written `_("...")`, as in
