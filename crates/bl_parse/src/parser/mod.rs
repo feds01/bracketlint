@@ -2420,7 +2420,7 @@ impl<'s, 'a> Parser<'s, 'a> {
                 ));
             }
 
-            let label = g.parse_name_or_string()?;
+            let label = g.parse_block_name()?;
 
             // A [Jinja] block can be `scoped` and `required`, in that order.
             //
@@ -2467,7 +2467,7 @@ impl<'s, 'a> Parser<'s, 'a> {
 
                 // @@Todo: check if the name matches the label, if the labels mismatch then
                 // we should generate an error.
-                let end_label = if g.peek().is_some() { Some(g.parse_name()?) } else { None };
+                let end_label = if g.peek().is_some() { Some(g.parse_block_name()?) } else { None };
                 Ok((end_label, g.trim()))
             },
         )?;
@@ -2484,6 +2484,32 @@ impl<'s, 'a> Parser<'s, 'a> {
             token.span,
         );
         Ok(self.node_with_joined_span(ast::Statement::Tag(ast::Tag::Block(block)), token.span))
+    }
+
+    /// Parse the name of a block, which is any word up to a space in [Django],
+    /// e.g. `table.caption`, and a name or a string in the other dialects.
+    ///
+    /// [Django]: https://github.com/django/django/blob/6.1.2/django/template/loader_tags.py#L221-L224
+    fn parse_block_name(&mut self) -> ParseResult<AstNode<'a, ast::Name>> {
+        let Some(first) = self.peek().copied() else {
+            return self.parse_name_or_string();
+        };
+        if !self.options.dialect.block_names_are_words() || first.kind == TokenKind::Str {
+            return self.parse_name_or_string();
+        }
+
+        // The word's tokens are next to each other, e.g. `table`, `.` and
+        // `caption`, as a space would end it.
+        self.skip_token(); // `<token>` Skip the first token of the word.
+        let mut span = first.span;
+        while let Some(next) = self.peek().copied()
+            && next.span.start() == span.end() + 1
+        {
+            self.skip_token(); // `<token>` Skip the next token of the word.
+            span = span.join(next.span);
+        }
+
+        Ok(self.node_with_span(ast::Name::new(ast::Identifier::from(0u32)), span))
     }
 
     fn parse_raw_block(&mut self) -> ParseResult<AstNode<'a, ast::Statement<'a>>> {
