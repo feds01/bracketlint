@@ -1,0 +1,9 @@
+ok            system/templates/default.html.twig
+ok            system/templates/default.md.twig
+ok            system/templates/external.html.twig
+ok            system/templates/flex/404.html.twig
+ok            system/templates/flex/_default/collection/debug.html.twig
+ok            system/templates/flex/_default/object/debug.html.twig
+ok            system/templates/modular/default.html.twig
+ok            system/templates/partials/messages.html.twig
+ok            system/templates/partials/metadata.html.twig
