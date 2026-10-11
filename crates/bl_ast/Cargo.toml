@@ -5,6 +5,7 @@ authors = { workspace = true }
 edition = { workspace = true }
 
 [dependencies]
+bl_arena = { workspace = true }
 bl_utils = { workspace = true }
 bl_macros = { workspace = true }
 
@@ -13,9 +14,7 @@ derive_more = { workspace = true }
 index_vec = { workspace = true }
 itertools = { workspace = true }
 line-span = { workspace = true }
-replace_with = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 strum = { workspace = true }
-thin-vec = { workspace = true }

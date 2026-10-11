@@ -16,6 +16,7 @@ repository = "https://github.com/feds01/bracketlint"
 
 
 [workspace.dependencies]
+bl_arena = { path = "crates/bl_arena" }
 bl_ast  = {  path = "crates/bl_ast" }
 bl_ast_utils = { path = "crates/bl_ast_utils" }
 bl_fmt = { path = "crates/bl_fmt" }
@@ -31,6 +32,7 @@ annotate-snippets = { version = "0.12.16" }
 anyhow = { version = "1.0.104" }
 argfile = { version = "1.0.0" }
 bitflags = { version = "2.13.2" }
+bumpalo = { version = "3.20.3", features = ["collections"] }
 bytecount = { version = "0.6.9" }
 clap = { version = "4.6.7", features = ["derive"] }
 colored = { version = "3.1.1" }
