@@ -1,0 +1,6 @@
+// run=pass, stage=check, dialect=jinja
+
+{{ {'a': 1, 'b': [2, 3],} }}
+{% set attrs = {} %}
+{{ cell.get('transient', {}).get('remove') }}
+{{ {key: value} }}

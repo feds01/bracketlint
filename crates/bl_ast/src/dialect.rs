@@ -276,6 +276,25 @@ impl Dialect {
         matches!(self, Dialect::Jinja | Dialect::Twig)
     }
 
+    /// Whether pairs of keys and values in braces are a mapping, e.g.
+    /// `{'a': 1}`, as in [Jinja], where it is a dict, and [Twig].
+    ///
+    /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#literals
+    /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#literals
+    pub fn has_mappings(self) -> bool {
+        matches!(self, Dialect::Jinja | Dialect::Twig)
+    }
+
+    /// Whether a key of a mapping can be a name, which is the name's string
+    /// rather than a variable, e.g. `{for: id}`, as in [Twig]. Its value can be
+    /// left out when it is the variable of the same name, e.g. `{post}`. A key
+    /// is an expression in Jinja, so `{name: 1}` takes the variable's value.
+    ///
+    /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#literals
+    pub fn mapping_keys_can_be_names(self) -> bool {
+        matches!(self, Dialect::Twig)
+    }
+
     /// Whether a string is translated when it is written `_("...")`, as in
     /// [Django], e.g. `{{ value|default:_("None") }}`. It is a string, rather
     /// than a call.

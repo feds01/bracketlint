@@ -347,6 +347,30 @@ impl AstVisitor for AstTreePrinter<'_> {
         Ok(TreeNode::branch("array_expr", children))
     }
 
+    type MappingExprRet = TreeNode;
+
+    fn visit_mapping_expr(
+        &self,
+        node: ast::AstNodeRef<ast::MappingExpr>,
+    ) -> Result<Self::MappingExprRet, Self::Error> {
+        let walk::MappingExpr { pairs } = walk::walk_mapping_expr(self, node)?;
+
+        Ok(TreeNode::branch("mapping_expr", pairs))
+    }
+
+    type PairRet = TreeNode;
+
+    fn visit_pair(&self, node: ast::AstNodeRef<ast::Pair>) -> Result<Self::PairRet, Self::Error> {
+        let walk::Pair { key, value } = walk::walk_pair(self, node)?;
+
+        let mut children = vec![TreeNode::branch("key", vec![key])];
+        if let Some(value) = value {
+            children.push(TreeNode::branch("value", vec![value]));
+        }
+
+        Ok(TreeNode::branch("pair", children))
+    }
+
     type GroupExprRet = TreeNode;
 
     fn visit_group_expr(

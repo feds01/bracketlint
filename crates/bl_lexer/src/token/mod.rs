@@ -23,6 +23,10 @@ pub enum Delimiter {
     /// Bracket, `[` or `]`
     Bracket,
 
+    /// Curly braces, `{` or `}`, around a mapping in Jinja and Twig, e.g.
+    /// `{'a': 1}`.
+    Curly,
+
     /// A line of a Liquid `{% liquid %}` tag, which is a tag without
     /// delimiters. It holds the line's tokens, up to the end of the line.
     Line,
@@ -36,6 +40,7 @@ impl Delimiter {
             Delimiter::Percent => "{%",
             Delimiter::Brace => "{{",
             Delimiter::Bracket => "[",
+            Delimiter::Curly => "{",
             Delimiter::Line => "",
         }
     }
@@ -47,6 +52,7 @@ impl Delimiter {
             Delimiter::Percent => "%}",
             Delimiter::Brace => "}}",
             Delimiter::Bracket => "]",
+            Delimiter::Curly => "}",
             Delimiter::Line => "",
         }
     }
@@ -55,7 +61,7 @@ impl Delimiter {
     pub const fn width(&self) -> usize {
         match self {
             // `(`, `)`, `{`, `}`, `[`, `]`
-            Delimiter::Paren | Delimiter::Bracket => 1,
+            Delimiter::Paren | Delimiter::Bracket | Delimiter::Curly => 1,
             // `{%`, `%}`, `{{`, `}}`
             Delimiter::Percent | Delimiter::Brace => 2,
             Delimiter::Line => 0,
