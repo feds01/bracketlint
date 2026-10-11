@@ -571,6 +571,18 @@ impl Dialect {
         matches!(self, Dialect::Twig)
     }
 
+    /// Whether `{% guard %}` blocks exist, as in Twig's [`guard`], which
+    /// renders its body if the function, filter or test that it names
+    /// exists, and else the part after its `{% else %}`, e.g.
+    /// `{% guard function importmap %}`. Twig's [`GuardTokenParser`] reads a
+    /// second name after a test's as part of it, e.g. `same as`.
+    ///
+    /// [`guard`]: https://twig.symfony.com/doc/3.x/tags/guard.html
+    /// [`GuardTokenParser`]: https://github.com/twigphp/Twig/blob/v3.30.0/src/TokenParser/GuardTokenParser.php#L36-L40
+    pub fn has_guard_blocks(self) -> bool {
+        matches!(self, Dialect::Twig)
+    }
+
     /// Whether [`nil`], `null`, `blank` and [`empty`] are literals, along with
     /// `true` and `false`, e.g. `{% if items == empty %}`. The other dialects
     /// read them as names like any other.

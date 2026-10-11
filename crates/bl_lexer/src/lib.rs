@@ -763,6 +763,23 @@ impl<'lex> Lexer<'lex> {
             return TokenKind::Keyword(Keyword::Liquid);
         }
 
+        // `guard` and `endguard` are only keywords as the names of the tags of
+        // a `{% guard %}` block, as in [Twig], so that they are still names
+        // elsewhere, e.g. in `{{ guard }}`.
+        //
+        // [Twig]: https://twig.symfony.com/doc/3.x/tags/guard.html
+        let guard = match name {
+            "guard" => Some(Keyword::Guard),
+            "endguard" => Some(Keyword::EndGuard),
+            _ => None,
+        };
+        if let Some(keyword) = guard
+            && self.dialect.has_guard_blocks()
+            && self.at_tag_name()
+        {
+            return TokenKind::Keyword(keyword);
+        }
+
         if let Some(keyword) = self.dialect.keyword(name) {
             TokenKind::Keyword(keyword)
         } else {
@@ -1133,6 +1150,27 @@ mod tests {
                 "{dialect}"
             );
         }
+    }
+
+    #[test]
+    fn guard_is_only_a_keyword_as_a_tag_name_in_twig() {
+        use crate::kw;
+
+        assert!(matches!(
+            lex("{%- guard function guard %}{% endguard -%}", Dialect::Twig)[..],
+            [
+                tok!(Tree(crate::token::Delimiter::Percent, 3)),
+                kw!(Guard),
+                tok!(Ident),
+                tok!(Ident),
+                tok!(Tree(crate::token::Delimiter::Percent, 1)),
+                kw!(EndGuard),
+            ]
+        ));
+        assert!(matches!(lex("{{ guard }}", Dialect::Twig)[..], tree!(Brace, [tok!(Ident)])));
+
+        // The other dialects have no `guard` blocks.
+        assert!(matches!(lex("{% guard %}", Dialect::Jinja)[..], tree!(Percent, [tok!(Ident)])));
     }
 
     #[test]

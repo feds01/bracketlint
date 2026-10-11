@@ -595,6 +595,27 @@ impl AstVisitor for AstTreePrinter<'_> {
         Ok(TreeNode::branch("case", children))
     }
 
+    type GuardRet = TreeNode;
+
+    fn visit_guard(
+        &self,
+        node: ast::AstNodeRef<ast::Guard>,
+    ) -> Result<Self::GuardRet, Self::Error> {
+        let walk::Guard { name, guard_body, otherwise } = walk::walk_guard(self, node)?;
+
+        let mut children = vec![
+            TreeNode::leaf(node.body().kind.as_str()),
+            name,
+            TreeNode::branch("guard_body", vec![guard_body]),
+        ];
+
+        if let Some(otherwise) = otherwise {
+            children.push(TreeNode::branch("otherwise", vec![otherwise]));
+        }
+
+        Ok(TreeNode::branch("guard", children))
+    }
+
     type RenderRet = TreeNode;
 
     fn visit_render(

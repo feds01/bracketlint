@@ -1,0 +1,3 @@
+// run=fail, stage=check, dialect=twig
+
+{% guard function importmap %}{{ importmap('app') }}{% else %}{{ fallback }}

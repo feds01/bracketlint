@@ -933,6 +933,58 @@ define_tree! {
         pub trim: TrimMarker,
     }
 
+    /// The kind of callable that a [`Guard`] block checks for.
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub enum GuardKind {
+        Function,
+        Filter,
+        Test,
+    }
+
+    impl GuardKind {
+        /// The word that the kind is written as, e.g. `function`.
+        pub fn as_str(self) -> &'static str {
+            match self {
+                GuardKind::Function => "function",
+                GuardKind::Filter => "filter",
+                GuardKind::Test => "test",
+            }
+        }
+    }
+
+    /// A Twig [`guard`] block, which renders its body if the function, filter
+    /// or test that it names exists, and else the body after its
+    /// `{% else %}`, i.e.
+    ///
+    /// ```twig
+    /// {% guard function importmap %}
+    ///     {{ importmap('app') }}
+    /// {% else %}
+    ///     <script src="app.js"></script>
+    /// {% endguard %}
+    /// ```
+    ///
+    /// [`guard`]: https://twig.symfony.com/doc/3.x/tags/guard.html
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct Guard {
+        pub kind: GuardKind,
+
+        /// The name of the callable, which spans both words of a test whose
+        /// name is two, e.g. `same as`.
+        pub name: Child!(Name),
+        pub guard_body: Child!(Body),
+
+        /// The body after `{% else %}`, which renders when the callable
+        /// doesn't exist.
+        pub otherwise: OptionalChild!(Body),
+
+        /// The whitespace control of the opening, `{% else %}` and closing
+        /// tags.
+        pub trim: TrimTag,
+        pub else_trim: TrimMarker,
+    }
+
     /// The target of a [`For`] loop, which can be a simple variable or a variable
     /// with an optional value, as in [Jinja].
     ///
@@ -1027,6 +1079,9 @@ define_tree! {
         /// The Liquid `{% case subject %}` tag
         Case(Child!(Case)),
 
+        /// The Twig `{% guard function name %}` tag, ending with `{% endguard %}`
+        Guard(Child!(Guard)),
+
         /// The Liquid `{% render "file" %}` tag
         Render(Child!(Render)),
 
@@ -1069,6 +1124,7 @@ define_tree! {
                 Tag::If(_) => "if",
                 Tag::For(_) => "for",
                 Tag::Case(_) => "case",
+                Tag::Guard(_) => "guard",
                 Tag::Render(_) => "render",
                 Tag::Capture(_) => "capture",
                 Tag::Liquid(_) => "liquid",

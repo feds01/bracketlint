@@ -1,0 +1,7 @@
+// run=pass, stage=check, dialect=twig
+
+{% guard function importmap %}{{ importmap('app') }}{% endguard %}
+{% guard filter raw %}{{ html|raw }}{% else %}{{ html|e }}{% endguard %}
+{%- guard test same as -%}{{ a is same as(b) }}{%~ else ~%}{{ a == b }}{%- endguard -%}
+{% guard test empty %}{% guard function csp_nonce %}{{ csp_nonce('script') }}{% endguard %}{% endguard %}
+{% set guard = 1 %}{{ guard }}

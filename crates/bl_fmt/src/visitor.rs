@@ -491,7 +491,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
     type Error = FmtError;
 
     ast_visitor_mut_self_default_impl!(
-        hiding: Text, Tag, For, If, IfClause, Case, When, Comment, Inline, Body, Name, Expr, Block, With, Extends
+        hiding: Text, Tag, For, If, IfClause, Case, When, Guard, Comment, Inline, Body, Name, Expr, Block, With, Extends
     );
 
     type TagRet = ();
@@ -509,6 +509,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             bl_ast::Tag::If(if_block) => self.visit_if(node.with_body(if_block)),
             bl_ast::Tag::For(for_loop) => self.visit_for(for_loop.ast_ref()),
             bl_ast::Tag::Case(case) => self.visit_case(case.ast_ref()),
+            bl_ast::Tag::Guard(guard) => self.visit_guard(guard.ast_ref()),
             bl_ast::Tag::Generic(_)
             | bl_ast::Tag::Unprocessable(_)
             | bl_ast::Tag::BlockShortcut(_)
@@ -830,6 +831,40 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         self.end_line();
 
         self.with_block(|formatter| formatter.visit_body(clause_body.ast_ref()))
+    }
+
+    type GuardRet = ();
+
+    /// A Twig [`guard`] block, whose name is kept as it is written, e.g. the
+    /// two words of `{% guard test same as %}`.
+    ///
+    /// [`guard`]: https://twig.symfony.com/doc/3.x/tags/guard.html
+    fn visit_guard(
+        &mut self,
+        node: bl_ast::AstNodeRef<bl_ast::Guard>,
+    ) -> Result<Self::GuardRet, Self::Error> {
+        let bl_ast::Guard { kind, name, guard_body, otherwise, trim, else_trim } = node.body();
+        let open = self.ctx.open_elements.clone();
+
+        self.start_item(node.range().start());
+        self.within_tag(TagKind::Block, trim.start, |this| {
+            this.push_hunk("guard ");
+            this.push_hunk(kind.as_str());
+            this.push_hunk(" ");
+            this.visit_name(name.ast_ref())
+        })?;
+        self.end_line();
+
+        self.with_block(|formatter| formatter.visit_body(guard_body.ast_ref()))?;
+        let after = self.ctx.open_elements.clone();
+
+        if let Some(otherwise) = otherwise {
+            self.start_branch(&open);
+            self.push_tag_line("else", *else_trim)?;
+            self.with_block(|formatter| formatter.visit_body(otherwise.ast_ref()))?;
+        }
+
+        self.end_block("endguard", trim.end, &open, after)
     }
 
     type BodyRet = ();

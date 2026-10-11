@@ -1,0 +1,7 @@
+error: expected a closing `{% endguard %}` tag
+ --> $DIR/guard_unclosed_twig.html:1:77
+  |
+1 | {% guard function importmap %}{{ importmap('app') }}{% else %}{{ fallback }}
+  |                                                                             -
+  |
+  = note: this file is parsed as Twig, from `--dialect twig`

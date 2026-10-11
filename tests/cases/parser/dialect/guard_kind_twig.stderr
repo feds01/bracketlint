@@ -1,0 +1,15 @@
+error: expected `function`, `filter` or `test` after `guard`, however received an identifier
+ --> $DIR/guard_kind_twig.html:1:10
+  |
+1 | {% guard macro forms %}{{ forms.input('name') }}{% endguard %}
+  |          -----
+  |
+  = note: this file is parsed as Twig, from `--dialect twig`
+error: expected a tag, however received the keyword `endguard`
+ --> $DIR/guard_kind_twig.html:1:52
+  |
+1 | {% guard macro forms %}{{ forms.input('name') }}{% endguard %}
+  |                                                    --------
+  |
+  = help: expected a `identifier`
+  = note: this file is parsed as Twig, from `--dialect twig`

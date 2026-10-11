@@ -1,0 +1,27 @@
+info: parsed module '$DIR/guard_jinja.html' as jinja:
+body
+├─generic_tag
+│ ├─name "guard"
+│ └─args
+│   ├─arg
+│   │ └─var_expr
+│   │   └─name "function"
+│   └─arg
+│     └─var_expr
+│       └─name "importmap"
+├─inline
+│ └─call_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "importmap"
+│   └─args
+│     └─arg
+│       └─lit_expr
+│         └─str_lit 'app'
+├─inline
+│ └─var_expr
+│   └─name "fallback"
+└─generic_tag
+  ├─name "endguard"
+  └─args
+
