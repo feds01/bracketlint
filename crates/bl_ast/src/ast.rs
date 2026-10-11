@@ -156,6 +156,20 @@ define_tree! {
         StrictEq,
         /// `!==`, not equal without converting either side, in Nunjucks
         StrictNotEq,
+        /// `<=>`, which compares its sides as `-1`, `0` or `1`, in Twig
+        Spaceship,
+        /// `xor`, whether exactly one of its sides is true, in Twig
+        Xor,
+        /// `b-and`, the bitwise and, in Twig
+        BitAnd,
+        /// `b-or`, the bitwise or, in Twig
+        BitOr,
+        /// `b-xor`, the bitwise exclusive or, in Twig
+        BitXor,
+        /// `has some`, whether an arrow function holds for some item, in Twig
+        HasSome,
+        /// `has every`, whether an arrow function holds for every item, in Twig
+        HasEvery,
         /// `and``
         And,
         /// `or`
@@ -211,6 +225,13 @@ define_tree! {
                 BinOp::NotEq => write!(f, "!="),
                 BinOp::StrictEq => write!(f, "==="),
                 BinOp::StrictNotEq => write!(f, "!=="),
+                BinOp::Spaceship => write!(f, "<=>"),
+                BinOp::Xor => write!(f, "xor"),
+                BinOp::BitAnd => write!(f, "b-and"),
+                BinOp::BitOr => write!(f, "b-or"),
+                BinOp::BitXor => write!(f, "b-xor"),
+                BinOp::HasSome => write!(f, "has some"),
+                BinOp::HasEvery => write!(f, "has every"),
                 BinOp::And => write!(f, "and"),
                 BinOp::Or => write!(f, "or"),
                 BinOp::NotIn => write!(f, "not in"),

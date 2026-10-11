@@ -350,10 +350,11 @@ impl<'lex> Lexer<'lex> {
                 c if is_ident_start(c) => self.ident(c),
                 '0'..='9' => self.number(ShouldSkip::No),
                 '|' => TokenKind::Pipe,
-                // `!==` and `===` in [Nunjucks], which compare without
-                // converting either side.
+                // `!==` and `===` in [Nunjucks] and [Twig], which compare
+                // without converting either side.
                 //
                 // [Nunjucks]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/lexer.js#L165-L178
+                // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#comparisons
                 '!' => match self.peek() {
                     '=' if self.dialect.has_strict_comparisons() && self.peek_second() == '=' => {
                         self.skip_ascii();
@@ -414,6 +415,14 @@ impl<'lex> Lexer<'lex> {
                     _ => TokenKind::Gt,
                 },
                 '<' => match self.peek() {
+                    // The spaceship operator `<=>` in [Twig].
+                    //
+                    // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#spaceship-operator
+                    '=' if self.dialect.has_spaceship_operator() && self.peek_second() == '>' => {
+                        self.skip_ascii();
+                        self.skip_ascii();
+                        TokenKind::Spaceship
+                    }
                     '=' => {
                         self.skip_ascii();
                         TokenKind::LtEq

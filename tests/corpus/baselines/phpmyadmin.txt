@@ -75,13 +75,13 @@ ok            templates/display/results/empty_display.twig
 ok            templates/display/results/null_display.twig
 ok            templates/display/results/page_selector.twig
 ok            templates/display/results/row_data.twig
-parse-error   templates/display/results/table.twig
+ok            templates/display/results/table.twig
 ok            templates/display/results/table_headers_for_columns.twig
 ok            templates/display/results/table_navigation_button.twig
 ok            templates/display/results/value_display.twig
 ok            templates/encoding/kanji_encoding_form.twig
 ok            templates/error/generic.twig
-parse-error   templates/error/report_form.twig
+ok            templates/error/report_form.twig
 ok            templates/error/report_modal.twig
 ok            templates/export.twig
 ok            templates/export/template_options.twig
