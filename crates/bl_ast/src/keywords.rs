@@ -420,6 +420,15 @@ const LIQUID_KEYWORDS: &[(&str, Keyword)] = {
 /// that a seed that gives each keyword a slot of its own is quick to find.
 const SLOTS: usize = ((KEYWORDS.len() + LIQUID_KEYWORDS.len()) * 4).next_power_of_two();
 
+/// The first seed that [KeywordTable::build] tries: 2⁶⁴ divided by the golden
+/// ratio, an odd multiplier that spreads the bits of a hash well.
+const FIRST_SEED: u64 = 0x9E37_79B9_7F4A_7C15;
+
+/// What [KeywordTable::build] adds to a seed to get the next one: the
+/// fractional part of √2. It is even, so that each seed is odd, as a
+/// multiplicative hash needs.
+const SEED_STEP: u64 = 0x6A09_E667_F3BC_C908;
+
 /// The keywords of a dialect, in a table where a perfect hash of a [Name]
 /// picks the only slot that its keyword can be in, so that finding a name's
 /// keyword takes one comparison.
@@ -443,7 +452,7 @@ impl KeywordTable {
     /// The table of the keywords in `lists`, with `elif` spelled as `elif`.
     const fn build(lists: &[&[(&str, Keyword)]], elif: &str) -> Self {
         // Try seeds until one puts each keyword in a slot of its own.
-        let mut seed: u64 = 0x9E37_79B9_7F4A_7C15;
+        let mut seed = FIRST_SEED;
         'seeds: loop {
             let mut slots = [None; SLOTS];
 
@@ -456,7 +465,7 @@ impl KeywordTable {
                     let name = Name::new(text);
                     let slot = Self::slot(name, seed);
                     if slots[slot].is_some() {
-                        seed = seed.wrapping_add(0x6A09_E667_F3BC_C908);
+                        seed = seed.wrapping_add(SEED_STEP);
                         continue 'seeds;
                     }
 
