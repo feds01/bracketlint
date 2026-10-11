@@ -1,0 +1,17 @@
+info: parsed module '$DIR/calls_django.html' as django:
+body
+├─inline
+│ └─call_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "range"
+│   └─args
+└─inline
+  └─filtered_expr
+    ├─subject
+    │ └─var_expr
+    │   └─name "items"
+    └─filter
+      ├─name "join"
+      └─args
+

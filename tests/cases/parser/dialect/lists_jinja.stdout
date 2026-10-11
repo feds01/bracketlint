@@ -1,0 +1,47 @@
+info: parsed module '$DIR/lists_jinja.html' as jinja:
+body
+├─inline
+│ └─array_expr
+│   ├─lit_expr
+│   │ └─str_lit 'a'
+│   └─lit_expr
+│     └─str_lit 'b'
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─var_expr
+│     │   │   └─name "type"
+│     │   ├─operator `in`
+│     │   └─rhs
+│     │     └─array_expr
+│     │       ├─lit_expr
+│     │       │ └─str_lit 'file'
+│     │       └─lit_expr
+│     │         └─str_lit 'hidden'
+│     └─clause_body
+│       └─body
+├─for
+│ ├─target
+│ │ └─for_target
+│ │   ├─name "href"
+│ │   └─name "caption"
+│ ├─iterator
+│ │ └─array_expr
+│ │   ├─tuple_expr
+│ │   │ ├─lit_expr
+│ │   │ │ └─str_lit 'index.html'
+│ │   │ └─lit_expr
+│ │   │   └─str_lit 'Index'
+│ │   └─tuple_expr
+│ │     ├─lit_expr
+│ │     │ └─str_lit 'about.html'
+│ │     └─lit_expr
+│ │       └─str_lit 'About'
+│ └─loop_body
+│   └─body
+└─inline
+  └─array_expr
+

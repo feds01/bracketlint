@@ -295,10 +295,26 @@ define_tree! {
         pub lit: Lit
     }
 
+    /// A list, e.g. `['a', 'b']` in Jinja, which Twig calls a sequence.
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct ArrayExpr {
-        children: Children!(Expr),
+        pub children: Children!(Expr),
+    }
+
+    /// An expression in parentheses, e.g. `(a or b)` in Jinja and Twig, which
+    /// groups it.
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct GroupExpr {
+        pub expr: Child!(Expr),
+    }
+
+    /// A tuple, e.g. `('a', 'b')` in Jinja.
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct TupleExpr {
+        pub children: Children!(Expr),
     }
 
     /// A binary operation, e.g. `a == b`. Jinja chains comparisons, so in
@@ -418,6 +434,8 @@ define_tree! {
         Range(RangeExpr),
         Lit(LitExpr),
         Array(ArrayExpr),
+        Tuple(TupleExpr),
+        Group(GroupExpr),
         Bin(BinExpr),
         Var(VarExpr),
         Call(CallExpr),

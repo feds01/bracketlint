@@ -1,0 +1,8 @@
+// run=pass, stage=check, dialect=jinja
+
+{{ range(3) }}
+{{ post.render(user, full=true,) }}
+{{ cell.metadata.get('transient', none).get('remove') }}
+{{ items|join(', ')|upper }}
+{{ items|map(attribute='name')|first }}
+{% macro input(name, value='') %}{% endmacro %}

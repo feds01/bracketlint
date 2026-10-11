@@ -1,0 +1,111 @@
+info: parsed module '$DIR/calls_jinja.html' as jinja:
+body
+├─inline
+│ └─call_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "range"
+│   └─args
+│     └─arg
+│       └─lit_expr
+│         └─int_lit 3
+├─inline
+│ └─call_expr
+│   ├─subject
+│   │ └─access_expr
+│   │   ├─subject
+│   │   │ └─var_expr
+│   │   │   └─name "post"
+│   │   └─field
+│   │     └─name "render"
+│   └─args
+│     ├─arg
+│     │ └─var_expr
+│     │   └─name "user"
+│     └─arg
+│       ├─name "full"
+│       └─var_expr
+│         └─name "true"
+├─inline
+│ └─call_expr
+│   ├─subject
+│   │ └─access_expr
+│   │   ├─subject
+│   │   │ └─call_expr
+│   │   │   ├─subject
+│   │   │   │ └─access_expr
+│   │   │   │   ├─subject
+│   │   │   │   │ └─access_expr
+│   │   │   │   │   ├─subject
+│   │   │   │   │   │ └─var_expr
+│   │   │   │   │   │   └─name "cell"
+│   │   │   │   │   └─field
+│   │   │   │   │     └─name "metadata"
+│   │   │   │   └─field
+│   │   │   │     └─name "get"
+│   │   │   └─args
+│   │   │     ├─arg
+│   │   │     │ └─lit_expr
+│   │   │     │   └─str_lit 'transient'
+│   │   │     └─arg
+│   │   │       └─var_expr
+│   │   │         └─name "none"
+│   │   └─field
+│   │     └─name "get"
+│   └─args
+│     └─arg
+│       └─lit_expr
+│         └─str_lit 'remove'
+├─inline
+│ └─filtered_expr
+│   ├─subject
+│   │ └─filtered_expr
+│   │   ├─subject
+│   │   │ └─var_expr
+│   │   │   └─name "items"
+│   │   └─filter
+│   │     ├─name "join"
+│   │     └─args
+│   │       └─arg
+│   │         └─lit_expr
+│   │           └─str_lit ', '
+│   └─filter
+│     ├─name "upper"
+│     └─args
+├─inline
+│ └─filtered_expr
+│   ├─subject
+│   │ └─filtered_expr
+│   │   ├─subject
+│   │   │ └─var_expr
+│   │   │   └─name "items"
+│   │   └─filter
+│   │     ├─name "map"
+│   │     └─args
+│   │       └─arg
+│   │         ├─name "attribute"
+│   │         └─lit_expr
+│   │           └─str_lit 'name'
+│   └─filter
+│     ├─name "first"
+│     └─args
+├─generic_tag
+│ ├─name "macro"
+│ └─args
+│   └─arg
+│     └─call_expr
+│       ├─subject
+│       │ └─var_expr
+│       │   └─name "input"
+│       └─args
+│         ├─arg
+│         │ └─var_expr
+│         │   └─name "name"
+│         └─arg
+│           ├─name "value"
+│           └─lit_expr
+│             └─str_lit ''
+└─generic_tag
+  ├─name "endmacro"
+  └─args
+

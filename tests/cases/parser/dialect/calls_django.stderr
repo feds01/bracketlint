@@ -1,0 +1,14 @@
+error: unexpectedly encountered a `(...)`
+ --> $DIR/calls_django.html:1:9
+  |
+1 | {{ range(3) }}
+  |         ---
+  |
+  = note: this file is parsed as Django, from `--dialect django`
+error: unexpectedly encountered a `(...)`
+ --> $DIR/calls_django.html:2:14
+  |
+2 | {{ items|join(', ') }}
+  |              ------
+  |
+  = note: this file is parsed as Django, from `--dialect django`

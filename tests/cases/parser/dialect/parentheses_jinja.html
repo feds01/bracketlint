@@ -1,0 +1,9 @@
+// run=pass, stage=check, dialect=jinja
+
+{{ (a or b) and c }}
+{% if (a + b) * c > 0 %}{% endif %}
+{{ (name)|upper }}
+{{ ('a', 'b') }}
+{{ ('a',) }}
+{{ () }}
+{% for (key, label), value in items %}{% endfor %}

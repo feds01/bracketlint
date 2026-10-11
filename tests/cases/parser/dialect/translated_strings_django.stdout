@@ -1,0 +1,31 @@
+info: parsed module '$DIR/translated_strings_django.html' as django:
+body
+├─inline
+│ └─lit_expr
+│   └─str_lit _("Hello")
+├─inline
+│ └─filtered_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "site_title"
+│   └─filter
+│     ├─name "default"
+│     └─args
+│       └─arg
+│         └─lit_expr
+│           └─str_lit _('Django site admin')
+└─if
+  └─clauses
+    └─if_clause
+      ├─condition
+      │ └─bin_expr
+      │   ├─lhs
+      │   │ └─var_expr
+      │   │   └─name "title"
+      │   ├─operator `==`
+      │   └─rhs
+      │     └─lit_expr
+      │       └─str_lit _("Home")
+      └─clause_body
+        └─body
+
