@@ -2608,7 +2608,7 @@ impl<'s, 'a> Parser<'s, 'a> {
     fn parse_extends_statement(&mut self) -> ParseResult<AstNode<'a, ast::Statement<'a>>> {
         self.in_tree(Delimiter::Percent, None, |g| {
             g.parse_token(TokenKind::Keyword(Keyword::Extends))?;
-            let template = g.parse_expr()?;
+            let template = g.parse_template_name()?;
 
             Ok(g.node_with_span(
                 ast::Statement::Tag(ast::Tag::Extends(ast::Extends { template, trim: g.trim() })),
@@ -2628,7 +2628,7 @@ impl<'s, 'a> Parser<'s, 'a> {
         // Parse the header first, we should get `block <name>`.
         self.in_tree(Delimiter::Percent, None, |g| {
             g.parse_token(TokenKind::Keyword(Keyword::Include))?;
-            let template = g.parse_expr()?;
+            let template = g.parse_template_name()?;
 
             // With comma separated arguments, the comma after the template
             // starts them rather than `with`, as in Liquid's [`render`], e.g.
@@ -2667,6 +2667,24 @@ impl<'s, 'a> Parser<'s, 'a> {
         })
     }
 
+    /// Parse the template that a tag such as `include` names, which is an
+    /// expression in [Jinja], [Nunjucks] and Twig's [`include`], [`extends`]
+    /// and [`import`], e.g. `"icons/" ~ icon ~ ".svg"`, or Twig's `_self`.
+    /// It is a value with its filters in Django and Liquid.
+    ///
+    /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L328-L366
+    /// [Nunjucks]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/parser.js#L285-L437
+    /// [`include`]: https://twig.symfony.com/doc/3.x/tags/include.html
+    /// [`extends`]: https://twig.symfony.com/doc/3.x/tags/extends.html#conditional-inheritance
+    /// [`import`]: https://github.com/twigphp/Twig/blob/v3.30.0/src/TokenParser/ImportTokenParser.php#L31
+    fn parse_template_name(&mut self) -> ParseResult<AstNode<'a, ast::Expr<'a>>> {
+        if self.options.dialect.template_names_take_operators() {
+            self.parse_compound_expr(0)
+        } else {
+            self.parse_expr()
+        }
+    }
+
     /// Parse a Jinja [`import`] statement, i.e.
     ///
     /// ```html
@@ -2677,7 +2695,7 @@ impl<'s, 'a> Parser<'s, 'a> {
     fn parse_import_statement(&mut self) -> ParseResult<AstNode<'a, ast::Statement<'a>>> {
         self.in_tree(Delimiter::Percent, None, |g| {
             g.parse_token(TokenKind::Keyword(Keyword::Import))?;
-            let template = g.parse_string()?;
+            let template = g.parse_template_name()?;
 
             let names = if g.parse_token_fast(TokenKind::Keyword(Keyword::As)).is_some() {
                 g.parse_names()?
@@ -2738,22 +2756,6 @@ impl<'s, 'a> Parser<'s, 'a> {
             token => self.err_with_location(
                 ParseErrorKind::UnExpected,
                 ExpectedItem::Ident,
-                token.map(|tok| tok.kind),
-                self.expected_pos(),
-            ),
-        }
-    }
-
-    fn parse_string(&mut self) -> ParseResult<AstNode<'a, ast::StrLit>> {
-        match self.peek() {
-            Some(Token { kind: TokenKind::Str, span }) => {
-                self.skip_fast(TokenKind::Str); // `<string>` Skip the string token.
-
-                Ok(self.node_with_span(ast::StrLit {}, *span))
-            }
-            token => self.err_with_location(
-                ParseErrorKind::UnExpected,
-                ExpectedItem::Literal,
                 token.map(|tok| tok.kind),
                 self.expected_pos(),
             ),

@@ -1,0 +1,62 @@
+info: parsed module '$DIR/template_names_jinja.html' as jinja:
+body
+├─extends
+│ └─cond_expr
+│   ├─condition
+│   │ └─bin_expr
+│   │   ├─lhs
+│   │   │ └─var_expr
+│   │   │   └─name "layout"
+│   │   ├─operator `is`
+│   │   └─rhs
+│   │     └─var_expr
+│   │       └─name "defined"
+│   ├─then
+│   │ └─var_expr
+│   │   └─name "layout"
+│   └─otherwise
+│     └─lit_expr
+│       └─str_lit "base.html"
+├─import
+│ ├─template
+│ │ └─bin_expr
+│ │   ├─lhs
+│ │   │ └─bin_expr
+│ │   │   ├─lhs
+│ │   │   │ └─lit_expr
+│ │   │   │   └─str_lit "partials/languages/"
+│ │   │   ├─operator `~`
+│ │   │   └─rhs
+│ │   │     └─access_expr
+│ │   │       ├─subject
+│ │   │       │ └─access_expr
+│ │   │       │   ├─subject
+│ │   │       │   │ └─var_expr
+│ │   │       │   │   └─name "config"
+│ │   │       │   └─field
+│ │   │       │     └─name "theme"
+│ │   │       └─field
+│ │   │         └─name "language"
+│ │   ├─operator `~`
+│ │   └─rhs
+│ │     └─lit_expr
+│ │       └─str_lit ".html"
+│ └─names
+│   └─name "lang"
+└─include
+  ├─bin_expr
+  │ ├─lhs
+  │ │ └─bin_expr
+  │ │   ├─lhs
+  │ │   │ └─lit_expr
+  │ │   │   └─str_lit ".icons/"
+  │ │   ├─operator `~`
+  │ │   └─rhs
+  │ │     └─var_expr
+  │ │       └─name "icon"
+  │ ├─operator `~`
+  │ └─rhs
+  │   └─lit_expr
+  │     └─str_lit ".svg"
+  └─context
+

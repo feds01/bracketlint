@@ -1,0 +1,36 @@
+info: parsed module '$DIR/template_names_twig.html' as twig:
+body
+├─extends
+│ └─cond_expr
+│   ├─condition
+│   │ └─var_expr
+│   │   └─name "standalone"
+│   ├─then
+│   │ └─lit_expr
+│   │   └─str_lit "minimum.html"
+│   └─otherwise
+│     └─lit_expr
+│       └─str_lit "base.html"
+├─import
+│ ├─template
+│ │ └─var_expr
+│ │   └─name "_self"
+│ └─names
+│   └─name "menus"
+└─include
+  ├─bin_expr
+  │ ├─lhs
+  │ │ └─bin_expr
+  │ │   ├─lhs
+  │ │   │ └─lit_expr
+  │ │   │   └─str_lit 'icons/'
+  │ │   ├─operator `~`
+  │ │   └─rhs
+  │ │     └─var_expr
+  │ │       └─name "icon"
+  │ ├─operator `~`
+  │ └─rhs
+  │   └─lit_expr
+  │     └─str_lit '.svg'
+  └─context
+

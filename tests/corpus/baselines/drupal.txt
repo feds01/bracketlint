@@ -36,7 +36,7 @@ ok            core/modules/system/templates/mark.html.twig
 ok            core/modules/system/templates/menu-local-action.html.twig
 ok            core/modules/system/templates/menu-local-task.html.twig
 ok            core/modules/system/templates/menu-local-tasks.html.twig
-parse-error   core/modules/system/templates/menu.html.twig
+ok            core/modules/system/templates/menu.html.twig
 ok            core/modules/system/templates/off-canvas-page-wrapper.html.twig
 ok            core/modules/system/templates/page-title.html.twig
 ok            core/modules/system/templates/page.html.twig
@@ -113,7 +113,7 @@ ok            core/themes/claro/templates/classy/media-library/media-library-ite
 ok            core/themes/claro/templates/classy/media-library/media-library-wrapper.html.twig
 ok            core/themes/claro/templates/classy/misc/help-section.html.twig
 ok            core/themes/claro/templates/classy/misc/progress-bar.html.twig
-parse-error   core/themes/claro/templates/classy/navigation/menu.html.twig
+ok            core/themes/claro/templates/classy/navigation/menu.html.twig
 ok            core/themes/claro/templates/classy/navigation/toolbar.html.twig
 ok            core/themes/claro/templates/classy/user/user.html.twig
 ok            core/themes/claro/templates/classy/user/username.html.twig
@@ -154,7 +154,7 @@ ok            core/themes/claro/templates/menu-link-form.html.twig
 ok            core/themes/claro/templates/menu-local-tasks.html.twig
 ok            core/themes/claro/templates/misc/status-messages.html.twig
 ok            core/themes/claro/templates/navigation/details--vertical-tabs.html.twig
-parse-error   core/themes/claro/templates/navigation/menu--toolbar.html.twig
+ok            core/themes/claro/templates/navigation/menu--toolbar.html.twig
 ok            core/themes/claro/templates/navigation/menu-local-task--views-ui.html.twig
 ok            core/themes/claro/templates/navigation/menu-local-task.html.twig
 ok            core/themes/claro/templates/navigation/toolbar.html.twig
@@ -237,11 +237,11 @@ ok            core/themes/olivero/templates/misc/status-messages.html.twig
 ok            core/themes/olivero/templates/navigation/breadcrumb.html.twig
 ok            core/themes/olivero/templates/navigation/links--comment.html.twig
 ok            core/themes/olivero/templates/navigation/links.html.twig
-parse-error   core/themes/olivero/templates/navigation/menu--primary-menu.html.twig
-parse-error   core/themes/olivero/templates/navigation/menu--secondary-menu.html.twig
+ok            core/themes/olivero/templates/navigation/menu--primary-menu.html.twig
+ok            core/themes/olivero/templates/navigation/menu--secondary-menu.html.twig
 ok            core/themes/olivero/templates/navigation/menu-local-task.html.twig
 ok            core/themes/olivero/templates/navigation/menu-local-tasks.html.twig
-parse-error   core/themes/olivero/templates/navigation/menu.html.twig
+ok            core/themes/olivero/templates/navigation/menu.html.twig
 ok            core/themes/olivero/templates/navigation/pager.html.twig
 ok            core/themes/olivero/templates/text-format-wrapper.html.twig
 ok            core/themes/olivero/templates/user/user--compact.html.twig

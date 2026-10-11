@@ -386,6 +386,21 @@ impl Dialect {
         matches!(self, Dialect::Jinja | Dialect::Twig)
     }
 
+    /// Whether the template that `extends`, `include` and `import` name is an
+    /// expression, which can have operators, e.g.
+    /// `{% include "icons/" ~ icon ~ ".svg" %}`, as in [Jinja], [Nunjucks] and
+    /// Twig's [`include`], [`extends`] and [`import`], which can also name
+    /// `_self`. Django and Liquid read a value with its filters.
+    ///
+    /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L328-L366
+    /// [Nunjucks]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/parser.js#L285-L437
+    /// [`include`]: https://twig.symfony.com/doc/3.x/tags/include.html
+    /// [`extends`]: https://twig.symfony.com/doc/3.x/tags/extends.html#conditional-inheritance
+    /// [`import`]: https://github.com/twigphp/Twig/blob/v3.30.0/src/TokenParser/ImportTokenParser.php#L31
+    pub fn template_names_take_operators(self) -> bool {
+        matches!(self, Dialect::Jinja | Dialect::Nunjucks | Dialect::Twig)
+    }
+
     /// Whether a block can be `scoped`, which gives it the variables of the
     /// scope that it is in, or `required`, which a child template has to
     /// override, as in [Jinja], e.g. `{% block item scoped required %}`.
