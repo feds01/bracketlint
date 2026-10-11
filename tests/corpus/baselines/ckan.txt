@@ -5,7 +5,7 @@ ok            ckan/templates/admin/index.html
 ok            ckan/templates/admin/snippets/confirm_delete.html
 ok            ckan/templates/admin/snippets/data_type.html
 ok            ckan/templates/admin/trash.html
-changed-tags  ckan/templates/base.html
+ok            ckan/templates/base.html
 ok            ckan/templates/dataviewer/base.html
 ok            ckan/templates/development/primer.html
 ok            ckan/templates/development/snippets/actions.html

@@ -414,6 +414,25 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         }
     }
 
+    /// Push the source at `range` as it is written, e.g. a comment, or a tag
+    /// that the formatter has no layout for. It starts a line when the source
+    /// starts one with it, and otherwise follows what comes before it after a
+    /// space when the source has one.
+    fn push_kept_source(&mut self, range: ByteRange) {
+        let whitespace = self.whitespace_before(range.start());
+        if whitespace.contains('\n') && !self.at_line_start() {
+            self.end_line();
+        }
+
+        if self.at_line_start() {
+            self.indent_kept_source(range.start(), self.ctx.source.hunk(range));
+        } else {
+            self.space_from_previous(range.start());
+        }
+
+        self.push_source(range);
+    }
+
     /// Indent `source`, which starts at `start` and a line, and which is kept
     /// as it is written. When it spans several lines, it keeps its column, so
     /// that its other lines still line up with it. Otherwise, it gets the
@@ -438,6 +457,9 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
             (bl_ast::Statement::Text(_), Some(bl_ast::Statement::Tag(tag))) if tag.is_inline() => {
                 Ok(())
             }
+            // A comment starts a line only when the source starts one with it,
+            // see [Self::push_kept_source].
+            (bl_ast::Statement::Text(_), Some(bl_ast::Statement::Comment(_))) => Ok(()),
 
             (bl_ast::Statement::Tag(tag), _) => {
                 let keyword = match tag {
@@ -470,12 +492,12 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
 
                 Ok(())
             }
+            // A comment that ends a line in the source ends it here too.
             (bl_ast::Statement::Comment(_), _) => {
-                // If the statement is a comment, we need to check if
-                // the next line is the end of the line.
-                self.push_hunk("\n");
-
-                // Additional logic can be added here that uses next_statement if needed
+                if self.whitespace_after(statement.range()).contains('\n') && !self.at_line_start()
+                {
+                    self.end_line();
+                }
 
                 Ok(())
             }
@@ -525,20 +547,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             // whitespace matters, just like a `raw` block's.
             | bl_ast::Tag::Capture(_)
             | bl_ast::Tag::Liquid(_) => {
-                // The tag starts a line when the source starts one with it.
-                let range = node.range();
-                let whitespace = self.whitespace_before(range.start());
-                if whitespace.contains('\n') && !self.at_line_start() {
-                    self.end_line();
-                }
-
-                if self.at_line_start() {
-                    self.indent_kept_source(range.start(), self.ctx.source.hunk(range));
-                } else {
-                    self.space_from_previous(range.start());
-                }
-
-                self.push_source(range);
+                self.push_kept_source(node.range());
                 Ok(())
             }
         }
@@ -928,17 +937,15 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
 
     type CommentRet = ();
 
-    /// Visit a comment node.
-    ///
-    /// For comments, we just emit the content of the comment as a verbatim.
+    /// A comment is kept as it is written, as is a tag that the formatter has
+    /// no layout for.
     fn visit_comment(
         &mut self,
         node: bl_ast::AstNodeRef<bl_ast::Comment>,
     ) -> Result<Self::CommentRet, Self::Error> {
         // The span of the comment includes its delimiters, which are either
         // `{# ... #}` or `{% comment %} ... {% endcomment %}`.
-        self.push_source(node.range());
-        self.end_line();
+        self.push_kept_source(node.range());
 
         Ok(())
     }

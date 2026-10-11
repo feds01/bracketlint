@@ -77,7 +77,7 @@ ok            templates/crud/field/time.html.twig
 ok            templates/crud/field/timezone.html.twig
 ok            templates/crud/field/url.html.twig
 ok            templates/crud/filters.html.twig
-changed-tags  templates/crud/form_theme.html.twig
+ok            templates/crud/form_theme.html.twig
 ok            templates/crud/includes/_action_confirmation_modal.html.twig
 ok            templates/crud/includes/_batch_action_modal.html.twig
 ok            templates/crud/includes/_filters_modal.html.twig
