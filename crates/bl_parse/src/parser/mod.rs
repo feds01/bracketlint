@@ -10,8 +10,8 @@ use std::cell::Cell;
 
 use bl_arena::{Arena, ArenaVec};
 use bl_ast::{
-    self as ast, AstNode, AstNodes, ByteRange, Identifier, Keyword, SourceId, Span, SpannedSource,
-    VarExpr,
+    self as ast, AstNode, AstNodes, ByteRange, ForeignSyntax, Identifier, Keyword, SourceId, Span,
+    SpannedSource, Syntax, VarExpr,
 };
 use bl_lexer::{
     kw, tok,
@@ -198,6 +198,10 @@ pub struct Parser<'s, 'a> {
     /// Any options that are supplied to the parser to alter
     /// its mode of operation.
     options: ParseOptions,
+
+    /// Syntax of another dialect that the parser stopped at, with the span of
+    /// its token, see [Parser::mark_foreign]. An error at the token names it.
+    foreign: Option<(ByteRange, ForeignSyntax)>,
 }
 
 impl<'s, 'a> Parser<'s, 'a> {
@@ -223,6 +227,7 @@ impl<'s, 'a> Parser<'s, 'a> {
             _source: source,
             diagnostics,
             options,
+            foreign: None,
             frame: ParseFrame::from_stream(stream, parent_span),
         }
     }
@@ -295,12 +300,154 @@ impl<'s, 'a> Parser<'s, 'a> {
     ) -> ParseError {
         self.frame.error.set(true);
 
-        ParseError::new(
-            kind,
-            self.make_span(span.unwrap_or_else(|| self.eof_pos())),
-            expected,
-            received,
-        )
+        let range = span.unwrap_or_else(|| self.eof_pos());
+        let foreign = self.foreign_at(range, received);
+        ParseError::new(kind, self.make_span(range), expected, received, foreign)
+    }
+
+    /// The syntax of another dialect that an error at `range` is at, if any:
+    /// syntax that the parser stopped at, see [Parser::mark_foreign], or a
+    /// whitespace control marker of another dialect. An error that didn't
+    /// receive a token is at the end of the tag, and so after its last token,
+    /// e.g. the `~` in `{{ x ~}}`, which is Jinja's concatenation.
+    fn foreign_at(&self, range: ByteRange, received: Option<TokenKind>) -> Option<ForeignSyntax> {
+        if let Some((at, foreign)) = self.foreign
+            && at == range
+        {
+            return Some(foreign);
+        }
+
+        let token = if received.is_some() { range } else { self.previous_pos() };
+        self.foreign_trim_marker(token)
+    }
+
+    /// The whitespace control marker of another dialect that the token at
+    /// `range` is, if it is one, e.g. the `~` in `{%~ if x %}` in Jinja. The
+    /// markers of [Jinja], [Liquid] and [Twig] are written right inside a
+    /// tag's delimiters, and the lexer leaves out the dialect's own, see
+    /// [Parser::trim].
+    ///
+    /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#whitespace-control
+    /// [Liquid]: https://shopify.github.io/liquid/basics/whitespace/
+    /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#whitespace-control
+    fn foreign_trim_marker(&self, range: ByteRange) -> Option<ForeignSyntax> {
+        // The range of an error can be made up, e.g. one byte after the last
+        // token, so it is read as bytes, which a character can't split.
+        let source = self._source.source.as_bytes();
+        let &marker = source.get(range.start()).filter(|_| range.len() == 1)?;
+
+        let before = &source[..range.start()];
+        let after = source.get(range.end() + 1..).unwrap_or_default();
+        let next_to_delimiter = before.ends_with(b"{%")
+            || before.ends_with(b"{{")
+            || after.starts_with(b"%}")
+            || after.starts_with(b"}}");
+
+        next_to_delimiter
+            .then(|| self.options.dialect.foreign(Syntax::TrimMarker(char::from(marker))))
+            .flatten()
+    }
+
+    /// Mark the token at `range` as `syntax` of another dialect, if the dialect
+    /// doesn't have it, so that an error at the token names the dialects that
+    /// do. The parser stops at such a token, which is then usually left over.
+    fn mark_foreign(&mut self, range: ByteRange, syntax: Syntax) {
+        if let Some(foreign) = self.options.dialect.foreign(syntax) {
+            self.foreign = Some((range, foreign));
+        }
+    }
+
+    /// Mark the next token as `syntax` of another dialect, see
+    /// [Parser::mark_foreign].
+    fn stop_at_foreign(&mut self, syntax: Syntax) {
+        if let Some(token) = self.peek().copied() {
+            self.mark_foreign(token.span, syntax);
+        }
+    }
+
+    /// Mark the next token as Liquid's syntax for a tag's arguments, if it is a
+    /// `,` between them, or the `:` of a `name: value` argument, as in Liquid's
+    /// [`render`]. The other dialects have neither.
+    ///
+    /// [`render`]: https://shopify.github.io/liquid/tags/template/#render-parameters
+    fn stop_at_foreign_args(&mut self) {
+        if !self.frame.delimiter.is_some_and(|delimiter| delimiter.is_tag()) {
+            return;
+        }
+
+        match self.peek_kind() {
+            Some(TokenKind::Comma) => self.stop_at_foreign(Syntax::ArgCommas),
+            Some(TokenKind::Colon) => self.stop_at_foreign(Syntax::ColonArgs),
+            _ => {}
+        }
+    }
+
+    /// Warn about each `{# #}` that starts in the text at `range`, in a dialect
+    /// without such comments, where it is text, since it is likely meant as a
+    /// comment, as in [Django], [Jinja] and [Twig]. The contents of a
+    /// `{% raw %}` block are output as they are written, so they are left out.
+    ///
+    /// [Django]: https://docs.djangoproject.com/en/stable/ref/templates/language/#comments
+    /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#comments
+    /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#comments
+    fn warn_hash_comments(&mut self, range: ByteRange) {
+        let Some(foreign) = self.options.dialect.foreign(Syntax::HashComments) else {
+            return;
+        };
+
+        if self.tag_context() == Some(TagContext::Raw) {
+            return;
+        }
+
+        // A comment can end after the text, e.g. `{# {{ x }} #}`, so its end is
+        // looked for in the rest of the source.
+        let source = self._source.source;
+        let mut start = range.start();
+        while let Some(index) = source[start..=range.end()].find("{#") {
+            let open = start + index;
+            let Some(len) = source[open + "{#".len()..].find("#}") else {
+                return;
+            };
+
+            let close = open + "{#".len() + len + "#}".len();
+            let span = self.make_span(ByteRange::new(open, close - 1));
+            self.add_warning(ParseWarning::new(ParseWarningKind::HashComment(foreign), span));
+
+            if close > range.end() {
+                return;
+            }
+            start = close;
+        }
+    }
+
+    /// Warn about a tag that is named as another dialect names one of its
+    /// tags, since the template is likely written in that dialect:
+    ///
+    /// - The tag that starts an `elif` clause, which is `elsif` in
+    ///   [Liquid][Liquid `elsif`], and `elif` in [Django][Django `if`],
+    ///   [Jinja][Jinja `if`] and [Twig][Twig `if`].
+    /// - The tags of a block that is output as written, which are `raw` and
+    ///   `endraw` in [Jinja][Jinja `raw`] and [Liquid][Liquid `raw`], and
+    ///   `verbatim` and `endverbatim` in [Django][Django `verbatim`] and
+    ///   [Twig][Twig `verbatim`].
+    ///
+    /// [Liquid `elsif`]: https://shopify.github.io/liquid/tags/control-flow/#elsif--else
+    /// [Django `if`]: https://docs.djangoproject.com/en/stable/ref/templates/builtins/#if
+    /// [Jinja `if`]: https://jinja.palletsprojects.com/en/stable/templates/#if
+    /// [Twig `if`]: https://twig.symfony.com/doc/3.x/tags/if.html
+    /// [Jinja `raw`]: https://jinja.palletsprojects.com/en/stable/templates/#escaping
+    /// [Liquid `raw`]: https://shopify.github.io/liquid/tags/template/#raw
+    /// [Django `verbatim`]: https://docs.djangoproject.com/en/stable/ref/templates/builtins/#verbatim
+    /// [Twig `verbatim`]: https://twig.symfony.com/doc/3.x/tags/verbatim.html
+    fn warn_foreign_tag(&mut self, name: Token) {
+        let foreign = Syntax::tag(self._source.hunk(name.span))
+            .and_then(|syntax| self.options.dialect.foreign(syntax));
+
+        if let Some(foreign) = foreign {
+            let warning =
+                ParseWarning::new(ParseWarningKind::ForeignTag(foreign), self.make_span(name.span));
+            self.add_warning(warning);
+        }
     }
 
     /// Create an error at the current location.
@@ -532,11 +679,12 @@ impl<'s, 'a> Parser<'s, 'a> {
     }
 
     fn parse_statement(&mut self) -> ParseResult<Option<AstNode<'a, ast::Statement<'a>>>> {
-        let token = self.peek().ok_or_else(|| self.make_unexpected_eof())?;
+        let token = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
         let statement = match token.kind {
             // For parsing text nodes.
             TokenKind::Text => {
                 self.skip_fast(TokenKind::Text); // `<text>` Skip the text token.
+                self.warn_hash_comments(token.span);
                 Ok(self.node_with_span(ast::Statement::text(), token.span))
             }
             // For parsing `{% ... %}` blocks.
@@ -569,6 +717,10 @@ impl<'s, 'a> Parser<'s, 'a> {
         debug_assert!(self.peek().is_some_and(|tok| tok.kind.is_tag_tree()));
 
         let token = self.peek_raw(1).copied().ok_or_else(|| self.make_unexpected_eof())?;
+        if matches!(token.kind, TokenKind::Ident | TokenKind::Keyword(Keyword::Raw)) {
+            self.warn_foreign_tag(token);
+        }
+
         let statement = match token.kind {
             TokenKind::Ident => self.in_tree(Delimiter::Percent, None, |g| {
                 let name = g.parse_name()?;
@@ -655,12 +807,30 @@ impl<'s, 'a> Parser<'s, 'a> {
                 Keyword::Include => self.parse_include_statement(),
                 Keyword::Load => self.parse_load_statement(),
                 Keyword::Import => self.parse_import_statement(),
-                _ => self.err_with_location(
-                    ParseErrorKind::Tag,
-                    ExpectedItem::Ident,
-                    Some(token.kind),
-                    token.span,
-                ),
+                _ => {
+                    // The body of an empty loop starts at `{% empty %}` in
+                    // [Django], and at `{% else %}` in [Jinja], [Liquid] and
+                    // [Twig], so the other's tag in a loop is likely written in
+                    // another dialect.
+                    //
+                    // [Django]: https://docs.djangoproject.com/en/stable/ref/templates/builtins/#for-empty
+                    // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#for
+                    // [Liquid]: https://shopify.github.io/liquid/tags/iteration/#else
+                    // [Twig]: https://twig.symfony.com/doc/3.x/tags/for.html#the-else-clause
+                    if matches!(keyword, Keyword::Else | Keyword::Empty)
+                        && self.tag_context() == Some(TagContext::For)
+                        && let Some(syntax) = Syntax::tag(keyword.as_ref())
+                    {
+                        self.mark_foreign(token.span, syntax);
+                    }
+
+                    self.err_with_location(
+                        ParseErrorKind::Tag,
+                        ExpectedItem::Ident,
+                        Some(token.kind),
+                        token.span,
+                    )
+                }
             },
             _ => self.err_with_location(
                 ParseErrorKind::Tag,
@@ -992,13 +1162,17 @@ impl<'s, 'a> Parser<'s, 'a> {
             let mut args = self.arena.vec();
             args.push(self.parse_filter_arg()?);
 
-            // [Liquid filters] take a list of arguments, e.g. `f: a, b`.
+            // [Liquid filters] take a list of arguments, e.g. `f: a, b`. In the
+            // other dialects, a filter takes a single argument, so a `,` or a
+            // `:` after it is Liquid's list.
             //
             // [Liquid filters]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/variable.rb#L17
             if self.options.dialect.filter_supports_arg_list() {
                 while self.parse_token_fast(TokenKind::Comma).is_some() {
                     args.push(self.parse_filter_arg()?);
                 }
+            } else if let Some(TokenKind::Comma | TokenKind::Colon) = self.peek_kind() {
+                self.stop_at_foreign(Syntax::FilterArgLists);
             }
 
             self.nodes_with_joined_span(args, start)
@@ -1741,6 +1915,7 @@ impl<'s, 'a> Parser<'s, 'a> {
             }
         }
 
+        self.stop_at_foreign_args();
         Ok(self.nodes_with_joined_span(args, start))
     }
 
@@ -1877,6 +2052,7 @@ impl<'s, 'a> Parser<'s, 'a> {
             {
                 g.parse_args()?
             } else {
+                g.stop_at_foreign_args();
                 g.nodes_with_span(g.arena.vec(), g.range())
             };
 

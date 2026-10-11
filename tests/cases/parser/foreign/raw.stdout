@@ -1,0 +1,8 @@
+info: parsed module '$DIR/raw.twig' as twig:
+body
+└─raw
+  └─body
+    └─inline
+      └─var_expr
+        └─name "x"
+

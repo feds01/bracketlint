@@ -1,0 +1,10 @@
+info: parsed module '$DIR/colon_args.html' as django:
+body
+└─include
+  ├─lit_expr
+  │ └─str_lit "card.html"
+  └─context
+    └─arg
+      └─var_expr
+        └─name "product"
+

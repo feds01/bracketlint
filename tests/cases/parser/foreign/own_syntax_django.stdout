@@ -1,0 +1,65 @@
+info: parsed module '$DIR/own_syntax_django.html' as django:
+body
+├─include
+│ ├─lit_expr
+│ │ └─str_lit "card.html"
+│ └─context
+│   └─arg
+│     ├─name "product"
+│     └─var_expr
+│       └─name "product"
+├─inline
+│ └─filtered_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "price"
+│   └─filter
+│     ├─name "floatformat"
+│     └─args
+│       └─arg
+│         └─lit_expr
+│           └─int_lit 2
+├─if
+│ ├─clauses
+│ │ ├─if_clause
+│ │ │ ├─condition
+│ │ │ │ └─var_expr
+│ │ │ │   └─name "a"
+│ │ │ └─clause_body
+│ │ │   └─body
+│ │ │     └─text
+│ │ └─elif_clause
+│ │   ├─condition
+│ │   │ └─var_expr
+│ │   │   └─name "b"
+│ │   └─clause_body
+│ │     └─body
+│ │       └─text
+│ └─otherwise
+│   └─body
+│     └─text
+├─for
+│ ├─target
+│ │ └─name "item"
+│ ├─iterator
+│ │ └─var_expr
+│ │   └─name "items"
+│ ├─loop_body
+│ │ └─body
+│ │   └─inline
+│ │     └─var_expr
+│ │       └─name "item"
+│ └─loop_empty
+│   └─body
+│     └─text
+├─generic_tag
+│ ├─name "verbatim"
+│ └─args
+├─inline
+│ └─var_expr
+│   └─name "x"
+├─generic_tag
+│ ├─name "endverbatim"
+│ └─args
+└─comment
+

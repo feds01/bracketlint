@@ -107,6 +107,19 @@ impl Dialect {
         matches!(self, Dialect::Jinja | Dialect::Liquid)
     }
 
+    /// The tags that open and close a block whose contents are output as they
+    /// are written, which are `raw` and `endraw` in [Jinja] and [Liquid], and
+    /// `verbatim` and `endverbatim` in [Django] and [Twig], see
+    /// [Dialect::has_raw_blocks].
+    ///
+    /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#escaping
+    /// [Liquid]: https://shopify.github.io/liquid/tags/template/#raw
+    /// [Django]: https://docs.djangoproject.com/en/stable/ref/templates/builtins/#verbatim
+    /// [Twig]: https://twig.symfony.com/doc/3.x/tags/verbatim.html
+    pub fn raw_tags(self) -> (&'static str, &'static str) {
+        if self.has_raw_blocks() { ("raw", "endraw") } else { ("verbatim", "endverbatim") }
+    }
+
     /// Whether `{% doc %}` blocks exist, as in [Liquid], whose contents are
     /// documentation that is neither rendered nor run. Liquid reads them as
     /// text up to `{% enddoc %}`, so they needn't be valid Liquid.
@@ -414,6 +427,32 @@ impl Dialect {
         }
     }
 
+    /// Whether the dialect has `syntax`, by the rule that decides it.
+    pub fn has(self, syntax: Syntax) -> bool {
+        match syntax {
+            Syntax::ArgCommas => self.requires_comma_separated_args(),
+            Syntax::ColonArgs => self.named_args_use_colon(),
+            Syntax::FilterArgLists => self.filter_supports_arg_list(),
+            Syntax::HashComments => self.has_hash_comments(),
+            Syntax::TrimMarker(marker) => self.trim_markers().contains(&marker),
+            Syntax::ElifTag(tag) => self.elif_tag() == tag,
+            Syntax::EmptyLoopTag(tag) => self.empty_loop_tag() == tag,
+            Syntax::RawTag(tag) => {
+                let (raw, end_raw) = self.raw_tags();
+                tag == raw || tag == end_raw
+            }
+        }
+    }
+
+    /// `syntax` in a template of this dialect, if the dialect doesn't have it
+    /// and another one does, e.g. Liquid's commas between a tag's arguments in
+    /// Jinja. The template is then likely written in one of the dialects that
+    /// have it.
+    pub fn foreign(self, syntax: Syntax) -> Option<ForeignSyntax> {
+        let foreign = !self.has(syntax) && syntax.dialects().next().is_some();
+        foreign.then_some(ForeignSyntax { syntax, dialect: self })
+    }
+
     /// Check if its currently Django dialect.
     #[inline]
     pub fn is_django(self) -> bool {
@@ -424,6 +463,147 @@ impl Dialect {
     #[inline]
     pub const fn is_liquid(self) -> bool {
         matches!(self, Dialect::Liquid)
+    }
+}
+
+/// Syntax that only some dialects have, which a rule on [Dialect] decides. A
+/// template that uses it in a dialect without it is likely written in one of
+/// those, so a diagnostic at it names them, see [Dialect::foreign].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Syntax {
+    /// Commas between a tag's arguments, see
+    /// [Dialect::requires_comma_separated_args].
+    ArgCommas,
+
+    /// Named arguments that are written `name: value`, see
+    /// [Dialect::named_args_use_colon].
+    ColonArgs,
+
+    /// A filter's list of arguments, which can be positional or keyword, e.g.
+    /// `f: a, key: b`, see [Dialect::filter_supports_arg_list].
+    FilterArgLists,
+
+    /// `{# #}` comments, see [Dialect::has_hash_comments].
+    HashComments,
+
+    /// A whitespace control marker, e.g. the `~` in `{%~ if x %}`, see
+    /// [Dialect::trim_markers].
+    TrimMarker(char),
+
+    /// A spelling of the tag that starts an `elif` clause, e.g. `elsif`, see
+    /// [Dialect::elif_tag].
+    ElifTag(&'static str),
+
+    /// A spelling of the tag that starts the body of a loop for when there is
+    /// nothing to loop over, e.g. `empty`, see [Dialect::empty_loop_tag].
+    EmptyLoopTag(&'static str),
+
+    /// A spelling of a tag that opens or closes a block whose contents are
+    /// output as they are written, e.g. `verbatim`, see [Dialect::raw_tags].
+    RawTag(&'static str),
+}
+
+impl Syntax {
+    /// The tag that `name` is in some dialect, e.g. `elsif`, which starts an
+    /// `elif` clause in Liquid.
+    pub fn tag(name: &str) -> Option<Self> {
+        Dialect::ALL.iter().find_map(|dialect| {
+            let (raw, end_raw) = dialect.raw_tags();
+            [
+                Syntax::ElifTag(dialect.elif_tag()),
+                Syntax::EmptyLoopTag(dialect.empty_loop_tag()),
+                Syntax::RawTag(raw),
+                Syntax::RawTag(end_raw),
+            ]
+            .into_iter()
+            .find(|syntax| syntax.tag_name() == Some(name))
+        })
+    }
+
+    /// The name of the tag, if the syntax is a tag.
+    pub fn tag_name(self) -> Option<&'static str> {
+        match self {
+            Syntax::ElifTag(tag) | Syntax::EmptyLoopTag(tag) | Syntax::RawTag(tag) => Some(tag),
+            Syntax::ArgCommas
+            | Syntax::ColonArgs
+            | Syntax::FilterArgLists
+            | Syntax::HashComments
+            | Syntax::TrimMarker(_) => None,
+        }
+    }
+
+    /// The dialects that have the syntax.
+    pub fn dialects(self) -> impl Iterator<Item = Dialect> {
+        Dialect::ALL.iter().copied().filter(move |dialect| dialect.has(self))
+    }
+}
+
+/// [Syntax] in a template of a dialect that doesn't have it, see
+/// [Dialect::foreign].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ForeignSyntax {
+    /// The syntax that the template uses.
+    pub syntax: Syntax,
+
+    /// The dialect that the template is parsed in.
+    pub dialect: Dialect,
+}
+
+impl ForeignSyntax {
+    /// A help message that names the dialects that have the syntax, and how to
+    /// parse the template in one of them, e.g. "commas between a tag's
+    /// arguments are Liquid syntax, pass `--dialect liquid` if this is a Liquid
+    /// template".
+    pub fn help(self) -> String {
+        let dialects: Vec<_> = self.syntax.dialects().collect();
+        let names = titles(&dialects);
+        let write = if dialects.len() == 1 { "writes" } else { "write" };
+
+        let syntax = match self.syntax {
+            Syntax::ArgCommas => format!("commas between a tag's arguments are {names} syntax"),
+            Syntax::ColonArgs => format!("`name: value` arguments are {names} syntax"),
+            Syntax::FilterArgLists => {
+                format!("a filter's list of arguments, e.g. `f: a, key: b`, is {names} syntax")
+            }
+            Syntax::HashComments => format!("`{{# #}}` comments are {names} syntax"),
+            Syntax::TrimMarker(marker) => {
+                format!("the whitespace control marker `{marker}` is {names} syntax")
+            }
+            Syntax::ElifTag(tag) => {
+                let elif = self.dialect.elif_tag();
+                format!("`{{% {tag} %}}` is how {names} {write} `{{% {elif} %}}`")
+            }
+            Syntax::EmptyLoopTag(tag) => {
+                let empty = self.dialect.empty_loop_tag();
+                format!("`{{% {tag} %}}` in a loop is how {names} {write} `{{% {empty} %}}`")
+            }
+            Syntax::RawTag(tag) => {
+                let (raw, end_raw) = self.dialect.raw_tags();
+                let raw = if tag.starts_with("end") { end_raw } else { raw };
+                format!("`{{% {tag} %}}` is how {names} {write} `{{% {raw} %}}`")
+            }
+        };
+
+        let switch = match dialects.as_slice() {
+            [dialect] => format!(
+                "pass `--dialect {}` if this is a {} template",
+                dialect.name(),
+                dialect.title()
+            ),
+            _ => "pass `--dialect` with the template's dialect if it is one of them".to_string(),
+        };
+
+        format!("{syntax}, {switch}")
+    }
+}
+
+/// The names of `dialects` in prose, e.g. `Django, Jinja and Twig`.
+fn titles(dialects: &[Dialect]) -> String {
+    let titles: Vec<_> = dialects.iter().map(|dialect| dialect.title()).collect();
+
+    match titles.split_last() {
+        Some((last, rest)) if !rest.is_empty() => format!("{} and {last}", rest.join(", ")),
+        _ => titles.concat(),
     }
 }
 
@@ -503,5 +683,60 @@ mod test_super {
             let power = dialect.infix_binding_power(BinOp::Contains);
             assert_eq!(power.is_some(), dialect.is_liquid(), "`contains` in {dialect}");
         }
+    }
+
+    #[test]
+    fn test_syntax_tag() {
+        assert_eq!(Syntax::tag("elsif"), Some(Syntax::ElifTag("elsif")));
+        assert_eq!(Syntax::tag("elif"), Some(Syntax::ElifTag("elif")));
+        assert_eq!(Syntax::tag("empty"), Some(Syntax::EmptyLoopTag("empty")));
+        assert_eq!(Syntax::tag("verbatim"), Some(Syntax::RawTag("verbatim")));
+        assert_eq!(Syntax::tag("endraw"), Some(Syntax::RawTag("endraw")));
+        assert_eq!(Syntax::tag("cycle"), None);
+    }
+
+    #[test]
+    fn test_foreign() {
+        // Each dialect has its own spelling, and not the others'.
+        assert!(Dialect::Jinja.foreign(Syntax::ElifTag("elsif")).is_some());
+        assert!(Dialect::Liquid.foreign(Syntax::ElifTag("elsif")).is_none());
+        assert!(Dialect::Liquid.foreign(Syntax::ElifTag("elif")).is_some());
+        assert!(Dialect::Django.foreign(Syntax::RawTag("endverbatim")).is_none());
+        assert!(Dialect::Twig.foreign(Syntax::RawTag("raw")).is_some());
+
+        assert!(Dialect::Django.foreign(Syntax::ArgCommas).is_some());
+        assert!(Dialect::Liquid.foreign(Syntax::ArgCommas).is_none());
+        assert!(Dialect::Liquid.foreign(Syntax::HashComments).is_some());
+        assert!(Dialect::Jinja.foreign(Syntax::TrimMarker('~')).is_some());
+        assert!(Dialect::Twig.foreign(Syntax::TrimMarker('~')).is_none());
+
+        // Syntax that no dialect has isn't another dialect's.
+        assert!(Dialect::Jinja.foreign(Syntax::TrimMarker('*')).is_none());
+    }
+
+    #[test]
+    fn test_foreign_help() {
+        let help = |dialect: Dialect, syntax| dialect.foreign(syntax).unwrap().help();
+
+        assert_eq!(
+            help(Dialect::Jinja, Syntax::ArgCommas),
+            "commas between a tag's arguments are Liquid syntax, pass `--dialect liquid` if this \
+             is a Liquid template"
+        );
+        assert_eq!(
+            help(Dialect::Jinja, Syntax::ElifTag("elsif")),
+            "`{% elsif %}` is how Liquid writes `{% elif %}`, pass `--dialect liquid` if this is \
+             a Liquid template"
+        );
+        assert_eq!(
+            help(Dialect::Liquid, Syntax::ElifTag("elif")),
+            "`{% elif %}` is how Django, Jinja and Twig write `{% elsif %}`, pass `--dialect` \
+             with the template's dialect if it is one of them"
+        );
+        assert_eq!(
+            help(Dialect::Jinja, Syntax::RawTag("endverbatim")),
+            "`{% endverbatim %}` is how Django and Twig write `{% endraw %}`, pass `--dialect` \
+             with the template's dialect if it is one of them"
+        );
     }
 }

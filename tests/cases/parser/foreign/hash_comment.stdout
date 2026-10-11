@@ -1,0 +1,12 @@
+info: parsed module '$DIR/hash_comment.liquid' as liquid:
+body
+├─text
+├─inline
+│ └─access_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "product"
+│   └─field
+│     └─name "title"
+└─text
+

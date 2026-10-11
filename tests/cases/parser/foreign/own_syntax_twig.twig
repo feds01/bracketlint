@@ -1,0 +1,6 @@
+// run=pass, stage=check
+
+{%~ if a ~%}x{%- else -%}z{% endif %}
+{% for item in items %}{{ item }}{% else %}No items{% endfor %}
+{% verbatim %}{{ x }}{% endverbatim %}
+{# A comment #}

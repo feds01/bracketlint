@@ -1,0 +1,29 @@
+info: parsed module '$DIR/filter_arg_list.html' as django:
+body
+├─inline
+│ └─filtered_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "price"
+│   └─filter
+│     ├─name "money"
+│     └─args
+│       └─arg
+│         └─lit_expr
+│           └─str_lit "USD"
+└─inline
+  └─filtered_expr
+    ├─subject
+    │ └─access_expr
+    │   ├─subject
+    │   │ └─var_expr
+    │   │   └─name "product"
+    │   └─field
+    │     └─name "available"
+    └─filter
+      ├─name "default"
+      └─args
+        └─arg
+          └─var_expr
+            └─name "allow_false"
+

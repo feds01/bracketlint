@@ -1,0 +1,26 @@
+error: expected a tag, however received a `~`
+ --> $DIR/trim_marker_tilde.jinja:1:3
+  |
+1 | {%~ if user ~%}{{ user.name }}{%~ endif ~%}
+  |   -
+  |
+  = note: this file is parsed as Jinja, from its `.jinja` extension
+  = help: expected a `identifier`
+  = help: the whitespace control marker `~` is Twig syntax, pass `--dialect twig` if this is a Twig template
+error: expected a tag, however received a `~`
+ --> $DIR/trim_marker_tilde.jinja:1:33
+  |
+1 | {%~ if user ~%}{{ user.name }}{%~ endif ~%}
+  |                                 -
+  |
+  = note: this file is parsed as Jinja, from its `.jinja` extension
+  = help: expected a `identifier`
+  = help: the whitespace control marker `~` is Twig syntax, pass `--dialect twig` if this is a Twig template
+error: unexpectedly reached the end of input
+ --> $DIR/trim_marker_tilde.jinja:2:15
+  |
+2 | {{ user.name ~}}
+  |               -
+  |
+  = note: this file is parsed as Jinja, from its `.jinja` extension
+  = help: the whitespace control marker `~` is Twig syntax, pass `--dialect twig` if this is a Twig template
