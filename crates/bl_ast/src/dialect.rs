@@ -171,8 +171,9 @@ impl Dialect {
     }
 
     /// Whether a filter takes a list of arguments, which can be positional or
-    /// keyword, e.g. `f: a, b, key: c`, as in [Liquid]. The other dialects take
-    /// a single argument, e.g. `f:a` in [Django].
+    /// keyword, e.g. `f: a, b, key: c`, as in [Liquid]. [Django] takes a single
+    /// argument, e.g. `f:a`, and Jinja and Twig take theirs in parentheses, see
+    /// [Dialect::filter_args_in_parentheses].
     ///
     /// [Liquid]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/variable.rb#L17
     /// [Django]: https://docs.djangoproject.com/en/stable/ref/templates/language/#filters
@@ -218,6 +219,70 @@ impl Dialect {
     /// [Liquid]: https://shopify.github.io/liquid/tags/iteration/#range
     pub fn has_ranges(self) -> bool {
         matches!(self, Dialect::Liquid)
+    }
+
+    /// Whether a value can be called with arguments in parentheses, e.g.
+    /// `range(3)` or `post.render(user, full=true)`, as in [Jinja] and [Twig].
+    ///
+    /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#other-operators
+    /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#functions
+    pub fn has_calls(self) -> bool {
+        matches!(self, Dialect::Jinja | Dialect::Twig)
+    }
+
+    /// Whether a named argument of a call can be written `name: value`, as in
+    /// [Twig], e.g. `date(format: 'r')`, as well as `name=value`.
+    ///
+    /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#named-arguments
+    pub fn call_args_named_with_colon(self) -> bool {
+        matches!(self, Dialect::Twig)
+    }
+
+    /// Whether a filter takes its arguments in parentheses, as a call does,
+    /// e.g. `join(', ')`, as in [Jinja] and [Twig]. Django and Liquid write
+    /// them after a `:` instead, see [Dialect::filter_supports_arg_list].
+    ///
+    /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#filters
+    /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#filters
+    pub fn filter_args_in_parentheses(self) -> bool {
+        matches!(self, Dialect::Jinja | Dialect::Twig)
+    }
+
+    /// Whether parentheses group an expression, e.g. `(a or b) and c`, as in
+    /// [Jinja] and [Twig]. Django has no grouping, and Liquid's parentheses
+    /// hold a range, see [Dialect::has_ranges].
+    ///
+    /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#logic
+    /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#operators
+    pub fn has_grouping(self) -> bool {
+        matches!(self, Dialect::Jinja | Dialect::Twig)
+    }
+
+    /// Whether items separated by commas in parentheses are a tuple, e.g.
+    /// `('a', 'b')`, as in [Jinja], which a `for` loop can also unpack into,
+    /// e.g. `{% for (a, b), c in items %}`.
+    ///
+    /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#literals
+    pub fn has_tuples(self) -> bool {
+        matches!(self, Dialect::Jinja)
+    }
+
+    /// Whether items separated by commas in brackets are a list, e.g.
+    /// `['a', 'b']`, as in [Jinja], and a sequence in [Twig].
+    ///
+    /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#literals
+    /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#literals
+    pub fn has_lists(self) -> bool {
+        matches!(self, Dialect::Jinja | Dialect::Twig)
+    }
+
+    /// Whether a string is translated when it is written `_("...")`, as in
+    /// [Django], e.g. `{{ value|default:_("None") }}`. It is a string, rather
+    /// than a call.
+    ///
+    /// [Django]: https://docs.djangoproject.com/en/stable/topics/i18n/translation/#string-literals-passed-to-tags-and-filters
+    pub fn has_translated_strings(self) -> bool {
+        matches!(self, Dialect::Django)
     }
 
     /// Whether [`nil`], `null`, `blank` and [`empty`] are literals, along with

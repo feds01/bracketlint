@@ -1,0 +1,34 @@
+info: parsed module '$DIR/lists_twig.html' as twig:
+body
+├─inline
+│ └─filtered_expr
+│   ├─subject
+│   │ └─array_expr
+│   │   ├─lit_expr
+│   │   │ └─str_lit 'a'
+│   │   └─lit_expr
+│   │     └─str_lit 'b'
+│   └─filter
+│     ├─name "join"
+│     └─args
+│       └─arg
+│         └─lit_expr
+│           └─str_lit ', '
+└─if
+  └─clauses
+    └─if_clause
+      ├─condition
+      │ └─bin_expr
+      │   ├─lhs
+      │   │ └─var_expr
+      │   │   └─name "type"
+      │   ├─operator `not in`
+      │   └─rhs
+      │     └─array_expr
+      │       ├─lit_expr
+      │       │ └─str_lit 'file'
+      │       └─lit_expr
+      │         └─str_lit 'hidden'
+      └─clause_body
+        └─body
+

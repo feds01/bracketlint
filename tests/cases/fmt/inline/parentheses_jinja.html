@@ -1,0 +1,5 @@
+// run=pass, stage=fmt, dialect=jinja
+
+<p>{{ (a or b) }}</p>
+<p>{{ ('a', 'b')|join(', ') }}</p>
+{% if (a) %}<p>{{ post.render( user ) }}</p>{% endif %}

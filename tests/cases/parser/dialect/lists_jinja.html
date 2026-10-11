@@ -1,0 +1,6 @@
+// run=pass, stage=check, dialect=jinja
+
+{{ ['a', 'b'] }}
+{% if type in ['file', 'hidden',] %}{% endif %}
+{% for href, caption in [('index.html', 'Index'), ('about.html', 'About')] %}{% endfor %}
+{{ [] }}

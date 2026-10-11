@@ -17,7 +17,7 @@ parse-error   packages/govuk-frontend/src/govuk/components/date-input/template.n
 ok            packages/govuk-frontend/src/govuk/components/details/macro.njk
 parse-error   packages/govuk-frontend/src/govuk/components/details/template.njk
 ok            packages/govuk-frontend/src/govuk/components/error-message/macro.njk
-parse-error   packages/govuk-frontend/src/govuk/components/error-message/template.njk
+ok            packages/govuk-frontend/src/govuk/components/error-message/template.njk
 ok            packages/govuk-frontend/src/govuk/components/error-summary/macro.njk
 parse-error   packages/govuk-frontend/src/govuk/components/error-summary/template.njk
 ok            packages/govuk-frontend/src/govuk/components/exit-this-page/macro.njk
@@ -67,7 +67,7 @@ parse-error   packages/govuk-frontend/src/govuk/components/summary-list/template
 ok            packages/govuk-frontend/src/govuk/components/table/macro.njk
 parse-error   packages/govuk-frontend/src/govuk/components/table/template.njk
 ok            packages/govuk-frontend/src/govuk/components/tabs/macro.njk
-parse-error   packages/govuk-frontend/src/govuk/components/tabs/template.njk
+ok            packages/govuk-frontend/src/govuk/components/tabs/template.njk
 ok            packages/govuk-frontend/src/govuk/components/tag/macro.njk
 parse-error   packages/govuk-frontend/src/govuk/components/tag/template.njk
 ok            packages/govuk-frontend/src/govuk/components/task-list/macro.njk

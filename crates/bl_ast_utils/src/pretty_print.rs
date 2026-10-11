@@ -347,6 +347,28 @@ impl AstVisitor for AstTreePrinter<'_> {
         Ok(TreeNode::branch("array_expr", children))
     }
 
+    type GroupExprRet = TreeNode;
+
+    fn visit_group_expr(
+        &self,
+        node: ast::AstNodeRef<ast::GroupExpr>,
+    ) -> Result<Self::GroupExprRet, Self::Error> {
+        let walk::GroupExpr { expr } = walk::walk_group_expr(self, node)?;
+
+        Ok(TreeNode::branch("group_expr", vec![expr]))
+    }
+
+    type TupleExprRet = TreeNode;
+
+    fn visit_tuple_expr(
+        &self,
+        node: ast::AstNodeRef<ast::TupleExpr>,
+    ) -> Result<Self::TupleExprRet, Self::Error> {
+        let walk::TupleExpr { children } = walk::walk_tuple_expr(self, node)?;
+
+        Ok(TreeNode::branch("tuple_expr", children))
+    }
+
     type UnaryOpRet = TreeNode;
 
     fn visit_unary_op(

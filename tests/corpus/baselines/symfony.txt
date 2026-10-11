@@ -20,7 +20,7 @@ parse-error   src/Symfony/Bundle/WebProfilerBundle/Resources/views/Collector/aja
 parse-error   src/Symfony/Bundle/WebProfilerBundle/Resources/views/Collector/cache.html.twig
 parse-error   src/Symfony/Bundle/WebProfilerBundle/Resources/views/Collector/command.html.twig
 parse-error   src/Symfony/Bundle/WebProfilerBundle/Resources/views/Collector/config.html.twig
-parse-error   src/Symfony/Bundle/WebProfilerBundle/Resources/views/Collector/events.html.twig
+ok            src/Symfony/Bundle/WebProfilerBundle/Resources/views/Collector/events.html.twig
 ok            src/Symfony/Bundle/WebProfilerBundle/Resources/views/Collector/exception.css.twig
 parse-error   src/Symfony/Bundle/WebProfilerBundle/Resources/views/Collector/exception.html.twig
 parse-error   src/Symfony/Bundle/WebProfilerBundle/Resources/views/Collector/form.html.twig
@@ -46,7 +46,7 @@ parse-error   src/Symfony/Bundle/WebProfilerBundle/Resources/views/Profiler/bag.
 parse-error   src/Symfony/Bundle/WebProfilerBundle/Resources/views/Profiler/base.html.twig
 ok            src/Symfony/Bundle/WebProfilerBundle/Resources/views/Profiler/base_js.html.twig
 parse-error   src/Symfony/Bundle/WebProfilerBundle/Resources/views/Profiler/cancel.html.twig
-parse-error   src/Symfony/Bundle/WebProfilerBundle/Resources/views/Profiler/header.html.twig
+ok            src/Symfony/Bundle/WebProfilerBundle/Resources/views/Profiler/header.html.twig
 parse-error   src/Symfony/Bundle/WebProfilerBundle/Resources/views/Profiler/info.html.twig
 parse-error   src/Symfony/Bundle/WebProfilerBundle/Resources/views/Profiler/layout.html.twig
 ok            src/Symfony/Bundle/WebProfilerBundle/Resources/views/Profiler/open.css.twig
@@ -54,7 +54,7 @@ parse-error   src/Symfony/Bundle/WebProfilerBundle/Resources/views/Profiler/open
 parse-error   src/Symfony/Bundle/WebProfilerBundle/Resources/views/Profiler/profiler.css.twig
 parse-error   src/Symfony/Bundle/WebProfilerBundle/Resources/views/Profiler/results.html.twig
 parse-error   src/Symfony/Bundle/WebProfilerBundle/Resources/views/Profiler/search.html.twig
-parse-error   src/Symfony/Bundle/WebProfilerBundle/Resources/views/Profiler/settings.html.twig
+ok            src/Symfony/Bundle/WebProfilerBundle/Resources/views/Profiler/settings.html.twig
 parse-error   src/Symfony/Bundle/WebProfilerBundle/Resources/views/Profiler/table.html.twig
 ok            src/Symfony/Bundle/WebProfilerBundle/Resources/views/Profiler/toolbar.css.twig
 parse-error   src/Symfony/Bundle/WebProfilerBundle/Resources/views/Profiler/toolbar.html.twig

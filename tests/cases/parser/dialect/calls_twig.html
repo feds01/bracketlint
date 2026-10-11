@@ -1,0 +1,7 @@
+// run=pass, stage=check, dialect=twig
+
+{{ path('home') }}
+{{ block('title') }}
+{{ include('card.html.twig') }}
+{{ date|date(format: 'r', timezone: 'GMT') }}
+{{ name|trim('-')|title }}

@@ -971,6 +971,31 @@ impl<'s, 'a> Parser<'s, 'a> {
             TokenKind::Tree(Delimiter::Paren, _) if self.options.dialect.has_ranges() => {
                 return self.parse_range(token);
             }
+            // Parentheses group an expression in [Jinja] and [Twig], e.g.
+            // `(a or b)`, and hold a tuple in Jinja.
+            //
+            // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#logic
+            // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#operators
+            TokenKind::Tree(Delimiter::Paren, _) if self.options.dialect.has_grouping() => {
+                return self.parse_parenthesised_expr(token);
+            }
+            // A list in [Jinja], or a sequence in [Twig], e.g. `['a', 'b']`.
+            //
+            // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#literals
+            // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#literals
+            TokenKind::Tree(Delimiter::Bracket, _) if self.options.dialect.has_lists() => {
+                return self.parse_list_literal(token);
+            }
+            // A string that [Django] translates, e.g. `_("Name")`, which is a
+            // string rather than a call.
+            //
+            // [Django]: https://docs.djangoproject.com/en/stable/topics/i18n/translation/#string-literals-passed-to-tags-and-filters
+            TokenKind::Ident if self.at_translated_string(token) => {
+                self.skip_fast(TokenKind::Ident); // `_` Skip the underscore.
+                self.skip_token(); // `(...)` Skip the parentheses, and the string in them.
+                let lit = ast::Lit::Str(ast::StrLit {});
+                self.node_with_joined_span(ast::Expr::Lit(ast::LitExpr { lit }), token.span)
+            }
 
             kw @ TokenKind::Keyword(keyword) if keyword.identifier_like() => {
                 self.skip_fast(kw); // `<kw>` Skip the identifier token.
@@ -1041,6 +1066,119 @@ impl<'s, 'a> Parser<'s, 'a> {
         Ok(self.node_with_span(ast::Expr::Range(ast::RangeExpr { start, end }), token.span))
     }
 
+    /// Parse an expression in parentheses, e.g. `(a or b)`, which groups it.
+    /// In [Jinja], items separated by commas are a tuple instead, e.g.
+    /// `('a', 'b')`, as are `()` and a single item with a comma after it.
+    ///
+    /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L685-L752
+    fn parse_parenthesised_expr(
+        &mut self,
+        token: Token,
+    ) -> ParseResult<AstNode<'a, ast::Expr<'a>>> {
+        let tuples = self.options.dialect.has_tuples();
+
+        self.in_tree(Delimiter::Paren, None, |g| {
+            let start = g.current_pos();
+            let mut items = g.arena.vec();
+
+            if !(tuples && g.exhausted()) {
+                let expr = g.parse_compound_expr(0)?;
+                if !(tuples && g.peek_kind() == Some(TokenKind::Comma)) {
+                    return Ok(
+                        g.node_with_span(ast::Expr::Group(ast::GroupExpr { expr }), token.span)
+                    );
+                }
+
+                items.push(expr);
+            }
+
+            while g.parse_token_fast(TokenKind::Comma).is_some() && !g.exhausted() {
+                items.push(g.parse_compound_expr(0)?);
+            }
+
+            let children = g.nodes_with_joined_span(items, start);
+            Ok(g.node_with_span(ast::Expr::Tuple(ast::TupleExpr { children }), token.span))
+        })
+    }
+
+    /// Parse a list in brackets, e.g. `['a', 'b']`, whose items are separated
+    /// by commas, with an optional comma after the last.
+    fn parse_list_literal(&mut self, token: Token) -> ParseResult<AstNode<'a, ast::Expr<'a>>> {
+        let children = self.in_tree(Delimiter::Bracket, None, |g| {
+            let start = g.current_pos();
+            let mut items = g.arena.vec();
+
+            while !g.exhausted() {
+                items.push(g.parse_compound_expr(0)?);
+
+                if g.parse_token_fast(TokenKind::Comma).is_none() {
+                    break;
+                }
+            }
+
+            Ok(g.nodes_with_joined_span(items, start))
+        })?;
+
+        Ok(self.node_with_span(ast::Expr::Array(ast::ArrayExpr { children }), token.span))
+    }
+
+    /// Parse the arguments of a call in parentheses, e.g. `(user, full=true)`,
+    /// which are separated by commas, with an optional comma after the last.
+    /// A named argument is written `name=value` in [Jinja] and [Twig], and
+    /// also `name: value` in Twig.
+    ///
+    /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L872-L926
+    /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#named-arguments
+    fn parse_call_args(&mut self) -> ParseResult<AstNodes<'a, ast::Arg<'a>>> {
+        let colon = self.options.dialect.call_args_named_with_colon();
+
+        self.in_tree(Delimiter::Paren, None, |g| {
+            let start = g.current_pos();
+            let mut args = g.arena.vec();
+
+            while let Some(token) = g.peek().copied() {
+                let named = match g.peek_second().map(|token| token.kind) {
+                    Some(TokenKind::Eq) => true,
+                    Some(TokenKind::Colon) => colon,
+                    _ => false,
+                };
+
+                let name = if named && token.kind.is_ident_like() {
+                    let name = g.parse_name()?;
+                    g.skip_token(); // `=` | `:` Skip the separator.
+                    Some(name)
+                } else {
+                    None
+                };
+
+                let value = g.parse_compound_expr(0)?;
+                args.push(
+                    g.node_with_joined_span(ast::Arg { name, value: Some(value) }, token.span),
+                );
+
+                if g.parse_token_fast(TokenKind::Comma).is_none() {
+                    break;
+                }
+            }
+
+            Ok(g.nodes_with_joined_span(args, start))
+        })
+    }
+
+    /// Whether `token` starts a string that [Django] translates, i.e. `_`
+    /// followed by a string in parentheses, e.g. `_("Name")`.
+    ///
+    /// [Django]: https://docs.djangoproject.com/en/stable/topics/i18n/translation/#string-literals-passed-to-tags-and-filters
+    fn at_translated_string(&self, token: Token) -> bool {
+        self.options.dialect.has_translated_strings()
+            && self._source.hunk(token.span) == "_"
+            && matches!(
+                self.peek_raw(1).map(|token| token.kind),
+                Some(TokenKind::Tree(Delimiter::Paren, 1))
+            )
+            && matches!(self.peek_raw(2).map(|token| token.kind), Some(TokenKind::Str))
+    }
+
     /// Parse a value, i.e. an expression without any filters applied to it.
     fn parse_value(&mut self) -> ParseResult<AstNode<'a, ast::Expr<'a>>> {
         let token = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
@@ -1088,8 +1226,18 @@ impl<'s, 'a> Parser<'s, 'a> {
                         subject_span,
                     )
                 }
-                // Function call
-                // TokenKind::Tree(Delimiter::Paren, _) => self.parse_call(subject, subject_span)?,
+                // A call in [Jinja] and [Twig], of a name, an attribute or the
+                // result of a filter, e.g. `range(3)` or `post.render(user)`.
+                //
+                // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#other-operators
+                // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#functions
+                TokenKind::Tree(Delimiter::Paren, _) if self.options.dialect.has_calls() => {
+                    let args = self.parse_call_args()?;
+                    self.node_with_joined_span(
+                        ast::Expr::Call(ast::CallExpr { subject, args }),
+                        subject_span,
+                    )
+                }
                 _ => break,
             };
 
@@ -1164,7 +1312,17 @@ impl<'s, 'a> Parser<'s, 'a> {
         subject_span: ByteRange,
     ) -> ParseResult<AstNode<'a, ast::Filter<'a>>> {
         let name = self.parse_name()?;
-        let args = if self.parse_token_fast(TokenKind::Colon).is_some() {
+
+        // A filter takes its arguments in parentheses in [Jinja] and [Twig],
+        // e.g. `join(', ')`, as a call does.
+        //
+        // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#filters
+        // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#filters
+        let args = if self.options.dialect.filter_args_in_parentheses()
+            && matches!(self.peek_kind(), Some(TokenKind::Tree(Delimiter::Paren, _)))
+        {
+            self.parse_call_args()?
+        } else if self.parse_token_fast(TokenKind::Colon).is_some() {
             let start = self.current_pos();
             let mut args = self.arena.vec();
             args.push(self.parse_filter_arg()?);
@@ -1451,21 +1609,44 @@ impl<'s, 'a> Parser<'s, 'a> {
     /// ```
     fn parse_for_target(&mut self) -> ParseResult<AstNode<'a, ast::ForTarget<'a>>> {
         let start = self.current_pos();
-        let key = self.parse_name()?;
         let mut items = self.arena.vec();
-        items.push(key);
+        self.parse_target_names(&mut items)?;
 
-        loop {
-            if self.parse_token_fast(TokenKind::Comma).is_none() {
-                break;
-            }
-
-            let key = self.parse_name()?;
-            items.push(key);
+        while self.parse_token_fast(TokenKind::Comma).is_some() {
+            self.parse_target_names(&mut items)?;
         }
 
         let items = self.nodes_with_joined_span(items, start);
         Ok(self.node_with_joined_span(ast::ForTarget { items }, start))
+    }
+
+    /// Parse a name that a loop assigns to, or in [Jinja] the names that a
+    /// tuple in parentheses unpacks into, e.g. `(a, b)` in
+    /// `{% for (a, b), c in items %}`, which are added to `items` in order.
+    ///
+    /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L473-L510
+    fn parse_target_names(
+        &mut self,
+        items: &mut ArenaVec<'a, AstNode<'a, ast::Name>>,
+    ) -> ParseResult<()> {
+        if !(self.options.dialect.has_tuples()
+            && matches!(self.peek_kind(), Some(TokenKind::Tree(Delimiter::Paren, _))))
+        {
+            items.push(self.parse_name()?);
+            return Ok(());
+        }
+
+        self.in_tree(Delimiter::Paren, None, |g| {
+            while !g.exhausted() {
+                g.parse_target_names(items)?;
+
+                if g.parse_token_fast(TokenKind::Comma).is_none() {
+                    break;
+                }
+            }
+
+            Ok(())
+        })
     }
 
     /// Parse statements up to a `{% %}` tag whose keyword `stop` accepts, or
@@ -2212,13 +2393,26 @@ impl<'s, 'a> Parser<'s, 'a> {
                     span,
                 )))
             }
-            (Some(Token { kind, span }), _) if kind.starts_expr() => {
+            (Some(Token { kind, span }), _) if self.starts_expr(kind) => {
                 let value = self.parse_expr()?;
                 Ok(Some(
                     self.node_with_joined_span(ast::Arg { name: None, value: Some(value) }, span),
                 ))
             }
             _ => Ok(None),
+        }
+    }
+
+    /// Whether `kind` starts an expression. A group or a tuple in parentheses
+    /// and a list in brackets, in [Jinja] and [Twig], do too.
+    ///
+    /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#literals
+    /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#literals
+    fn starts_expr(&self, kind: TokenKind) -> bool {
+        match kind {
+            TokenKind::Tree(Delimiter::Paren, _) => self.options.dialect.has_grouping(),
+            TokenKind::Tree(Delimiter::Bracket, _) => self.options.dialect.has_lists(),
+            kind => kind.starts_expr(),
         }
     }
 

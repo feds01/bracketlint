@@ -1,0 +1,62 @@
+info: parsed module '$DIR/calls_twig.html' as twig:
+body
+├─inline
+│ └─call_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "path"
+│   └─args
+│     └─arg
+│       └─lit_expr
+│         └─str_lit 'home'
+├─inline
+│ └─call_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "block"
+│   └─args
+│     └─arg
+│       └─lit_expr
+│         └─str_lit 'title'
+├─inline
+│ └─call_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "include"
+│   └─args
+│     └─arg
+│       └─lit_expr
+│         └─str_lit 'card.html.twig'
+├─inline
+│ └─filtered_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "date"
+│   └─filter
+│     ├─name "date"
+│     └─args
+│       ├─arg
+│       │ ├─name "format"
+│       │ └─lit_expr
+│       │   └─str_lit 'r'
+│       └─arg
+│         ├─name "timezone"
+│         └─lit_expr
+│           └─str_lit 'GMT'
+└─inline
+  └─filtered_expr
+    ├─subject
+    │ └─filtered_expr
+    │   ├─subject
+    │   │ └─var_expr
+    │   │   └─name "name"
+    │   └─filter
+    │     ├─name "trim"
+    │     └─args
+    │       └─arg
+    │         └─lit_expr
+    │           └─str_lit '-'
+    └─filter
+      ├─name "title"
+      └─args
+

@@ -6,7 +6,7 @@ ok            django/contrib/admin/templates/admin/app_list.html
 ok            django/contrib/admin/templates/admin/auth/user/add_form.html
 ok            django/contrib/admin/templates/admin/auth/user/change_password.html
 ok            django/contrib/admin/templates/admin/base.html
-parse-error   django/contrib/admin/templates/admin/base_site.html
+ok            django/contrib/admin/templates/admin/base_site.html
 ok            django/contrib/admin/templates/admin/change_form.html
 ok            django/contrib/admin/templates/admin/change_form_actions.html
 ok            django/contrib/admin/templates/admin/change_form_object_tools.html

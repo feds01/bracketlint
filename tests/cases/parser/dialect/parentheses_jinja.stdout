@@ -1,0 +1,78 @@
+info: parsed module '$DIR/parentheses_jinja.html' as jinja:
+body
+├─inline
+│ └─bin_expr
+│   ├─lhs
+│   │ └─group_expr
+│   │   └─bin_expr
+│   │     ├─lhs
+│   │     │ └─var_expr
+│   │     │   └─name "a"
+│   │     ├─operator `or`
+│   │     └─rhs
+│   │       └─var_expr
+│   │         └─name "b"
+│   ├─operator `and`
+│   └─rhs
+│     └─var_expr
+│       └─name "c"
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─bin_expr
+│     │   │   ├─lhs
+│     │   │   │ └─group_expr
+│     │   │   │   └─bin_expr
+│     │   │   │     ├─lhs
+│     │   │   │     │ └─var_expr
+│     │   │   │     │   └─name "a"
+│     │   │   │     ├─operator `+`
+│     │   │   │     └─rhs
+│     │   │   │       └─var_expr
+│     │   │   │         └─name "b"
+│     │   │   ├─operator `*`
+│     │   │   └─rhs
+│     │   │     └─var_expr
+│     │   │       └─name "c"
+│     │   ├─operator `>`
+│     │   └─rhs
+│     │     └─lit_expr
+│     │       └─int_lit 0
+│     └─clause_body
+│       └─body
+├─inline
+│ └─filtered_expr
+│   ├─subject
+│   │ └─group_expr
+│   │   └─var_expr
+│   │     └─name "name"
+│   └─filter
+│     ├─name "upper"
+│     └─args
+├─inline
+│ └─tuple_expr
+│   ├─lit_expr
+│   │ └─str_lit 'a'
+│   └─lit_expr
+│     └─str_lit 'b'
+├─inline
+│ └─tuple_expr
+│   └─lit_expr
+│     └─str_lit 'a'
+├─inline
+│ └─tuple_expr
+└─for
+  ├─target
+  │ └─for_target
+  │   ├─name "key"
+  │   ├─name "label"
+  │   └─name "value"
+  ├─iterator
+  │ └─var_expr
+  │   └─name "items"
+  └─loop_body
+    └─body
+
