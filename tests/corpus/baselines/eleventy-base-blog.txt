@@ -1,5 +1,5 @@
 ok            _includes/layouts/base.njk
-unstable      _includes/layouts/home.njk
+ok            _includes/layouts/home.njk
 ok            _includes/layouts/post.njk
 ok            _includes/postslist.njk
 ok            content/blog.njk

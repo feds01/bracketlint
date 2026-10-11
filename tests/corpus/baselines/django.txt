@@ -105,7 +105,7 @@ ok            django/forms/templates/django/forms/widgets/text.html
 ok            django/forms/templates/django/forms/widgets/textarea.html
 ok            django/forms/templates/django/forms/widgets/time.html
 ok            django/forms/templates/django/forms/widgets/url.html
-unstable      django/views/templates/csrf_403.html
+ok            django/views/templates/csrf_403.html
 ok            django/views/templates/default_urlconf.html
 ok            django/views/templates/directory_index.html
 ok            django/views/templates/technical_404.html

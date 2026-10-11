@@ -1,0 +1,9 @@
+<div id="info">
+    <p>
+        You’re seeing the help section of this page because you have
+        <code>DEBUG = True</code> in your Django settings file. Change that to
+        <code>False</code>, and only the initial error message will be
+        displayed.
+    </p>
+</div>
+
