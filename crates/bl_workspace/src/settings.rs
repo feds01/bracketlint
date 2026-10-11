@@ -69,6 +69,7 @@ pub(crate) static INCLUDE: &[FilePattern] = &[
     FilePattern::Builtin("*.html"),
     FilePattern::Builtin("*.jinja"),
     FilePattern::Builtin("*.liquid"),
+    FilePattern::Builtin("*.njk"),
     FilePattern::Builtin("*.twig"),
 ];
 
@@ -221,7 +222,7 @@ mod test_super {
     fn test_include() {
         let settings = FileResolverSettings::new();
 
-        for path in ["index.html", "base.jinja", "product.liquid", "layout.twig"] {
+        for path in ["index.html", "base.jinja", "product.liquid", "page.njk", "layout.twig"] {
             assert!(settings.include.is_match(path), "{path} isn't included");
         }
 

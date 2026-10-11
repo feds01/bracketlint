@@ -1,0 +1,34 @@
+info: parsed module '$DIR/subscripts_nunjucks.njk' as nunjucks:
+body
+├─inline
+│ └─index_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "items"
+│   └─index
+│     └─bin_expr
+│       ├─lhs
+│       │ └─var_expr
+│       │   └─name "i"
+│       ├─operator `+`
+│       └─rhs
+│         └─lit_expr
+│           └─int_lit 1
+└─inline
+  └─index_expr
+    ├─subject
+    │ └─access_expr
+    │   ├─subject
+    │   │ └─var_expr
+    │   │   └─name "params"
+    │   └─field
+    │     └─name "attributes"
+    └─index
+      └─filtered_expr
+        ├─subject
+        │ └─var_expr
+        │   └─name "name"
+        └─filter
+          ├─name "lower"
+          └─args
+

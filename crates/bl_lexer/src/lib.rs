@@ -253,11 +253,13 @@ impl<'lex> Lexer<'lex> {
                 return None;
             }
 
-            // The contents of a `{% raw %}` block, as in [Jinja] and [Liquid], are
-            // output as they are written, so they are text rather than tokens.
+            // The contents of a `{% raw %}` block, as in [Jinja], [Liquid] and
+            // [Nunjucks], are output as they are written, so they are text
+            // rather than tokens.
             //
             // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#escaping
             // [Liquid]: https://shopify.github.io/liquid/tags/template/#raw
+            // [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#raw
             if this.dialect.has_raw_blocks()
                 && matches!(this.tokens[tree..], tree!(Percent, [kw!(Raw)]))
             {
@@ -332,9 +334,10 @@ impl<'lex> Lexer<'lex> {
                 ch @ ('(' | '[') => {
                     return on_tree(self, Delimiter::try_from(ch).unwrap());
                 }
-                // A mapping in [Jinja] and [Twig], e.g. `{'a': 1}`.
+                // A mapping in [Jinja], [Nunjucks] and [Twig], e.g. `{'a': 1}`.
                 //
                 // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#literals
+                // [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#expressions
                 // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#literals
                 '{' if self.dialect.has_mappings() => {
                     return on_tree(self, Delimiter::Curly);
@@ -447,11 +450,12 @@ impl<'lex> Lexer<'lex> {
                                 if c == '%' { Delimiter::Percent } else { Delimiter::Brace };
                             return on_tree(self, delimiter);
                         }
-                        // A `{# #}` comment, as in [Django], [Jinja] and [Twig].
-                        // Liquid has none.
+                        // A `{# #}` comment, as in [Django], [Jinja], [Nunjucks]
+                        // and [Twig]. Liquid has none.
                         //
                         // [Django]: https://docs.djangoproject.com/en/stable/ref/templates/language/#comments
                         // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#comments
+                        // [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#comments
                         // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#comments
                         '#' if self.dialect.has_hash_comments() => {
                             self.skip_ascii();
@@ -751,10 +755,11 @@ impl<'lex> Lexer<'lex> {
     }
 
     /// `text` without the whitespace control marker that it starts with, if
-    /// it has one, as in [Jinja], [Liquid] and [Twig].
+    /// it has one, as in [Jinja], [Liquid], [Nunjucks] and [Twig].
     ///
     /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#whitespace-control
     /// [Liquid]: https://shopify.github.io/liquid/basics/whitespace/
+    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#whitespace-control
     /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#whitespace-control
     fn strip_trim_marker<'s>(&self, text: &'s str) -> &'s str {
         text.strip_prefix(self.dialect.trim_markers()).unwrap_or(text)
@@ -841,11 +846,12 @@ impl<'lex> Lexer<'lex> {
     }
 
     /// Whether a `-` here subtracts, because the dialect has a binary `-`, as
-    /// [Jinja] and [Twig] do, and the last token ends an operand, e.g. in
-    /// `a -1` or `10-1`. Otherwise a `-` right before a digit starts a
+    /// [Jinja], [Nunjucks] and [Twig] do, and the last token ends an operand,
+    /// e.g. in `a -1` or `10-1`. Otherwise a `-` right before a digit starts a
     /// negative number, e.g. in `x > -1`.
     ///
     /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#math
+    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#math
     /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#math
     fn minus_subtracts(&self) -> bool {
         self.dialect.infix_binding_power(BinOp::Sub).is_some()
@@ -876,10 +882,11 @@ impl<'lex> Lexer<'lex> {
 
     /// Whether `c` controls the whitespace around a tag when it is written
     /// next to one of the tag's delimiters, e.g. the `-` in `{%-`, as in
-    /// [Jinja], [Liquid] and [Twig].
+    /// [Jinja], [Liquid], [Nunjucks] and [Twig].
     ///
     /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#whitespace-control
     /// [Liquid]: https://shopify.github.io/liquid/basics/whitespace/
+    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#whitespace-control
     /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#whitespace-control
     fn is_trim_marker(&self, c: char) -> bool {
         self.dialect.trim_markers().contains(&c)

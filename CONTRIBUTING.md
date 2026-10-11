@@ -4,7 +4,7 @@ The [README](README.md#development) lists the `just` recipes for building and te
 
 ## Dialect rules link their spec
 
-Bracketlint reads Django, Jinja, Liquid and Twig templates, which differ in small ways. For example, Liquid spells `elif` as `elsif`, `{# #}` is text in Liquid, and only Jinja and Twig take operators inside `{{ }}`. Each difference is a rule on `Dialect`, in `crates/bl_ast/src/dialect.rs`. Each rule links the spec it follows, so that a reader can check it against the dialect rather than trust the code.
+Bracketlint reads Django, Jinja, Liquid, Nunjucks and Twig templates, which differ in small ways. For example, Liquid spells `elif` as `elsif`, `{# #}` is text in Liquid, and only Jinja, Nunjucks and Twig take operators inside `{{ }}`. Each difference is a rule on `Dialect`, in `crates/bl_ast/src/dialect.rs`. Each rule links the spec it follows, so that a reader can check it against the dialect rather than trust the code.
 
 When you add or change a rule:
 
@@ -14,6 +14,7 @@ When you add or change a rule:
   - Django: <https://docs.djangoproject.com/en/stable/ref/templates/>
   - Jinja: <https://jinja.palletsprojects.com/en/stable/templates/>
   - Liquid: <https://shopify.github.io/liquid/>
+  - Nunjucks: <https://mozilla.github.io/nunjucks/templating.html>
   - Twig: <https://twig.symfony.com/doc/3.x/>
 - Where the docs don't state the rule, link the engine's source at a release tag, with the lines that decide it, e.g. <https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/lexer.rb#L23>. A link to a branch drifts as the branch changes.
 - Open every link before you commit it, and check that its anchor or lines exist.

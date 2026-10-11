@@ -86,7 +86,7 @@ pub struct LintCommand {
     pub deny_warnings: bool,
 
     /// The template dialect to parse files in. By default it is picked from
-    /// each file's extension (`.jinja`, `.liquid` or `.twig`), and is
+    /// each file's extension (`.jinja`, `.liquid`, `.njk` or `.twig`), and is
     /// `django` for any other file.
     #[arg(
         long,

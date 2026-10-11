@@ -443,15 +443,17 @@ pub(crate) struct KeywordTable {
 
 impl KeywordTable {
     /// The table of the keywords of `dialect`: those of every dialect, and
-    /// Liquid's own in Liquid, with `elif` spelled as the dialect spells it.
+    /// Liquid's own in Liquid, with `elif` spelled each way that the dialect
+    /// spells it, see [Dialect::elif_tags].
     pub(crate) const fn of(dialect: Dialect) -> Self {
         let lists: &[&[(&str, Keyword)]] =
             if dialect.is_liquid() { &[KEYWORDS, LIQUID_KEYWORDS] } else { &[KEYWORDS] };
-        Self::build(lists, dialect.elif_tag())
+        Self::build(lists, dialect.elif_tags())
     }
 
-    /// The table of the keywords in `lists`, with `elif` spelled as `elif`.
-    const fn build(lists: &[&[(&str, Keyword)]], elif: &str) -> Self {
+    /// The table of the keywords in `lists`, with `elif` spelled each way in
+    /// `elifs`.
+    const fn build(lists: &[&[(&str, Keyword)]], elifs: &[&str]) -> Self {
         // Try seeds until one puts each keyword in a slot of its own.
         let mut seed = FIRST_SEED;
         'seeds: loop {
@@ -462,15 +464,21 @@ impl KeywordTable {
                 let mut index = 0;
                 while index < lists[list].len() {
                     let (text, keyword) = lists[list][index];
-                    let text = if matches!(keyword, Keyword::Elif) { elif } else { text };
-                    let name = Name::new(text);
-                    let slot = Self::slot(name, seed);
-                    if slots[slot].is_some() {
-                        seed = seed.wrapping_add(SEED_STEP);
-                        continue 'seeds;
-                    }
+                    let elif = matches!(keyword, Keyword::Elif);
+                    let spellings = if elif { elifs.len() } else { 1 };
 
-                    slots[slot] = Some((name, keyword));
+                    let mut spelling = 0;
+                    while spelling < spellings {
+                        let name = Name::new(if elif { elifs[spelling] } else { text });
+                        let slot = Self::slot(name, seed);
+                        if slots[slot].is_some() {
+                            seed = seed.wrapping_add(SEED_STEP);
+                            continue 'seeds;
+                        }
+
+                        slots[slot] = Some((name, keyword));
+                        spelling += 1;
+                    }
                     index += 1;
                 }
                 list += 1;
@@ -502,7 +510,7 @@ impl TryFrom<&str> for Keyword {
 
     /// The keyword that `value` is in every dialect, if any.
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        static EVERY_DIALECT: KeywordTable = KeywordTable::build(&[KEYWORDS], "elif");
+        static EVERY_DIALECT: KeywordTable = KeywordTable::build(&[KEYWORDS], &["elif"]);
         EVERY_DIALECT.get(value).ok_or(())
     }
 }
@@ -524,15 +532,16 @@ mod tests {
                 assert_eq!(dialect.keyword(text), expected, "{text:?} in {dialect}");
             }
 
-            // Each dialect has its own spelling of `elif`, and none of the others'.
-            let elif = match dialect {
-                Dialect::Liquid => "elsif",
-                Dialect::Twig => "elseif",
-                Dialect::Django | Dialect::Jinja => "elif",
+            // Each dialect has its own spellings of `elif`, and none of the others'.
+            let elifs: &[&str] = match dialect {
+                Dialect::Liquid => &["elsif"],
+                Dialect::Twig => &["elseif"],
+                Dialect::Django | Dialect::Jinja => &["elif"],
+                Dialect::Nunjucks => &["elif", "elseif"],
             };
-            assert_eq!(dialect.keyword(elif), Some(Keyword::Elif), "{elif:?} in {dialect}");
-            for other in ["elif", "elsif", "elseif"].into_iter().filter(|other| *other != elif) {
-                assert_eq!(dialect.keyword(other), None, "{other:?} in {dialect}");
+            for elif in ["elif", "elsif", "elseif"] {
+                let expected = elifs.contains(&elif).then_some(Keyword::Elif);
+                assert_eq!(dialect.keyword(elif), expected, "{elif:?} in {dialect}");
             }
 
             for name in ["", "item", "fors", "fo", "endforx", "a_name_that_is_long", "For"] {

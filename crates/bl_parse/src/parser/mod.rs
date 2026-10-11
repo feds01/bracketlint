@@ -323,12 +323,13 @@ impl<'s, 'a> Parser<'s, 'a> {
 
     /// The whitespace control marker of another dialect that the token at
     /// `range` is, if it is one, e.g. the `~` in `{%~ if x %}` in Jinja. The
-    /// markers of [Jinja], [Liquid] and [Twig] are written right inside a
-    /// tag's delimiters, and the lexer leaves out the dialect's own, see
-    /// [Parser::trim].
+    /// markers of [Jinja], [Liquid], [Nunjucks] and [Twig] are written right
+    /// inside a tag's delimiters, and the lexer leaves out the dialect's own,
+    /// see [Parser::trim].
     ///
     /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#whitespace-control
     /// [Liquid]: https://shopify.github.io/liquid/basics/whitespace/
+    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#whitespace-control
     /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#whitespace-control
     fn foreign_trim_marker(&self, range: ByteRange) -> Option<ForeignSyntax> {
         // The range of an error can be made up, e.g. one byte after the last
@@ -384,11 +385,13 @@ impl<'s, 'a> Parser<'s, 'a> {
 
     /// Warn about each `{# #}` that starts in the text at `range`, in a dialect
     /// without such comments, where it is text, since it is likely meant as a
-    /// comment, as in [Django], [Jinja] and [Twig]. The contents of a
-    /// `{% raw %}` block are output as they are written, so they are left out.
+    /// comment, as in [Django], [Jinja], [Nunjucks] and [Twig]. The contents of
+    /// a `{% raw %}` block are output as they are written, so they are left
+    /// out.
     ///
     /// [Django]: https://docs.djangoproject.com/en/stable/ref/templates/language/#comments
     /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#comments
+    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#comments
     /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#comments
     fn warn_hash_comments(&mut self, range: ByteRange) {
         let Some(foreign) = self.options.dialect.foreign(Syntax::HashComments) else {
@@ -431,19 +434,22 @@ impl<'s, 'a> Parser<'s, 'a> {
     /// tags, since the template is likely written in that dialect:
     ///
     /// - The tag that starts an `elif` clause, which is `elsif` in
-    ///   [Liquid][Liquid `elsif`], `elseif` in [Twig][Twig `if`], and `elif` in
-    ///   [Django][Django `if`] and [Jinja][Jinja `if`].
+    ///   [Liquid][Liquid `elsif`], `elseif` in [Twig][Twig `if`], `elif` in
+    ///   [Django][Django `if`] and [Jinja][Jinja `if`], and either of the last
+    ///   two in [Nunjucks][Nunjucks `if`].
     /// - The tags of a block that is output as written, which are `raw` and
-    ///   `endraw` in [Jinja][Jinja `raw`] and [Liquid][Liquid `raw`], and
-    ///   `verbatim` and `endverbatim` in [Django][Django `verbatim`] and
-    ///   [Twig][Twig `verbatim`].
+    ///   `endraw` in [Jinja][Jinja `raw`], [Liquid][Liquid `raw`] and
+    ///   [Nunjucks][Nunjucks `raw`], and `verbatim` and `endverbatim` in
+    ///   [Django][Django `verbatim`] and [Twig][Twig `verbatim`].
     ///
     /// [Liquid `elsif`]: https://shopify.github.io/liquid/tags/control-flow/#elsif--else
     /// [Django `if`]: https://docs.djangoproject.com/en/stable/ref/templates/builtins/#if
     /// [Jinja `if`]: https://jinja.palletsprojects.com/en/stable/templates/#if
+    /// [Nunjucks `if`]: https://mozilla.github.io/nunjucks/templating.html#if
     /// [Twig `if`]: https://twig.symfony.com/doc/3.x/tags/if.html
     /// [Jinja `raw`]: https://jinja.palletsprojects.com/en/stable/templates/#escaping
     /// [Liquid `raw`]: https://shopify.github.io/liquid/tags/template/#raw
+    /// [Nunjucks `raw`]: https://mozilla.github.io/nunjucks/templating.html#raw
     /// [Django `verbatim`]: https://docs.djangoproject.com/en/stable/ref/templates/builtins/#verbatim
     /// [Twig `verbatim`]: https://twig.symfony.com/doc/3.x/tags/verbatim.html
     fn warn_foreign_tag(&mut self, name: Token) {
@@ -603,10 +609,11 @@ impl<'s, 'a> Parser<'s, 'a> {
     /// e.g. the `-`s in `{%- if x -%}`. The lexer leaves the markers out of
     /// the tag's tokens, so they are read from its source, see [tag_trim]. A
     /// line of a `liquid` tag has no delimiters, and so no markers. See
-    /// [Jinja], [Liquid] and [Twig].
+    /// [Jinja], [Liquid], [Nunjucks] and [Twig].
     ///
     /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#whitespace-control
     /// [Liquid]: https://shopify.github.io/liquid/basics/whitespace/
+    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#whitespace-control
     /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#whitespace-control
     pub(crate) fn trim(&self) -> ast::TrimMarker {
         if self.frame.delimiter == Some(Delimiter::Line) {
@@ -827,13 +834,14 @@ impl<'s, 'a> Parser<'s, 'a> {
                 Keyword::Import => self.parse_import_statement(),
                 _ => {
                     // The body of an empty loop starts at `{% empty %}` in
-                    // [Django], and at `{% else %}` in [Jinja], [Liquid] and
-                    // [Twig], so the other's tag in a loop is likely written in
-                    // another dialect.
+                    // [Django], and at `{% else %}` in [Jinja], [Liquid],
+                    // [Nunjucks] and [Twig], so the other's tag in a loop is
+                    // likely written in another dialect.
                     //
                     // [Django]: https://docs.djangoproject.com/en/stable/ref/templates/builtins/#for-empty
                     // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#for
                     // [Liquid]: https://shopify.github.io/liquid/tags/iteration/#else
+                    // [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#for
                     // [Twig]: https://twig.symfony.com/doc/3.x/tags/for.html#the-else-clause
                     if matches!(keyword, Keyword::Else | Keyword::Empty)
                         && self.tag_context() == Some(TagContext::For)
@@ -864,10 +872,12 @@ impl<'s, 'a> Parser<'s, 'a> {
     fn parse_variable_block(&mut self) -> ParseResult<AstNode<'a, ast::Statement<'a>>> {
         let token = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
         let (expr, trim) = self.in_tag(Delimiter::Brace, |g| {
-            // Jinja's [`Parser.subparse`] and Twig's [`Parser::subparse`] parse
-            // `{{ }}` as any expression, rather than a single value.
+            // Jinja's [`Parser.subparse`], Nunjucks' [`Parser.parseNodes`] and
+            // Twig's [`Parser::subparse`] parse `{{ }}` as any expression,
+            // rather than a single value.
             //
             // [`Parser.subparse`]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L1019-L1022
+            // [`Parser.parseNodes`]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/parser.js#L1317-L1318
             // [`Parser::subparse`]: https://github.com/twigphp/Twig/blob/v3.30.0/src/Parser.php#L187-L190
             let (subject, subject_span) = g.track_span(|g| {
                 if g.options.dialect.variable_supports_operators() {
@@ -927,11 +937,12 @@ impl<'s, 'a> Parser<'s, 'a> {
             // doesn't continue the expression. It is left for the tag, which
             // reports it as unexpected, like any token after an expression.
             // How tightly each operator binds follows [Django], [Jinja],
-            // [Liquid] and [Twig].
+            // [Liquid], [Nunjucks] and [Twig].
             //
             // [Django]: https://github.com/django/django/blob/5.2.18/django/template/smartif.py#L97-L111
             // [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L536-L624
             // [Liquid]: https://shopify.github.io/liquid/basics/operators/#order-of-operations
+            // [Nunjucks]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/parser.js#L776-L992
             // [Twig]: https://github.com/twigphp/Twig/blob/v3.30.0/src/Extension/CoreExtension.php#L343-L391
             let Some((l_precedence, r_precedence)) = self.options.dialect.infix_binding_power(op)
             else {
@@ -974,13 +985,14 @@ impl<'s, 'a> Parser<'s, 'a> {
     }
 
     /// Parse the rest of a conditional expression after `expr`, at `span`:
-    /// `then if condition else otherwise` in [Jinja], whose `else` part can be
-    /// left out, and `condition ? then : otherwise` in [Twig], whose `:` part
-    /// can be left out. Each part can be a conditional expression too, apart
-    /// from Jinja's condition, so `a if b else c if d else e` is
-    /// `a if b else (c if d else e)`.
+    /// `then if condition else otherwise` in [Jinja] and [Nunjucks], whose
+    /// `else` part can be left out, and `condition ? then : otherwise` in
+    /// [Twig], whose `:` part can be left out. Each part can be a conditional
+    /// expression too, apart from Jinja's condition, so
+    /// `a if b else c if d else e` is `a if b else (c if d else e)`.
     ///
     /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L521-L534
+    /// [Nunjucks]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/parser.js#L758-L774
     /// [Twig]: https://github.com/twigphp/Twig/blob/v3.30.0/src/ExpressionParser/Infix/ConditionalTernaryExpressionParser.php#L29-L41
     fn parse_conditional(
         &mut self,
@@ -1060,25 +1072,29 @@ impl<'s, 'a> Parser<'s, 'a> {
             TokenKind::Tree(Delimiter::Paren, _) if self.options.dialect.has_ranges() => {
                 return self.parse_range(token);
             }
-            // Parentheses group an expression in [Jinja] and [Twig], e.g.
-            // `(a or b)`, and hold a tuple in Jinja.
+            // Parentheses group an expression in [Jinja], [Nunjucks] and
+            // [Twig], e.g. `(a or b)`, and hold a tuple in Jinja.
             //
             // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#logic
+            // [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#logic
             // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#operators
             TokenKind::Tree(Delimiter::Paren, _) if self.options.dialect.has_grouping() => {
                 return self.parse_parenthesised_expr(token);
             }
-            // A list in [Jinja], or a sequence in [Twig], e.g. `['a', 'b']`.
+            // A list in [Jinja], an array in [Nunjucks], or a sequence in
+            // [Twig], e.g. `['a', 'b']`.
             //
             // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#literals
+            // [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#expressions
             // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#literals
             TokenKind::Tree(Delimiter::Bracket, _) if self.options.dialect.has_lists() => {
                 return self.parse_list_literal(token);
             }
-            // A mapping in [Jinja], where it is a dict, and [Twig], e.g.
-            // `{'a': 1}`.
+            // A mapping in [Jinja] and [Nunjucks], where it is a dict, and
+            // [Twig], e.g. `{'a': 1}`.
             //
             // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#literals
+            // [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#expressions
             // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#literals
             TokenKind::Tree(Delimiter::Curly, _) if self.options.dialect.has_mappings() => {
                 return self.parse_mapping(token);
@@ -1387,10 +1403,11 @@ impl<'s, 'a> Parser<'s, 'a> {
 
     /// Parse the arguments of a call in parentheses, e.g. `(user, full=true)`,
     /// which are separated by commas, with an optional comma after the last.
-    /// A named argument is written `name=value` in [Jinja] and [Twig], and
-    /// also `name: value` in Twig.
+    /// A named argument is written `name=value` in [Jinja], [Nunjucks] and
+    /// [Twig], and also `name: value` in Twig.
     ///
     /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L872-L926
+    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#keyword-arguments
     /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#named-arguments
     fn parse_call_args(&mut self) -> ParseResult<AstNodes<'a, ast::Arg<'a>>> {
         let colon = self.options.dialect.call_args_named_with_colon();
@@ -1482,9 +1499,18 @@ impl<'s, 'a> Parser<'s, 'a> {
                 TokenKind::Dot => self.parse_property_access(subject, subject_span)?,
                 // Array index access syntax: ident[...]
                 TokenKind::Tree(Delimiter::Bracket, _) => {
+                    // A subscript is an expression in [Jinja], [Nunjucks] and
+                    // [Twig], e.g. `items[i + 1]`, which can be a slice in
+                    // Jinja and Twig, e.g. `items[1:]`.
+                    //
+                    // [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L840-L870
+                    // [Nunjucks]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/parser.js#L711-L721
+                    // [Twig]: https://github.com/twigphp/Twig/blob/v3.30.0/src/ExpressionParser/Infix/SquareBracketExpressionParser.php#L38-L45
                     let index = self.in_tree(Delimiter::Bracket, None, |g| {
                         if g.options.dialect.has_slices() {
                             g.parse_subscript()
+                        } else if g.options.dialect.subscripts_take_operators() {
+                            g.parse_compound_expr(0)
                         } else {
                             g.parse_expr()
                         }
@@ -1495,10 +1521,12 @@ impl<'s, 'a> Parser<'s, 'a> {
                         subject_span,
                     )
                 }
-                // A call in [Jinja] and [Twig], of a name, an attribute or the
-                // result of a filter, e.g. `range(3)` or `post.render(user)`.
+                // A call in [Jinja], [Nunjucks] and [Twig], of a name, an
+                // attribute or the result of a filter, e.g. `range(3)` or
+                // `post.render(user)`.
                 //
                 // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#other-operators
+                // [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#function-calls
                 // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#functions
                 TokenKind::Tree(Delimiter::Paren, _) if self.options.dialect.has_calls() => {
                     let args = self.parse_call_args()?;
@@ -1530,11 +1558,13 @@ impl<'s, 'a> Parser<'s, 'a> {
 
         self.skip_fast(token.kind); // `<op>` Skip the operator token.
 
-        // How tightly `not` binds follows [Django], [Jinja], [Liquid] and [Twig].
+        // How tightly `not` binds follows [Django], [Jinja], [Liquid],
+        // [Nunjucks] and [Twig].
         //
         // [Django]: https://github.com/django/django/blob/5.2.18/django/template/smartif.py#L97-L111
         // [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L536-L624
         // [Liquid]: https://shopify.github.io/liquid/basics/operators/#order-of-operations
+        // [Nunjucks]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/parser.js#L800-L808
         // [Twig]: https://github.com/twigphp/Twig/blob/v3.30.0/src/Extension/CoreExtension.php#L343-L391
         let expr = self.parse_compound_expr(self.options.dialect.prefix_binding_power(*op.body))?;
         Ok(self.node_with_joined_span(ast::Expr::Unary(ast::UnaryExpr { op, expr }), token.span))
@@ -1592,10 +1622,11 @@ impl<'s, 'a> Parser<'s, 'a> {
     ) -> ParseResult<AstNode<'a, ast::Filter<'a>>> {
         let name = self.parse_name()?;
 
-        // A filter takes its arguments in parentheses in [Jinja] and [Twig],
-        // e.g. `join(', ')`, as a call does.
+        // A filter takes its arguments in parentheses in [Jinja], [Nunjucks]
+        // and [Twig], e.g. `join(', ')`, as a call does.
         //
         // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#filters
+        // [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#filters
         // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#filters
         let args = if self.options.dialect.filter_args_in_parentheses()
             && matches!(self.peek_kind(), Some(TokenKind::Tree(Delimiter::Paren, _)))
@@ -1751,11 +1782,12 @@ impl<'s, 'a> Parser<'s, 'a> {
         };
 
         // The body for an empty loop comes after `{% empty %}` in [Django], and
-        // after `{% else %}` in [Jinja], [Liquid] and [Twig].
+        // after `{% else %}` in [Jinja], [Liquid], [Nunjucks] and [Twig].
         //
         // [Django]: https://docs.djangoproject.com/en/stable/ref/templates/builtins/#for-empty
         // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#for
         // [Liquid]: https://shopify.github.io/liquid/tags/iteration/#else
+        // [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#for
         // [Twig]: https://twig.symfony.com/doc/3.x/tags/for.html#the-else-clause
         let dialect = self.options.dialect;
         let empty = match kind {
@@ -1771,11 +1803,13 @@ impl<'s, 'a> Parser<'s, 'a> {
 
                 g.parse_token(TokenKind::Keyword(Keyword::In))?;
 
-                // The iterator can have operators in [Jinja] and [Twig], e.g.
-                // `{% for i in 1..n %}`, but isn't a conditional expression,
-                // since an `if` after it is the loop's filter in Jinja.
+                // The iterator can have operators in [Jinja], [Nunjucks] and
+                // [Twig], e.g. `{% for i in 1..n %}`, but isn't a conditional
+                // expression, since an `if` after it is the loop's filter in
+                // Jinja.
                 //
                 // [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L240-L243
+                // [Nunjucks]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/parser.js#L191
                 // [Twig]: https://github.com/twigphp/Twig/blob/v3.30.0/src/TokenParser/ForTokenParser.php#L39-L40
                 let iterator = if g.options.dialect.loop_iterator_takes_operators() {
                     g.parse_compound_expr(ast::Dialect::CONDITIONAL_BINDING_POWER + 1)?
@@ -2018,11 +2052,12 @@ impl<'s, 'a> Parser<'s, 'a> {
                         Keyword::Unless => bl_ast::ClauseKind::Unless,
                         _ => bl_ast::ClauseKind::Elif,
                     };
+                    let elseif = self._source.hunk(token.span) == "elseif";
                     let clause_body = self.parse_body_until(|kwd| {
                         kwd == end || matches!(kwd, Keyword::Elif | Keyword::Else)
                     })?;
                     clauses.push(self.node_with_joined_span(
-                        ast::IfClause { kind: clause_kind, condition, clause_body, trim },
+                        ast::IfClause { kind: clause_kind, condition, clause_body, trim, elseif },
                         start,
                     ));
                 }
@@ -2764,10 +2799,11 @@ impl<'s, 'a> Parser<'s, 'a> {
     }
 
     /// Whether `kind` starts an expression. A group or a tuple in parentheses,
-    /// a list in brackets and a mapping in braces, in [Jinja] and [Twig], do
-    /// too.
+    /// a list in brackets and a mapping in braces, in [Jinja], [Nunjucks] and
+    /// [Twig], do too.
     ///
     /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#literals
+    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#expressions
     /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#literals
     fn starts_expr(&self, kind: TokenKind) -> bool {
         match kind {

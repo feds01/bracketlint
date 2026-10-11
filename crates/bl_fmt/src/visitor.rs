@@ -684,11 +684,13 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         let after = self.ctx.open_elements.clone();
 
         // Check if we have an empty loop body, which comes after `{% empty %}`
-        // in [Django] and `{% else %}` in [Jinja], [Liquid] and [Twig].
+        // in [Django] and `{% else %}` in [Jinja], [Liquid], [Nunjucks] and
+        // [Twig].
         //
         // [Django]: https://docs.djangoproject.com/en/stable/ref/templates/builtins/#for-empty
         // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#for
         // [Liquid]: https://shopify.github.io/liquid/tags/iteration/#else
+        // [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#for
         // [Twig]: https://twig.symfony.com/doc/3.x/tags/for.html#the-else-clause
         if let Some(loop_empty) = loop_empty {
             self.start_branch(&open);
@@ -737,7 +739,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         &mut self,
         node: bl_ast::AstNodeRef<bl_ast::IfClause>,
     ) -> Result<Self::IfClauseRet, Self::Error> {
-        let bl_ast::IfClause { kind, condition, clause_body, trim } = node.body();
+        let bl_ast::IfClause { kind, condition, clause_body, trim, elseif } = node.body();
 
         // Each clause spans from the start of its block, so only the first one
         // knows where its tag starts in the source.
@@ -750,11 +752,13 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         self.within_tag(TagKind::Block, *trim, |this| {
             match kind {
                 bl_ast::ClauseKind::If => this.push_hunk("if "),
-                // [Liquid] spells `elif` as `elsif`.
+                // [Liquid] spells `elif` as `elsif`, and [Nunjucks] spells it
+                // `elseif` too, which is kept as it is written.
                 //
                 // [Liquid]: https://shopify.github.io/liquid/tags/control-flow/#elsif--else
+                // [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#if
                 bl_ast::ClauseKind::Elif => {
-                    this.push_hunk(this.ctx.dialect.elif_tag());
+                    this.push_hunk(if *elseif { "elseif" } else { this.ctx.dialect.elif_tag() });
                     this.push_hunk(" ");
                 }
                 bl_ast::ClauseKind::Unless => this.push_hunk("unless "),

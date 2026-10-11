@@ -43,6 +43,10 @@ pub enum Dialect {
     ///
     /// [Liquid]: https://shopify.github.io/liquid/
     Liquid,
+    /// [Nunjucks] templates, which are close to Jinja's.
+    ///
+    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html
+    Nunjucks,
     /// [Twig] templates.
     ///
     /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html
@@ -64,17 +68,22 @@ impl Dialect {
             Dialect::Django => "Django",
             Dialect::Jinja => "Jinja",
             Dialect::Liquid => "Liquid",
+            Dialect::Nunjucks => "Nunjucks",
             Dialect::Twig => "Twig",
         }
     }
 
     /// The file extension that identifies the dialect, if it has its own.
-    /// Django templates use `.html`, which every dialect uses.
+    /// Django templates use `.html`, which every dialect uses. [Nunjucks]
+    /// templates use `.njk`.
+    ///
+    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#file-extensions
     pub const fn extension(self) -> Option<&'static str> {
         match self {
             Dialect::Django => None,
             Dialect::Jinja => Some("jinja"),
             Dialect::Liquid => Some("liquid"),
+            Dialect::Nunjucks => Some("njk"),
             Dialect::Twig => Some("twig"),
         }
     }
@@ -85,35 +94,39 @@ impl Dialect {
         Self::ALL.iter().copied().find(|dialect| dialect.extension() == Some(extension))
     }
 
-    /// Whether `{# ... #}` is a comment, as in [Django], [Jinja] and [Twig].
-    /// Liquid has no such comment, so it is text there.
+    /// Whether `{# ... #}` is a comment, as in [Django], [Jinja], [Nunjucks]
+    /// and [Twig]. Liquid has no such comment, so it is text there.
     ///
     /// [Django]: https://docs.djangoproject.com/en/stable/ref/templates/language/#comments
     /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#comments
+    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#comments
     /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#comments
     pub fn has_hash_comments(self) -> bool {
-        matches!(self, Dialect::Django | Dialect::Jinja | Dialect::Twig)
+        matches!(self, Dialect::Django | Dialect::Jinja | Dialect::Nunjucks | Dialect::Twig)
     }
 
-    /// Whether `{% raw %}` blocks exist, as in [Jinja] and [Liquid], whose
-    /// contents are output as they are written. [Django] and [Twig] have
-    /// `{% verbatim %}` instead.
+    /// Whether `{% raw %}` blocks exist, as in [Jinja], [Liquid] and
+    /// [Nunjucks], whose contents are output as they are written. [Django] and
+    /// [Twig] have `{% verbatim %}` instead. Nunjucks takes `{% verbatim %}`
+    /// too, which is read as a tag like any other here.
     ///
     /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#escaping
     /// [Liquid]: https://shopify.github.io/liquid/tags/template/#raw
+    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#raw
     /// [Django]: https://docs.djangoproject.com/en/stable/ref/templates/builtins/#verbatim
     /// [Twig]: https://twig.symfony.com/doc/3.x/tags/verbatim.html
     pub fn has_raw_blocks(self) -> bool {
-        matches!(self, Dialect::Jinja | Dialect::Liquid)
+        matches!(self, Dialect::Jinja | Dialect::Liquid | Dialect::Nunjucks)
     }
 
     /// The tags that open and close a block whose contents are output as they
-    /// are written, which are `raw` and `endraw` in [Jinja] and [Liquid], and
-    /// `verbatim` and `endverbatim` in [Django] and [Twig], see
+    /// are written, which are `raw` and `endraw` in [Jinja], [Liquid] and
+    /// [Nunjucks], and `verbatim` and `endverbatim` in [Django] and [Twig], see
     /// [Dialect::has_raw_blocks].
     ///
     /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#escaping
     /// [Liquid]: https://shopify.github.io/liquid/tags/template/#raw
+    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#raw
     /// [Django]: https://docs.djangoproject.com/en/stable/ref/templates/builtins/#verbatim
     /// [Twig]: https://twig.symfony.com/doc/3.x/tags/verbatim.html
     pub fn raw_tags(self) -> (&'static str, &'static str) {
@@ -156,23 +169,25 @@ impl Dialect {
 
     /// The markers that control the whitespace around a tag when they are
     /// written next to its delimiters, e.g. the `-` in `{%- if x -%}`, as in
-    /// [Jinja], [Liquid] and [Twig]. Django has none.
+    /// [Jinja], [Liquid], [Nunjucks] and [Twig]. Django has none.
     ///
     /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#whitespace-control
     /// [Liquid]: https://shopify.github.io/liquid/basics/whitespace/
+    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#whitespace-control
     /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#whitespace-control
     pub fn trim_markers(self) -> &'static [char] {
         match self {
             Dialect::Django => &[],
             Dialect::Jinja => &['-', '+'],
-            Dialect::Liquid => &['-'],
+            Dialect::Liquid | Dialect::Nunjucks => &['-'],
             Dialect::Twig => &['-', '~'],
         }
     }
 
     /// Whether a filter takes a list of arguments, which can be positional or
     /// keyword, e.g. `f: a, b, key: c`, as in [Liquid]. [Django] takes a single
-    /// argument, e.g. `f:a`, and Jinja and Twig take theirs in parentheses, see
+    /// argument, e.g. `f:a`, and Jinja, Nunjucks and Twig take theirs in
+    /// parentheses, see
     /// [Dialect::filter_args_in_parentheses].
     ///
     /// [Liquid]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/variable.rb#L17
@@ -182,17 +197,18 @@ impl Dialect {
     }
 
     /// Whether `{{ }}` takes binary operators, as a tag's condition does, e.g.
-    /// `{{ a == b }}`. Jinja's [`Parser.subparse`] and Twig's
-    /// [`Parser::subparse`] parse it as any expression. Django's
-    /// [`FilterExpression`] and Liquid's [`Variable#strict_parse`] read a
-    /// single value with its filters.
+    /// `{{ a == b }}`. Jinja's [`Parser.subparse`], Nunjucks'
+    /// [`Parser.parseNodes`] and Twig's [`Parser::subparse`] parse it as any
+    /// expression. Django's [`FilterExpression`] and Liquid's
+    /// [`Variable#strict_parse`] read a single value with its filters.
     ///
     /// [`Parser.subparse`]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L1019-L1022
+    /// [`Parser.parseNodes`]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/parser.js#L1317-L1318
     /// [`Parser::subparse`]: https://github.com/twigphp/Twig/blob/v3.30.0/src/Parser.php#L187-L190
     /// [`FilterExpression`]: https://github.com/django/django/blob/6.1.2/django/template/base.py#L739-L752
     /// [`Variable#strict_parse`]: https://github.com/Shopify/liquid/blob/v5.13.0/lib/liquid/variable.rb#L66-L79
     pub fn variable_supports_operators(self) -> bool {
-        matches!(self, Dialect::Jinja | Dialect::Twig)
+        matches!(self, Dialect::Jinja | Dialect::Nunjucks | Dialect::Twig)
     }
 
     /// Whether a tag's arguments are separated by commas, as in Liquid's
@@ -222,12 +238,14 @@ impl Dialect {
     }
 
     /// Whether a value can be called with arguments in parentheses, e.g.
-    /// `range(3)` or `post.render(user, full=true)`, as in [Jinja] and [Twig].
+    /// `range(3)` or `post.render(user, full=true)`, as in [Jinja], [Nunjucks]
+    /// and [Twig].
     ///
     /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#other-operators
+    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#function-calls
     /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#functions
     pub fn has_calls(self) -> bool {
-        matches!(self, Dialect::Jinja | Dialect::Twig)
+        matches!(self, Dialect::Jinja | Dialect::Nunjucks | Dialect::Twig)
     }
 
     /// Whether a named argument of a call can be written `name: value`, as in
@@ -239,23 +257,26 @@ impl Dialect {
     }
 
     /// Whether a filter takes its arguments in parentheses, as a call does,
-    /// e.g. `join(', ')`, as in [Jinja] and [Twig]. Django and Liquid write
-    /// them after a `:` instead, see [Dialect::filter_supports_arg_list].
+    /// e.g. `join(', ')`, as in [Jinja], [Nunjucks] and [Twig]. Django and
+    /// Liquid write them after a `:` instead, see
+    /// [Dialect::filter_supports_arg_list].
     ///
     /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#filters
+    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#filters
     /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#filters
     pub fn filter_args_in_parentheses(self) -> bool {
-        matches!(self, Dialect::Jinja | Dialect::Twig)
+        matches!(self, Dialect::Jinja | Dialect::Nunjucks | Dialect::Twig)
     }
 
     /// Whether parentheses group an expression, e.g. `(a or b) and c`, as in
-    /// [Jinja] and [Twig]. Django has no grouping, and Liquid's parentheses
-    /// hold a range, see [Dialect::has_ranges].
+    /// [Jinja], [Nunjucks] and [Twig]. Django has no grouping, and Liquid's
+    /// parentheses hold a range, see [Dialect::has_ranges].
     ///
     /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#logic
+    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#logic
     /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#operators
     pub fn has_grouping(self) -> bool {
-        matches!(self, Dialect::Jinja | Dialect::Twig)
+        matches!(self, Dialect::Jinja | Dialect::Nunjucks | Dialect::Twig)
     }
 
     /// Whether items separated by commas in parentheses are a tuple, e.g.
@@ -268,21 +289,25 @@ impl Dialect {
     }
 
     /// Whether items separated by commas in brackets are a list, e.g.
-    /// `['a', 'b']`, as in [Jinja], and a sequence in [Twig].
+    /// `['a', 'b']`, as in [Jinja], an array in [Nunjucks], and a sequence in
+    /// [Twig].
     ///
     /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#literals
+    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#expressions
     /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#literals
     pub fn has_lists(self) -> bool {
-        matches!(self, Dialect::Jinja | Dialect::Twig)
+        matches!(self, Dialect::Jinja | Dialect::Nunjucks | Dialect::Twig)
     }
 
     /// Whether pairs of keys and values in braces are a mapping, e.g.
-    /// `{'a': 1}`, as in [Jinja], where it is a dict, and [Twig].
+    /// `{'a': 1}`, as in [Jinja] and [Nunjucks], where it is a dict, and
+    /// [Twig].
     ///
     /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#literals
+    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#expressions
     /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#literals
     pub fn has_mappings(self) -> bool {
-        matches!(self, Dialect::Jinja | Dialect::Twig)
+        matches!(self, Dialect::Jinja | Dialect::Nunjucks | Dialect::Twig)
     }
 
     /// Whether a key of a mapping can be a name, which is the name's string
@@ -305,11 +330,12 @@ impl Dialect {
     }
 
     /// Whether `then if condition else otherwise` is an expression, as in
-    /// [Jinja], whose `else otherwise` can be left out.
+    /// [Jinja] and [Nunjucks], whose `else otherwise` can be left out.
     ///
     /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#if-expression
+    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#if-expression
     pub fn has_inline_if(self) -> bool {
-        matches!(self, Dialect::Jinja)
+        matches!(self, Dialect::Jinja | Dialect::Nunjucks)
     }
 
     /// Whether `?` is an operator, as in [Twig]: the conditional
@@ -321,10 +347,20 @@ impl Dialect {
         matches!(self, Dialect::Twig)
     }
 
+    /// Whether a subscript is an expression, which can have operators, e.g.
+    /// `items[i + 1]`, as in [Jinja], [Nunjucks] and [Twig], rather than a
+    /// value, as in Django and Liquid. Jinja and Twig also take a slice there,
+    /// see [Dialect::has_slices].
+    ///
+    /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L840-L870
+    /// [Nunjucks]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/parser.js#L711-L721
+    /// [Twig]: https://github.com/twigphp/Twig/blob/v3.30.0/src/ExpressionParser/Infix/SquareBracketExpressionParser.php#L38-L45
+    pub fn subscripts_take_operators(self) -> bool {
+        matches!(self, Dialect::Jinja | Dialect::Nunjucks | Dialect::Twig)
+    }
+
     /// Whether a subscript can be a slice, e.g. `items[1:]`, as in [Jinja],
-    /// whose slices can also have a step, e.g. `items[::2]`, and [Twig]. A
-    /// subscript is an expression there, e.g. `items[i + 1]`, rather than a
-    /// value, as in Django and Liquid.
+    /// whose slices can also have a step, e.g. `items[::2]`, and [Twig].
     ///
     /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L840-L870
     /// [Twig]: https://twig.symfony.com/doc/3.x/filters/slice.html
@@ -359,13 +395,14 @@ impl Dialect {
     }
 
     /// Whether the iterator of a `for` loop is an expression, which can have
-    /// operators, e.g. `{% for i in 1..n %}`, as in [Jinja] and [Twig]. Django
-    /// and Liquid read a value with its filters.
+    /// operators, e.g. `{% for i in 1..n %}`, as in [Jinja], [Nunjucks] and
+    /// [Twig]. Django and Liquid read a value with its filters.
     ///
     /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L240-L243
+    /// [Nunjucks]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/parser.js#L191
     /// [Twig]: https://github.com/twigphp/Twig/blob/v3.30.0/src/TokenParser/ForTokenParser.php#L39-L40
     pub fn loop_iterator_takes_operators(self) -> bool {
-        matches!(self, Dialect::Jinja | Dialect::Twig)
+        matches!(self, Dialect::Jinja | Dialect::Nunjucks | Dialect::Twig)
     }
 
     /// Whether a block can be written as a single tag whose content is the
@@ -415,27 +452,39 @@ impl Dialect {
     }
 
     /// How the dialect spells `elif`, which is `elsif` in [Liquid], `elseif` in
-    /// [Twig], and `elif` in [Django] and [Jinja].
+    /// [Twig], and `elif` in [Django], [Jinja] and [Nunjucks]. Nunjucks also
+    /// spells it `elseif`, see [Dialect::elif_tags].
     ///
     /// [Liquid]: https://shopify.github.io/liquid/tags/control-flow/#elsif--else
     /// [Twig]: https://twig.symfony.com/doc/3.x/tags/if.html
     /// [Django]: https://docs.djangoproject.com/en/stable/ref/templates/builtins/#if
     /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#if
+    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#if
     pub const fn elif_tag(self) -> &'static str {
+        self.elif_tags()[0]
+    }
+
+    /// Each way that the dialect spells `elif`, see [Dialect::elif_tag], which
+    /// is the first. [Nunjucks] spells it `elseif` too.
+    ///
+    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#if
+    pub const fn elif_tags(self) -> &'static [&'static str] {
         match self {
-            Dialect::Liquid => "elsif",
-            Dialect::Twig => "elseif",
-            Dialect::Django | Dialect::Jinja => "elif",
+            Dialect::Liquid => &["elsif"],
+            Dialect::Twig => &["elseif"],
+            Dialect::Django | Dialect::Jinja => &["elif"],
+            Dialect::Nunjucks => &["elif", "elseif"],
         }
     }
 
     /// The tag that starts the body of a loop for when there is nothing to
-    /// loop over, which is `empty` in [Django], and `else` in [Jinja], [Liquid]
-    /// and [Twig].
+    /// loop over, which is `empty` in [Django], and `else` in [Jinja],
+    /// [Liquid], [Nunjucks] and [Twig].
     ///
     /// [Django]: https://docs.djangoproject.com/en/stable/ref/templates/builtins/#for-empty
     /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#for
     /// [Liquid]: https://shopify.github.io/liquid/tags/iteration/#else
+    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#for
     /// [Twig]: https://twig.symfony.com/doc/3.x/tags/for.html#the-else-clause
     pub fn empty_loop_tag(self) -> &'static str {
         if self.is_django() { "empty" } else { "else" }
@@ -448,12 +497,14 @@ impl Dialect {
         static DJANGO: KeywordTable = KeywordTable::of(Dialect::Django);
         static JINJA: KeywordTable = KeywordTable::of(Dialect::Jinja);
         static LIQUID: KeywordTable = KeywordTable::of(Dialect::Liquid);
+        static NUNJUCKS: KeywordTable = KeywordTable::of(Dialect::Nunjucks);
         static TWIG: KeywordTable = KeywordTable::of(Dialect::Twig);
 
         let table = match self {
             Dialect::Django => &DJANGO,
             Dialect::Jinja => &JINJA,
             Dialect::Liquid => &LIQUID,
+            Dialect::Nunjucks => &NUNJUCKS,
             Dialect::Twig => &TWIG,
         };
         table.get(name)
@@ -465,7 +516,8 @@ impl Dialect {
     /// is `a or (b and c)`.
     ///
     /// Each dialect follows its own engine, see the comment on each arm. Only
-    /// Jinja and Twig have arithmetic and `~`, and only Liquid has `contains`.
+    /// Jinja, Nunjucks and Twig have arithmetic and `~`, and only Liquid has
+    /// `contains`.
     pub fn infix_binding_power(self, op: BinOp) -> Option<(u8, u8)> {
         let power = match self {
             // Django's own precedences, from [`smartif.py`]. `in` and `not in`
@@ -508,12 +560,6 @@ impl Dialect {
             // `a == b and b > c`, which is `(a == b) > c` here. Unlike in
             // Python, `**` is left-associative, so `a ** b ** c` is
             // `(a ** b) ** c`. A test binds tighter than any operator.
-            //
-            // Nunjucks, which GOV.UK's templates in the corpus are written in,
-            // also has JavaScript's `===` and `!==`, and takes a name as the
-            // key of a mapping, e.g. `{for: id}`. Jinja has neither, so those
-            // templates don't parse as Jinja, and Nunjucks isn't a dialect of
-            // its own yet.
             //
             // [Jinja's parser]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L536-L624
             Dialect::Jinja => match op {
@@ -562,6 +608,39 @@ impl Dialect {
                 | BinOp::Mod
                 | BinOp::Pow
                 | BinOp::Concat
+                | BinOp::Coalesce
+                | BinOp::Elvis
+                | BinOp::Range
+                | BinOp::Matches
+                | BinOp::StartsWith
+                | BinOp::EndsWith => return None,
+            },
+
+            // [Nunjucks' parser] has a function for each level too, from
+            // `parseOr` to `parsePow`, but orders them differently: `in` and
+            // then `is` bind looser than the comparisons, and each arithmetic
+            // operator has a level of its own, so `a - b + c` is
+            // `(a - b) + c`, but `a + b - c` is `a + (b - c)`. Every level is
+            // left-associative, `**` too.
+            //
+            // [Nunjucks' parser]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/parser.js#L776-L992
+            Dialect::Nunjucks => match op {
+                BinOp::Or => left_assoc(10),
+                BinOp::And => left_assoc(20),
+                BinOp::In | BinOp::NotIn => left_assoc(40),
+                BinOp::Is | BinOp::IsNot => left_assoc(50),
+                BinOp::Eq | BinOp::NotEq | BinOp::Lt | BinOp::LtEq | BinOp::Gt | BinOp::GtEq => {
+                    left_assoc(60)
+                }
+                BinOp::Concat => left_assoc(70),
+                BinOp::Add => left_assoc(80),
+                BinOp::Sub => left_assoc(90),
+                BinOp::Mul => left_assoc(100),
+                BinOp::Div => left_assoc(110),
+                BinOp::FloorDiv => left_assoc(120),
+                BinOp::Mod => left_assoc(130),
+                BinOp::Pow => left_assoc(140),
+                BinOp::Contains
                 | BinOp::Coalesce
                 | BinOp::Elvis
                 | BinOp::Range
@@ -631,7 +710,7 @@ impl Dialect {
             UnaryOp::Neg => u8::MAX,
             UnaryOp::Not => match self {
                 Dialect::Django => 8,
-                Dialect::Jinja => 30,
+                Dialect::Jinja | Dialect::Nunjucks => 30,
                 Dialect::Liquid => 6,
                 Dialect::Twig => 50,
             },
@@ -646,10 +725,12 @@ impl Dialect {
             Syntax::FilterArgLists => self.filter_supports_arg_list(),
             Syntax::HashComments => self.has_hash_comments(),
             Syntax::TrimMarker(marker) => self.trim_markers().contains(&char::from(marker)),
-            Syntax::ElifTag(_)
-            | Syntax::EmptyLoopTag(_)
-            | Syntax::RawTag(_)
-            | Syntax::EndRawTag(_) => syntax.spelling(self) == syntax.tag_name(),
+            Syntax::ElifTag(_) => {
+                syntax.tag_name().is_some_and(|tag| self.elif_tags().contains(&tag))
+            }
+            Syntax::EmptyLoopTag(_) | Syntax::RawTag(_) | Syntax::EndRawTag(_) => {
+                syntax.spelling(self) == syntax.tag_name()
+            }
         }
     }
 
@@ -866,6 +947,7 @@ mod test_super {
         assert_eq!(Dialect::from_path(Path::new("product.liquid")), Some(Dialect::Liquid));
         assert_eq!(Dialect::from_path(Path::new("base.twig")), Some(Dialect::Twig));
         assert_eq!(Dialect::from_path(Path::new("templates/page.jinja")), Some(Dialect::Jinja));
+        assert_eq!(Dialect::from_path(Path::new("template.njk")), Some(Dialect::Nunjucks));
         assert_eq!(Dialect::from_path(Path::new("index.html")), None);
         assert_eq!(Dialect::from_path(Path::new("Makefile")), None);
     }
@@ -878,7 +960,8 @@ mod test_super {
         }
 
         assert_eq!(Dialect::Liquid.name(), "liquid");
-        assert!("nunjucks".parse::<Dialect>().is_err());
+        assert_eq!("nunjucks".parse::<Dialect>(), Ok(Dialect::Nunjucks));
+        assert!("mustache".parse::<Dialect>().is_err());
     }
 
     #[test]
@@ -912,7 +995,8 @@ mod test_super {
         ];
 
         for &dialect in Dialect::ALL {
-            let has_arithmetic = matches!(dialect, Dialect::Jinja | Dialect::Twig);
+            let has_arithmetic =
+                matches!(dialect, Dialect::Jinja | Dialect::Nunjucks | Dialect::Twig);
             for op in arithmetic {
                 let power = dialect.infix_binding_power(op);
                 assert_eq!(power.is_some(), has_arithmetic, "`{op}` in {dialect}");
@@ -959,6 +1043,11 @@ mod test_super {
         assert!(Dialect::Django.foreign(Syntax::EndRawTag(Dialect::Twig)).is_none());
         assert!(Dialect::Twig.foreign(Syntax::RawTag(Dialect::Jinja)).is_some());
 
+        // Nunjucks spells `elif` as Twig does too.
+        assert!(Dialect::Nunjucks.foreign(Syntax::ElifTag(Dialect::Twig)).is_none());
+        assert!(Dialect::Nunjucks.foreign(Syntax::ElifTag(Dialect::Jinja)).is_none());
+        assert!(Dialect::Nunjucks.foreign(Syntax::ElifTag(Dialect::Liquid)).is_some());
+
         assert!(Dialect::Django.foreign(Syntax::ArgCommas).is_some());
         assert!(Dialect::Liquid.foreign(Syntax::ArgCommas).is_none());
         assert!(Dialect::Liquid.foreign(Syntax::HashComments).is_some());
@@ -985,7 +1074,12 @@ mod test_super {
         );
         assert_eq!(
             help(Dialect::Liquid, Syntax::ElifTag(Dialect::Jinja)),
-            "`{% elif %}` is how Django and Jinja write `{% elsif %}`, pass `--dialect` \
+            "`{% elif %}` is how Django, Jinja and Nunjucks write `{% elsif %}`, pass \
+             `--dialect` with the template's dialect if it is one of them"
+        );
+        assert_eq!(
+            help(Dialect::Jinja, Syntax::ElifTag(Dialect::Twig)),
+            "`{% elseif %}` is how Nunjucks and Twig write `{% elif %}`, pass `--dialect` \
              with the template's dialect if it is one of them"
         );
         assert_eq!(

@@ -44,10 +44,9 @@ tag = "v3.1.0"
 paths = ["templates"]
 extension = "twig"
 
-# Nunjucks is close to Jinja, and has no dialect of its own yet.
 [[source]]
 name = "govuk-frontend"
-dialect = "jinja"
+dialect = "nunjucks"
 repo = "https://github.com/alphagov/govuk-frontend.git"
 tag = "v6.5.1"
 paths = ["packages/govuk-frontend/src/govuk"]
@@ -55,7 +54,7 @@ extension = "njk"
 
 [[source]]
 name = "eleventy-base-blog"
-dialect = "jinja"
+dialect = "nunjucks"
 repo = "https://github.com/11ty/eleventy-base-blog.git"
 tag = "v9.0.0"
 paths = ["_includes", "content"]

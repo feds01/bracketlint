@@ -23,8 +23,8 @@ pub enum Delimiter {
     /// Bracket, `[` or `]`
     Bracket,
 
-    /// Curly braces, `{` or `}`, around a mapping in Jinja and Twig, e.g.
-    /// `{'a': 1}`.
+    /// Curly braces, `{` or `}`, around a mapping in Jinja, Nunjucks and Twig,
+    /// e.g. `{'a': 1}`.
     Curly,
 
     /// A line of a Liquid `{% liquid %}` tag, which is a tag without
@@ -159,7 +159,8 @@ pub enum TokenKind {
     /// Two slashes, `//`, the floor division operator
     SlashSlash,
 
-    /// Tilde, `~`, the string concatenation operator in Jinja and Twig
+    /// Tilde, `~`, the string concatenation operator in Jinja, Nunjucks and
+    /// Twig
     Tilde,
 
     /// Exclamation, `!`
