@@ -1,10 +1,7 @@
 <style>
 body { margin: 0 }
-    {% if dark %}
-        body {
-        	background: #000;
-        	color: #fff;
-        }
-    {% endif %}
+{% if dark %}
+body{background:#000;color:#fff}
+{% endif %}
 </style>
 

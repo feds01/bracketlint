@@ -1,11 +1,16 @@
 #![allow(dead_code)]
 
-use core::{fmt, ops::Range};
+use core::fmt;
+use std::rc::Rc;
 
-use bl_ast::{Dialect, SourceId, SpannedSource};
+use bl_ast::{ByteRange, Dialect, SourceId, SpannedSource};
 use derive_more::Constructor;
 
-use crate::{diagnostics::FmtResult, options::FormatterOptions};
+use crate::{
+    diagnostics::FmtResult,
+    dialects::html::{implied_ends, is_verbatim, keeps_whitespace},
+    options::FormatterOptions,
+};
 
 /// The type of language that the code is written in. These can be encountered
 /// when iterating through templates that are scanned by `brackelint`.
@@ -22,42 +27,6 @@ pub enum LanguageType {
 
     /// Unknown language.
     Text,
-}
-
-/// The elements whose content can't be laid out as other HTML is: whitespace
-/// matters in `<pre>` and `<textarea>`, and `<script>` and `<style>` hold
-/// code. Like any element name in HTML, they are matched regardless of case.
-pub const VERBATIM_ELEMENTS: [&str; 4] = ["pre", "textarea", "script", "style"];
-
-/// Whether `name` is one of the [VERBATIM_ELEMENTS].
-pub fn is_verbatim(name: &str) -> bool {
-    VERBATIM_ELEMENTS.iter().any(|element| name.eq_ignore_ascii_case(element))
-}
-
-/// Whether whitespace matters in the element `name`, i.e. a `<pre>` or a
-/// `<textarea>`, so that everything in it is kept exactly as it is written.
-pub fn keeps_whitespace(name: &str) -> bool {
-    ["pre", "textarea"].iter().any(|element| name.eq_ignore_ascii_case(element))
-}
-
-/// The open elements that an element `name` closes when it opens, since their
-/// end tags can be left out, e.g. an `<li>` closes the `<li>` before it, as
-/// [HTML] does.
-///
-/// [HTML]: https://html.spec.whatwg.org/multipage/syntax.html#syntax-tag-omission
-fn implied_ends(name: &str) -> &'static [&'static str] {
-    match name.to_ascii_lowercase().as_str() {
-        "li" => &["li"],
-        "dt" | "dd" => &["dt", "dd"],
-        "p" => &["p"],
-        "rt" | "rp" => &["rt", "rp"],
-        "option" => &["option"],
-        "optgroup" => &["option", "optgroup"],
-        "td" | "th" => &["td", "th"],
-        "tr" => &["td", "th", "tr"],
-        "tbody" | "tfoot" => &["td", "th", "tr", "thead", "tbody"],
-        _ => &[],
-    }
 }
 
 impl LanguageType {
@@ -147,8 +116,9 @@ pub struct FormatterContext<'s> {
 
     /// The names of the HTML elements that are open, outermost first, which
     /// the template opened in a piece of HTML before a tag and hasn't closed
-    /// yet. Each indents what is inside it, as a block does.
-    pub open_elements: Vec<String>,
+    /// yet. Each indents what is inside it, as a block does. Each block keeps
+    /// a copy, which shares the names.
+    pub open_elements: Vec<Rc<str>>,
 }
 
 impl<'s> FormatterContext<'s> {
@@ -176,6 +146,12 @@ impl<'s> FormatterContext<'s> {
         self.state.indent.saturating_add(depth.saturating_mul(self.indent_step() as u16))
     }
 
+    /// Whether the innermost open element is one whose content is kept as it
+    /// is written, see [is_verbatim], e.g. a `<script>` that a tag splits.
+    pub fn in_verbatim(&self) -> bool {
+        self.open_elements.last().is_some_and(|name| is_verbatim(name))
+    }
+
     /// Whether the innermost open element is one whose whitespace matters, see
     /// [keeps_whitespace].
     pub fn keeps_whitespace(&self) -> bool {
@@ -200,7 +176,7 @@ impl<'s> FormatterContext<'s> {
     pub(crate) fn open_elements(&mut self, names: impl IntoIterator<Item = String>) {
         for name in names {
             self.close_implied(&name);
-            self.open_elements.push(name);
+            self.open_elements.push(name.into());
         }
 
         self.state.language = self.element_language();
@@ -223,7 +199,7 @@ impl<'s> FormatterContext<'s> {
 
     /// Set the open elements to `elements`, e.g. those at the start of a block
     /// that each of its branches starts from.
-    pub(crate) fn set_open_elements(&mut self, elements: Vec<String>) {
+    pub(crate) fn set_open_elements(&mut self, elements: Vec<Rc<str>>) {
         self.open_elements = elements;
         self.state.language = self.element_language();
     }
@@ -256,23 +232,23 @@ pub enum HtmlPart {
     /// The HTML at `range` in the piece, formatted, or `None` if it doesn't
     /// parse, in which case it is kept as it is written. It leaves the
     /// elements `opens` open, outermost first.
-    Html { range: Range<usize>, formatted: Option<String>, opens: Vec<String> },
+    Html { range: ByteRange, formatted: Option<String>, opens: Vec<String> },
 
-    /// The content at `range` in the piece of one of the
-    /// [VERBATIM_ELEMENTS], e.g. the code of a `<script>`, which is kept
-    /// exactly as it is written.
-    Verbatim { range: Range<usize> },
+    /// The content at `range` in the piece of one of the verbatim elements,
+    /// see [is_verbatim], e.g. the code of a `<script>`, which is kept exactly
+    /// as it is written.
+    Verbatim { range: ByteRange },
 
     /// The closing tag at `range` in the piece of an element `name` that opens
     /// before the piece, e.g. the `</li>` in `{% endif %}</li>`.
-    Close { range: Range<usize>, name: String },
+    Close { range: ByteRange, name: String },
 }
 
 impl HtmlPart {
     /// The part, with its range moved by `offset`, e.g. from a slice of its
     /// piece to the piece.
     pub fn shift(self, offset: usize) -> Self {
-        let shift = |range: Range<usize>| range.start + offset..range.end + offset;
+        let shift = |range: ByteRange| ByteRange::new(range.start() + offset, range.end() + offset);
         match self {
             HtmlPart::Html { range, formatted, opens } => {
                 HtmlPart::Html { range: shift(range), formatted, opens }
@@ -287,7 +263,8 @@ impl HtmlPart {
 pub trait HasHTMLParsing<'ctx> {
     /// Format `contents`, a piece of HTML between template tags, in its
     /// parts: the closing tags of elements that open before it, the content
-    /// of the [VERBATIM_ELEMENTS] in it, and the HTML between them.
+    /// of the verbatim elements in it, see [is_verbatim], and the HTML between
+    /// them. A part is never empty.
     fn format(&mut self, contents: &str) -> FmtResult<Vec<HtmlPart>>;
 }
 

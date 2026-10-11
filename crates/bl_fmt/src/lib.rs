@@ -12,6 +12,7 @@ pub use crate::options::FormatterOptions;
 mod adapters;
 mod backends;
 mod diagnostics;
+mod dialects;
 mod options;
 mod visitor;
 

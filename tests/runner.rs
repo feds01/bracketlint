@@ -273,16 +273,20 @@ fn handle_test(test: TestingInput) {
         StageKind::Fmt => commands::fmt::fmt(&files, &mut workspace).unwrap(),
     };
 
-    if test.metadata.stage == StageKind::Fmt && test.metadata.completion == TestResult::Pass {
-        assert_formats_stably(&test, &case);
-    }
-
     // Based on the specified metadata within the test case itself, we know
-    // whether the test should fail or not
-    if test.metadata.completion == TestResult::Fail {
-        handle_failure_case(test, &workspace, messages, &raw_output_stream).unwrap();
-    } else {
-        handle_pass_case(test, &workspace, messages, &raw_output_stream).unwrap();
+    // whether the test should fail or not. A case that formats has to format
+    // the same way again.
+    match (test.metadata.completion, test.metadata.stage) {
+        (TestResult::Fail, _) => {
+            handle_failure_case(test, &workspace, messages, &raw_output_stream).unwrap();
+        }
+        (TestResult::Pass, StageKind::Fmt) => {
+            assert_formats_stably(&test, &case);
+            handle_pass_case(test, &workspace, messages, &raw_output_stream).unwrap();
+        }
+        (TestResult::Pass, StageKind::Check) => {
+            handle_pass_case(test, &workspace, messages, &raw_output_stream).unwrap();
+        }
     }
 }
 

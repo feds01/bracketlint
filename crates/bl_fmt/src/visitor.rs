@@ -1,3 +1,5 @@
+use std::{ops::Range, rc::Rc};
+
 use bl_ast::{
     AstVisitorMutSelf, ByteRange, Dialect, SourceId, SpannedSource,
     ast_visitor_mut_self_default_impl, walk_mut_self,
@@ -6,8 +8,8 @@ use bl_reporting::inline::{InlineSnippet, note_on_span};
 
 use crate::{
     adapters::{
-        ExternalLanguagesEngineAdaptor, FormatterContext, HasCSSParsing, HasHTMLParsing, HtmlPart,
-        LanguageType, TerminalState,
+        ExternalLanguagesEngineAdaptor, FormatterContext, HasHTMLParsing, HtmlPart, LanguageType,
+        TerminalState,
     },
     diagnostics::FmtError,
     options::FormatterOptions,
@@ -27,8 +29,8 @@ pub(crate) struct Formatter<'fmt, EngineAdaptor: ExternalLanguagesEngineAdaptor>
 
     /// Where the source that the buffer ends with ends, when the buffer ends
     /// with source that is pushed exactly as it is written, with the length of
-    /// the buffer then. In a `<pre>` or `<textarea>`, the source after it is
-    /// pushed exactly as it is written too, from there.
+    /// the buffer then. In a `<pre>`, `<textarea>`, `<script>` or `<style>`,
+    /// the source after it is pushed exactly as it is written too, from there.
     exact: Option<(usize, usize)>,
 }
 
@@ -171,9 +173,10 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         Ok(())
     }
 
-    /// Indent a tag of a block, when it starts a line, so that the tags of the
-    /// block line up. One that continues a line, e.g. the `{% endif %}` of
-    /// `{% if a %}b{% endif %}`, isn't indented.
+    /// Indent a tag that ends a block, or a branch of it, when it starts a
+    /// line, so that it lines up with the tag that starts the block. One that
+    /// continues a line, e.g. the `{% endif %}` of `{% if a %}b{% endif %}`,
+    /// isn't indented.
     fn indent_tag(&mut self) {
         if self.at_line_start() {
             self.add_indent();
@@ -198,7 +201,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
     /// Start a branch of a block, e.g. the `{% else %}` of an if block, with
     /// the elements `open` at the start of the block. Each branch opens and
     /// closes its own, and the tags of the block line up with its start.
-    fn start_branch(&mut self, open: &[String]) {
+    fn start_branch(&mut self, open: &[Rc<str>]) {
         self.ctx.set_open_elements(open.to_vec());
     }
 
@@ -209,8 +212,8 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         &mut self,
         end: &str,
         trim: bl_ast::TrimMarker,
-        open: &[String],
-        after: Vec<String>,
+        open: &[Rc<str>],
+        after: Vec<Rc<str>>,
     ) -> Result<(), FmtError> {
         self.start_branch(open);
         self.push_tag_line(end, trim)?;
@@ -265,24 +268,17 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
     /// Push `text`, which starts at `start` in the source, formatted in the
     /// current language, or as it is written if it doesn't parse.
     fn push_text(&mut self, start: usize, text: &str) -> Result<(), FmtError> {
-        // We need to check which language engine to use for the formatting.
-        let (result, state) = match self.ctx.state.language {
+        match self.ctx.state.language {
             LanguageType::Html => return self.push_html(start, text),
-            LanguageType::Css => {
-                let engine = self.adaptor.css_engine(&self.ctx);
-                let result = engine.format(text)?;
-                (result, engine.into_state())
-            }
-            // The text is only JavaScript when a tag splits a `<script>` element,
-            // and a piece of a script can't be formatted on its own without
-            // changing it. Biome drops the `;` of `{{ data }};`, and makes
-            // `{{ f }}\n(x)`, a call, into `{{ f }}\nx;`.
-            LanguageType::Js => (None, self.ctx.state),
-            LanguageType::Text => (Some(text.to_string()), self.ctx.state),
-        };
+            // The text is only CSS or JavaScript when a tag splits a `<style>`
+            // or `<script>`, whose content is kept exactly as it is written, as
+            // a whole one's is. A piece of a script can't be formatted on its
+            // own without changing it: Biome drops the `;` of `{{ data }};`,
+            // and makes `{{ f }}\n(x)`, a call, into `{{ f }}\nx;`.
+            LanguageType::Css | LanguageType::Js => self.push_exact(start, text),
+            LanguageType::Text => self.push_piece(start, text, Some(text.to_string())),
+        }
 
-        self.push_piece(start, text, result);
-        self.ctx.state = state;
         Ok(())
     }
 
@@ -302,29 +298,31 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
                     }
 
                     // The content of a `<pre>` or `<textarea>` that a tag splits
-                    // is kept exactly as it is written, since its whitespace
-                    // matters.
-                    if self.ctx.keeps_whitespace() {
-                        self.push_exact(start + range.start, &text[range]);
+                    // is kept exactly as it is written, as a whole one's is.
+                    let (at, html) = (start + range.start(), &text[Range::from(range)]);
+                    if self.ctx.in_verbatim() {
+                        self.push_exact(at, html);
                     } else {
-                        self.push_piece(start + range.start, &text[range], formatted);
+                        self.push_piece(at, html, formatted);
                     }
 
                     self.ctx.open_elements(opens);
                 }
-                HtmlPart::Verbatim { range } => self.push_exact(start + range.start, &text[range]),
+                HtmlPart::Verbatim { range } => {
+                    self.push_exact(start + range.start(), &text[Range::from(range)]);
+                }
                 HtmlPart::Close { range, name } => {
                     // The closing tag of a `<pre>` or `<textarea>` stays where it
                     // is, as the whitespace before it is its content. Any other
                     // is at the indent of the elements that are still open.
-                    let tag_start = start + range.start;
+                    let (at, tag) = (start + range.start(), &text[Range::from(range)]);
                     if self.ctx.keeps_whitespace() {
-                        self.push_exact(tag_start, &text[range]);
+                        self.push_exact(at, tag);
                         self.ctx.close_element(&name);
                     } else {
                         self.ctx.close_element(&name);
-                        self.start_item(tag_start);
-                        self.push_hunk(&text[range]);
+                        self.start_item(at);
+                        self.push_hunk(tag);
                     }
                 }
             }
@@ -337,35 +335,24 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
     /// written, e.g. the content of a `<pre>`, but for the whitespace at its
     /// end when it ends a line, which the formatter lays out with what comes
     /// next, e.g. a `</script>`. The last line is left open, as
-    /// [Self::push_lines] leaves it. In a `<pre>` or `<textarea>`, what comes
-    /// next is pushed exactly too, from the whitespace before it, see
-    /// [Self::push_exact_gap].
+    /// [Self::push_lines] leaves it.
+    ///
+    /// In a `<pre>`, `<textarea>`, `<script>` or `<style>`, the whitespace
+    /// before `text` is pushed exactly too: from where the buffer ends with
+    /// source pushed exactly, or else the whitespace right before `start`.
     fn push_exact(&mut self, start: usize, text: &str) {
-        self.push_exact_gap(start);
-
-        let trimmed = text.trim_end();
-        let text = if text[trimmed.len()..].contains('\n') { trimmed } else { text };
-        self.push_hunk(text);
-        self.exact = Some((start + text.len(), self.buffer.len()));
-    }
-
-    /// Push the source before `start` exactly as it is written, in a `<pre>`
-    /// or `<textarea>`: the whitespace from where the buffer ends with source
-    /// pushed exactly, or else the whitespace right before `start`.
-    fn push_exact_gap(&mut self, start: usize) {
-        if !self.ctx.keeps_whitespace() {
-            return;
-        }
-
-        let exact_end = self.exact.filter(|&(_, len)| len == self.buffer.len());
-        let from = match exact_end {
+        let from = match self.exact.filter(|&(_, len)| len == self.buffer.len()) {
+            _ if !self.ctx.in_verbatim() => start,
             Some((end, _)) => end,
             None => start - self.whitespace_before(start).len(),
         };
 
-        if from < start {
-            self.push_hunk(&self.ctx.source.source[from..start]);
-        }
+        let source = &self.ctx.source.source[from..start + text.len()];
+        let trimmed = source.trim_end();
+        let source = if source[trimmed.len()..].contains('\n') { trimmed } else { source };
+
+        self.push_hunk(source);
+        self.exact = Some((from + source.len(), self.buffer.len()));
     }
 
     /// Push `text`, which starts at `start` in the source, as `formatted`, or
@@ -561,7 +548,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         let bl_ast::Block { label, block_body, end_label, trim } = node.body();
         let open = self.ctx.open_elements.clone();
 
-        self.indent_tag();
+        self.start_item(node.range().start());
         self.within_tag(TagKind::Block, trim.start, |this| {
             this.push_hunk("block");
             if let Some(label) = label {
@@ -596,7 +583,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         let open = self.ctx.open_elements.clone();
 
         // Keep the assignments as they are written, e.g. `a=1 b=2` or `x as y`.
-        self.indent_tag();
+        self.start_item(node.range().start());
         self.within_tag(TagKind::Block, trim.start, |this| {
             this.push_hunk("with");
             if !assignments.is_empty() {
@@ -641,7 +628,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         let open = self.ctx.open_elements.clone();
 
         // @@ Proof of concept: for now, we will just push a for loop into the buffer.
-        self.indent_tag();
+        self.start_item(node.range().start());
         self.within_tag(TagKind::Block, trim.start, |this| {
             this.push_hunk(opening);
             this.push_hunk(" ");
@@ -734,7 +721,14 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
     ) -> Result<Self::IfClauseRet, Self::Error> {
         let bl_ast::IfClause { kind, condition, clause_body, trim } = node.body();
 
-        self.indent_tag();
+        // Each clause spans from the start of its block, so only the first one
+        // knows where its tag starts in the source.
+        match kind {
+            bl_ast::ClauseKind::Elif => self.indent_tag(),
+            bl_ast::ClauseKind::If | bl_ast::ClauseKind::Unless => {
+                self.start_item(node.range().start());
+            }
+        }
         self.within_tag(TagKind::Block, *trim, |this| {
             match kind {
                 bl_ast::ClauseKind::If => this.push_hunk("if "),
@@ -767,7 +761,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         let open = self.ctx.open_elements.clone();
         let mut after = None;
 
-        self.indent_tag();
+        self.start_item(node.range().start());
         self.within_tag(TagKind::Block, trim.start, |this| {
             this.push_hunk("case ");
             this.visit_expr(subject.ast_ref())
@@ -805,7 +799,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
 
         // The values are separated by either `,` or `or`, so keep them as they
         // are written.
-        self.indent_tag();
+        self.start_item(node.range().start());
         self.within_tag(TagKind::Block, *trim, |this| {
             this.push_hunk("when ");
             this.push_source(values.range());
@@ -827,14 +821,12 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
 
         // Visit the body of the document
         for (i, item) in statements.iter().enumerate() {
-            // The tags in a `<pre>` or `<textarea>` are kept exactly as they
-            // are written, with the whitespace around them, since it is the
-            // element's content. A block in one is kept whole, so a closing
-            // tag in it doesn't close the element.
+            // The tags in a `<pre>`, `<textarea>`, `<script>` or `<style>` are
+            // kept exactly as they are written, with the whitespace around
+            // them, as is the rest of its content. A block in one is kept
+            // whole, so a closing tag in it doesn't close the element.
             let statement = item.ast_ref();
-            if self.ctx.keeps_whitespace()
-                && !matches!(statement.body(), bl_ast::Statement::Text(_))
-            {
+            if self.ctx.in_verbatim() && !matches!(statement.body(), bl_ast::Statement::Text(_)) {
                 let range = statement.range();
                 self.push_exact(range.start(), self.ctx.source.hunk(range));
                 continue;
@@ -842,9 +834,10 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
 
             walk_mut_self::walk_statement(self, item.ast_ref())?;
 
-            // The whitespace after a statement in a `<pre>` or `<textarea>` is
-            // kept as it is written, before what comes next.
-            if self.ctx.keeps_whitespace() {
+            // The whitespace after a statement in a `<pre>`, `<textarea>`,
+            // `<script>` or `<style>` is kept as it is written, before what
+            // comes next.
+            if self.ctx.in_verbatim() {
                 continue;
             }
 
