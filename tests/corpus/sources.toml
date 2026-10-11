@@ -182,6 +182,30 @@ paths = ["_includes", "content"]
 extension = "njk"
 
 [[source]]
+name = "govuk-prototype-kit"
+dialect = "nunjucks"
+repo = "https://github.com/alphagov/govuk-prototype-kit.git"
+tag = "v13.20.5"
+paths = ["lib/nunjucks", "prototype-starter"]
+extension = "njk"
+
+[[source]]
+name = "nhsuk-frontend"
+dialect = "nunjucks"
+repo = "https://github.com/nhsuk/nhsuk-frontend.git"
+tag = "v10.6.1"
+paths = ["packages/nhsuk-frontend/src"]
+extension = "njk"
+
+[[source]]
+name = "moj-frontend"
+dialect = "nunjucks"
+repo = "https://github.com/ministryofjustice/moj-frontend.git"
+tag = "v11.1.0"
+paths = ["src/moj"]
+extension = "njk"
+
+[[source]]
 name = "dawn"
 dialect = "liquid"
 repo = "https://github.com/Shopify/dawn.git"
