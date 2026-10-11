@@ -7,6 +7,10 @@ The first line of a case configures the run, e.g. `// run=fail, stage=check`
 part of the template: the case runs without it and the blank line after it,
 so line numbers in the snapshots count from the first line of the template.
 
+A `stage=fmt` case that passes is also formatted a second time, which has to
+give the same output, as the corpus in `tests/corpus` checks of real-world
+templates.
+
 ## `unsupported/` directories
 
 An `unsupported/` directory holds **valid** templates that bracketlint doesn't

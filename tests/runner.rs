@@ -36,6 +36,7 @@ use std::{
     sync::{Arc, Mutex, OnceLock},
 };
 
+use bl_ast::Dialect;
 use bl_lints::settings::FixMode;
 use bl_reporting::{Report, Reporter};
 use bl_testing_internal::{
@@ -52,7 +53,7 @@ use bl_workspace::{Workspace, WorkspaceBuilder, settings::Settings};
 use bracketlint::commands;
 use tempfile::TempDir;
 
-use crate::{ANSI_REGEX, assert_snapshot};
+use crate::{ANSI_REGEX, assert_snapshot, corpus};
 
 /// The directory that the case runs in, which `$DIR` stands for in the
 /// snapshots. Each case runs in a process of its own, so there is only one.
@@ -272,6 +273,10 @@ fn handle_test(test: TestingInput) {
         StageKind::Fmt => commands::fmt::fmt(&files, &mut workspace).unwrap(),
     };
 
+    if test.metadata.stage == StageKind::Fmt && test.metadata.completion == TestResult::Pass {
+        assert_formats_stably(&test, &case);
+    }
+
     // Based on the specified metadata within the test case itself, we know
     // whether the test should fail or not
     if test.metadata.completion == TestResult::Fail {
@@ -279,6 +284,27 @@ fn handle_test(test: TestingInput) {
     } else {
         handle_pass_case(test, &workspace, messages, &raw_output_stream).unwrap();
     }
+}
+
+/// Check that the case formats the same way again, as the corpus checks that
+/// the real-world templates do.
+fn assert_formats_stably(test: &TestingInput, case: &CaseCopy) {
+    let contents = fs::read_to_string(&case.path).unwrap();
+    let dialect =
+        test.metadata.dialect.or_else(|| Dialect::from_path(&case.path)).unwrap_or_default();
+
+    let format = |contents: &str| match corpus::check::format(dialect, contents) {
+        Ok(formatted) => formatted,
+        Err(outcome) => panic!("`{}` failed to format: {:?}", test.path.display(), outcome.error),
+    };
+
+    let once = format(&contents);
+    pretty_assertions::assert_str_eq!(
+        once,
+        format(&once),
+        "\nformatting `{}` again changes it\n",
+        test.path.display()
+    );
 }
 
 // Generate all the tests
