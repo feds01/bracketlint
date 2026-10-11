@@ -132,6 +132,39 @@ tag = "v3.1.0"
 paths = ["templates"]
 extension = "twig"
 
+# Two of core's themes and the system module, rather than every module.
+[[source]]
+name = "drupal"
+dialect = "twig"
+repo = "https://github.com/drupal/drupal.git"
+tag = "11.4.9"
+paths = ["core/themes/olivero/templates", "core/themes/claro/templates", "core/modules/system/templates"]
+extension = "twig"
+
+[[source]]
+name = "easyadmin"
+dialect = "twig"
+repo = "https://github.com/EasyCorp/EasyAdminBundle.git"
+tag = "v5.6.1"
+paths = ["templates"]
+extension = "twig"
+
+[[source]]
+name = "grav"
+dialect = "twig"
+repo = "https://github.com/getgrav/grav.git"
+tag = "2.2.6"
+paths = ["system/templates"]
+extension = "twig"
+
+[[source]]
+name = "phpmyadmin"
+dialect = "twig"
+repo = "https://github.com/phpmyadmin/phpmyadmin.git"
+tag = "RELEASE_5_2_3"
+paths = ["templates"]
+extension = "twig"
+
 [[source]]
 name = "govuk-frontend"
 dialect = "nunjucks"
