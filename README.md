@@ -45,6 +45,12 @@ Each file is read in the dialect that its extension names: `.jinja` is Jinja, `.
 $ bracketlint check --dialect liquid theme/
 ```
 
+Only errors fail a run. A warning, such as another dialect's spelling of a tag, is reported but doesn't fail it, unless you pass `--deny-warnings`:
+
+```bash
+$ bracketlint check --deny-warnings templates/
+```
+
 ### Development
 
 Common tasks are recipes in the [`justfile`](./justfile) (install [just](https://github.com/casey/just) with `brew install just` or `cargo install just`). Run `just` to list them all:

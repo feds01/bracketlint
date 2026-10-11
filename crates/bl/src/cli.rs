@@ -80,6 +80,11 @@ pub struct LintCommand {
     #[arg(long)]
     pub dump_ast: bool,
 
+    /// Exit with 1 when there are warnings, as when there are errors. By
+    /// default, only errors fail the run.
+    #[arg(long)]
+    pub deny_warnings: bool,
+
     /// The template dialect to parse files in. By default it is picked from
     /// each file's extension (`.jinja`, `.liquid` or `.twig`), and is
     /// `django` for any other file.
