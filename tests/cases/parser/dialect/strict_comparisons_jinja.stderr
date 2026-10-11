@@ -1,0 +1,8 @@
+error: unexpectedly encountered a `=`
+ --> $DIR/strict_comparisons_jinja.html:1:11
+  |
+1 | {% if a === b %}{% endif %}
+  |           -
+  |
+  = help: expected either `identifier`, `literal`, `(`, `{`, or `[`
+  = note: this file is parsed as Jinja, from `--dialect jinja`

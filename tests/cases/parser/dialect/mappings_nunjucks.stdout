@@ -1,0 +1,66 @@
+info: parsed module '$DIR/mappings_nunjucks.njk' as nunjucks:
+body
+├─inline
+│ └─call_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "govukAttributes"
+│   └─args
+│     └─arg
+│       └─mapping_expr
+│         ├─pair
+│         │ ├─key
+│         │ │ └─var_expr
+│         │ │   └─name "for"
+│         │ └─value
+│         │   └─var_expr
+│         │     └─name "id"
+│         ├─pair
+│         │ ├─key
+│         │ │ └─lit_expr
+│         │ │   └─str_lit 'data-module'
+│         │ └─value
+│         │   └─lit_expr
+│         │     └─str_lit "govuk-input"
+│         └─pair
+│           ├─key
+│           │ └─lit_expr
+│           │   └─str_lit "class"
+│           └─value
+│             └─var_expr
+│               └─name "classes"
+└─generic_tag
+  ├─name "set"
+  └─args
+    └─arg
+      ├─name "item"
+      └─mapping_expr
+        ├─pair
+        │ ├─key
+        │ │ └─var_expr
+        │ │   └─name "text"
+        │ └─value
+        │   └─access_expr
+        │     ├─subject
+        │     │ └─var_expr
+        │     │   └─name "item"
+        │     └─field
+        │       └─name "text"
+        └─pair
+          ├─key
+          │ └─var_expr
+          │   └─name "checked"
+          └─value
+            └─bin_expr
+              ├─lhs
+              │ └─access_expr
+              │   ├─subject
+              │   │ └─var_expr
+              │   │   └─name "item"
+              │   └─field
+              │     └─name "value"
+              ├─operator `in`
+              └─rhs
+                └─var_expr
+                  └─name "values"
+

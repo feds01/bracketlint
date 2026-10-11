@@ -311,13 +311,31 @@ impl Dialect {
     }
 
     /// Whether a key of a mapping can be a name, which is the name's string
-    /// rather than a variable, e.g. `{for: id}`, as in [Twig]. Its value can be
-    /// left out when it is the variable of the same name, e.g. `{post}`. A key
-    /// is an expression in Jinja, so `{name: 1}` takes the variable's value.
+    /// rather than a variable, e.g. `{for: id}`, as in [Nunjucks] and [Twig].
+    /// A key is an expression in Jinja, so `{name: 1}` takes the variable's
+    /// value.
     ///
+    /// [Nunjucks]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/compiler.js#L318-L319
     /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#literals
     pub fn mapping_keys_can_be_names(self) -> bool {
+        matches!(self, Dialect::Nunjucks | Dialect::Twig)
+    }
+
+    /// Whether the value of a mapping's pair can be left out when it is the
+    /// variable that its key names, e.g. `{post}` for `{post: post}`, as in
+    /// [Twig], see [Dialect::mapping_keys_can_be_names].
+    ///
+    /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#literals
+    pub fn mapping_values_can_be_left_out(self) -> bool {
         matches!(self, Dialect::Twig)
+    }
+
+    /// Whether `===` and `!==` are comparisons, as in [Nunjucks], which compare
+    /// as JavaScript's do, without converting either side.
+    ///
+    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#comparisons
+    pub fn has_strict_comparisons(self) -> bool {
+        matches!(self, Dialect::Nunjucks)
     }
 
     /// Whether a string is translated when it is written `_("...")`, as in
@@ -551,7 +569,9 @@ impl Dialect {
                 | BinOp::Range
                 | BinOp::Matches
                 | BinOp::StartsWith
-                | BinOp::EndsWith => return None,
+                | BinOp::EndsWith
+                | BinOp::StrictEq
+                | BinOp::StrictNotEq => return None,
             },
 
             // [Jinja's parser] has a function for each level, from `parse_or`
@@ -584,7 +604,9 @@ impl Dialect {
                 | BinOp::Range
                 | BinOp::Matches
                 | BinOp::StartsWith
-                | BinOp::EndsWith => return None,
+                | BinOp::EndsWith
+                | BinOp::StrictEq
+                | BinOp::StrictNotEq => return None,
             },
 
             // Liquid has no precedence between `and` and `or`, and evaluates
@@ -613,7 +635,9 @@ impl Dialect {
                 | BinOp::Range
                 | BinOp::Matches
                 | BinOp::StartsWith
-                | BinOp::EndsWith => return None,
+                | BinOp::EndsWith
+                | BinOp::StrictEq
+                | BinOp::StrictNotEq => return None,
             },
 
             // [Nunjucks' parser] has a function for each level too, from
@@ -629,9 +653,14 @@ impl Dialect {
                 BinOp::And => left_assoc(20),
                 BinOp::In | BinOp::NotIn => left_assoc(40),
                 BinOp::Is | BinOp::IsNot => left_assoc(50),
-                BinOp::Eq | BinOp::NotEq | BinOp::Lt | BinOp::LtEq | BinOp::Gt | BinOp::GtEq => {
-                    left_assoc(60)
-                }
+                BinOp::Eq
+                | BinOp::NotEq
+                | BinOp::StrictEq
+                | BinOp::StrictNotEq
+                | BinOp::Lt
+                | BinOp::LtEq
+                | BinOp::Gt
+                | BinOp::GtEq => left_assoc(60),
                 BinOp::Concat => left_assoc(70),
                 BinOp::Add => left_assoc(80),
                 BinOp::Sub => left_assoc(90),
@@ -679,7 +708,7 @@ impl Dialect {
                 BinOp::Is | BinOp::IsNot => left_assoc(100),
                 BinOp::Pow => right_assoc(200),
                 BinOp::Coalesce => right_assoc(250),
-                BinOp::Contains => return None,
+                BinOp::Contains | BinOp::StrictEq | BinOp::StrictNotEq => return None,
             },
         };
 
@@ -1016,6 +1045,11 @@ mod test_super {
             for op in twig {
                 let power = dialect.infix_binding_power(op);
                 assert_eq!(power.is_some(), dialect == Dialect::Twig, "`{op}` in {dialect}");
+            }
+
+            for op in [BinOp::StrictEq, BinOp::StrictNotEq] {
+                let power = dialect.infix_binding_power(op);
+                assert_eq!(power.is_some(), dialect == Dialect::Nunjucks, "`{op}` in {dialect}");
             }
         }
     }

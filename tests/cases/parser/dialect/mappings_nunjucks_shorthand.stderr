@@ -1,0 +1,8 @@
+error: unexpectedly reached the end of input
+ --> $DIR/mappings_nunjucks_shorthand.njk:1:16
+  |
+1 | {{ render({post}) }}
+  |                -
+  |
+  = help: expected a `:`
+  = note: this file is parsed as Nunjucks, from its `.njk` extension

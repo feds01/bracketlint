@@ -1355,23 +1355,26 @@ impl<'s, 'a> Parser<'s, 'a> {
     /// separated by commas, with an optional comma after the last.
     fn parse_mapping(&mut self, token: Token) -> ParseResult<AstNode<'a, ast::Expr<'a>>> {
         let names = self.options.dialect.mapping_keys_can_be_names();
+        let shorthand = self.options.dialect.mapping_values_can_be_left_out();
 
         let pairs = self.in_tree(Delimiter::Curly, None, |g| {
             let start = g.current_pos();
             let mut pairs = g.arena.vec();
 
             while let Some(first) = g.peek().copied() {
-                // A key can be any name in [Twig], even a keyword, e.g.
-                // `{for: id}`, and the variable of that name is its value when
-                // it has none, e.g. `{post}`.
+                // A key can be any name in [Nunjucks] and [Twig], even a
+                // keyword, e.g. `{for: id}`. In Twig, the variable of that name
+                // is its value when it has none, e.g. `{post}`.
                 //
+                // [Nunjucks]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/compiler.js#L318-L319
                 // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#literals
                 let name = names
                     && matches!(first.kind, TokenKind::Ident | TokenKind::Keyword(_))
-                    && matches!(
-                        g.peek_second().map(|token| token.kind),
-                        None | Some(TokenKind::Colon | TokenKind::Comma)
-                    );
+                    && match g.peek_second().map(|token| token.kind) {
+                        Some(TokenKind::Colon) => true,
+                        None | Some(TokenKind::Comma) => shorthand,
+                        _ => false,
+                    };
 
                 let key = if name {
                     g.skip_token(); // `<name>` Skip the name.
@@ -1696,6 +1699,8 @@ impl<'s, 'a> Parser<'s, 'a> {
             TokenKind::Keyword(Keyword::Contains) => (Some(ast::BinOp::Contains), 1),
             TokenKind::EqEq => (Some(ast::BinOp::Eq), 1),
             TokenKind::NotEq => (Some(ast::BinOp::NotEq), 1),
+            TokenKind::EqEqEq => (Some(ast::BinOp::StrictEq), 1),
+            TokenKind::NotEqEq => (Some(ast::BinOp::StrictNotEq), 1),
             TokenKind::Lt => (Some(ast::BinOp::Lt), 1),
             TokenKind::LtEq => (Some(ast::BinOp::LtEq), 1),
             TokenKind::Gt => (Some(ast::BinOp::Gt), 1),

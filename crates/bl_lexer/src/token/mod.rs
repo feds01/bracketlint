@@ -129,6 +129,12 @@ pub enum TokenKind {
     /// Not equal to, `!=`
     NotEq,
 
+    /// Equal to without converting either side, `===`, in Nunjucks
+    EqEqEq,
+
+    /// Not equal to without converting either side, `!==`, in Nunjucks
+    NotEqEq,
+
     /// Greater than, `>`
     Gt,
 
@@ -288,6 +294,8 @@ impl fmt::Display for TokenKind {
             TokenKind::Eq => write!(f, "="),
             TokenKind::EqEq => write!(f, "=="),
             TokenKind::NotEq => write!(f, "!="),
+            TokenKind::EqEqEq => write!(f, "==="),
+            TokenKind::NotEqEq => write!(f, "!=="),
             TokenKind::Lt => write!(f, "<"),
             TokenKind::LtEq => write!(f, "<="),
             TokenKind::Gt => write!(f, ">"),

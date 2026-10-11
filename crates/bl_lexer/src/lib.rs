@@ -350,7 +350,16 @@ impl<'lex> Lexer<'lex> {
                 c if is_ident_start(c) => self.ident(c),
                 '0'..='9' => self.number(ShouldSkip::No),
                 '|' => TokenKind::Pipe,
+                // `!==` and `===` in [Nunjucks], which compare without
+                // converting either side.
+                //
+                // [Nunjucks]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/lexer.js#L165-L178
                 '!' => match self.peek() {
+                    '=' if self.dialect.has_strict_comparisons() && self.peek_second() == '=' => {
+                        self.skip_ascii();
+                        self.skip_ascii();
+                        TokenKind::NotEqEq
+                    }
                     '=' => {
                         self.skip_ascii();
                         TokenKind::NotEq
@@ -379,6 +388,11 @@ impl<'lex> Lexer<'lex> {
                     _ => TokenKind::Dot,
                 },
                 '=' => match self.peek() {
+                    '=' if self.dialect.has_strict_comparisons() && self.peek_second() == '=' => {
+                        self.skip_ascii();
+                        self.skip_ascii();
+                        TokenKind::EqEqEq
+                    }
                     '=' => {
                         self.skip_ascii();
                         TokenKind::EqEq

@@ -1,0 +1,72 @@
+info: parsed module '$DIR/strict_comparisons_nunjucks.njk' as nunjucks:
+body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─access_expr
+│     │   │   ├─subject
+│     │   │   │ └─var_expr
+│     │   │   │   └─name "params"
+│     │   │   └─field
+│     │   │     └─name "value"
+│     │   ├─operator `!==`
+│     │   └─rhs
+│     │     └─var_expr
+│     │       └─name "undefined"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─group_expr
+│     │   │   └─bin_expr
+│     │   │     ├─lhs
+│     │   │     │ └─access_expr
+│     │   │     │   ├─subject
+│     │   │     │   │ └─var_expr
+│     │   │     │   │   └─name "params"
+│     │   │     │   └─field
+│     │   │     │     └─name "spellcheck"
+│     │   │     ├─operator `===`
+│     │   │     └─rhs
+│     │   │       └─var_expr
+│     │   │         └─name "false"
+│     │   ├─operator `or`
+│     │   └─rhs
+│     │     └─group_expr
+│     │       └─bin_expr
+│     │         ├─lhs
+│     │         │ └─access_expr
+│     │         │   ├─subject
+│     │         │   │ └─var_expr
+│     │         │   │   └─name "params"
+│     │         │   └─field
+│     │         │     └─name "spellcheck"
+│     │         ├─operator `===`
+│     │         └─rhs
+│     │           └─var_expr
+│     │             └─name "true"
+│     └─clause_body
+│       └─body
+└─inline
+  └─bin_expr
+    ├─lhs
+    │ └─bin_expr
+    │   ├─lhs
+    │   │ └─var_expr
+    │   │   └─name "a"
+    │   ├─operator `===`
+    │   └─rhs
+    │     └─var_expr
+    │       └─name "b"
+    ├─operator `==`
+    └─rhs
+      └─var_expr
+        └─name "c"
+
