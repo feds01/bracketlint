@@ -1,0 +1,17 @@
+{% if nonce %}
+    <style nonce="{{ nonce }}">
+{% else %}
+    <style>
+{% endif %}
+p { color: red; }
+</style>
+<div>
+    {% if nonce %}
+        <script nonce="{{ nonce }}">
+    {% else %}
+        <script>
+    {% endif %}
+        var a = 1;
+    </script>
+</div>
+

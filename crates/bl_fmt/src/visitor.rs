@@ -180,10 +180,29 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
     /// line, so that it lines up with the tag that starts the block. One that
     /// continues a line, e.g. the `{% endif %}` of `{% if a %}b{% endif %}`,
     /// isn't indented.
+    ///
+    /// The tag doesn't know where it starts in the source, so it only starts a
+    /// line of its own after source pushed exactly, see [Self::push_exact],
+    /// which leaves the line break at its end for what comes next, e.g. the
+    /// `{% else %}` after a `<style>` that the `{% if %}` branch opens.
     fn indent_tag(&mut self) {
+        if self.exact_ends_line() && !self.at_line_start() {
+            self.end_line();
+        }
+
         if self.at_line_start() {
             self.add_indent();
         }
+    }
+
+    /// Whether the buffer ends with source pushed exactly, see
+    /// [Self::push_exact], after which the source ends the line.
+    fn exact_ends_line(&self) -> bool {
+        self.exact.is_some_and(|(end, len)| {
+            let after = &self.ctx.source.source[end..];
+            len == self.buffer.len()
+                && after[..after.len() - after.trim_start().len()].contains('\n')
+        })
     }
 
     /// Start an item that starts at `start` in the source, e.g. a `{{ }}` tag:
@@ -345,14 +364,26 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
     /// In a `<pre>`, `<textarea>`, `<script>` or `<style>`, the whitespace
     /// before `text` is pushed exactly too: from where the buffer ends with
     /// source pushed exactly, or else the whitespace right before `start`.
+    /// When the buffer starts a line, e.g. after the `{% endif %}` of a block
+    /// whose branches open a `<style>`, it already has the line break that the
+    /// whitespace starts with, which ended the line of the tag.
     fn push_exact(&mut self, start: usize, text: &str) {
-        let from = match self.exact.filter(|&(_, len)| len == self.buffer.len()) {
+        let mut from = match self.exact.filter(|&(_, len)| len == self.buffer.len()) {
             _ if !self.ctx.in_verbatim() => start,
             Some((end, _)) => end,
             None => start - self.whitespace_before(start).len(),
         };
 
-        let source = &self.ctx.source.source[from..start + text.len()];
+        let end = start + text.len();
+        if self.at_line_start() {
+            let source = &self.ctx.source.source[from..end];
+            let whitespace = &source[..source.len() - source.trim_start().len()];
+            if let Some(newline) = whitespace.find('\n') {
+                from += newline + 1;
+            }
+        }
+
+        let source = &self.ctx.source.source[from..end];
         let trimmed = source.trim_end();
         let source = if source[trimmed.len()..].contains('\n') { trimmed } else { source };
 
