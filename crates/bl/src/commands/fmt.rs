@@ -3,7 +3,7 @@
 use std::{fs, io::Write, path::PathBuf};
 
 use anyhow::Result;
-use bl_ast::Arena;
+use bl_arena::Arena;
 use bl_fmt::{FormatQuery, FormatQueryResult, FormatterOptions, fmt_module};
 use bl_lints::{diff::Diff, settings};
 use bl_parse::{ParseQuery, ParseQueryResult, parse_source};
@@ -47,32 +47,10 @@ pub fn fmt(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
             for file in files {
                 match file {
                     Ok(file) => {
-                        // We first need to convert this to a workspace member.
-                        let Ok(contents) = fs::read_to_string(file.path()) else {
-                            // @@Todo: add an error for the queue.
-                            continue;
-                        };
-
-                        let source = workspace.reserve_member(file.into_path(), contents);
-                        let member = workspace.members.member(source);
-
-                        let ParseQueryResult { node, diagnostics } =
-                            parse_source(ParseQuery::new(source, member), &arena);
-
-                        // Files that failed to parse aren't formatted: the formatter
-                        // would drop the parts that it couldn't parse.
-                        let has_errors = diagnostics.iter().any(|report| report.is_error());
-                        parse_diagnostics.extend(diagnostics);
-
-                        if let Some(document) = node
-                            && !has_errors
-                        {
-                            let FormatQueryResult { buffer, diagnostics } =
-                                fmt_module(FormatQuery { member, source, options, document });
-                            format_diagnostics.extend(diagnostics);
-                            emit_formatted(workspace, member, &buffer);
-                        }
-
+                        let (parsed, formatted) =
+                            format_file(workspace, file.into_path(), &arena, options);
+                        parse_diagnostics.extend(parsed);
+                        format_diagnostics.extend(formatted);
                         arena.reset();
                     }
                     Err(err) => {
@@ -92,6 +70,41 @@ pub fn fmt(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
     // them.
     parse_diagnostics.extend(format_diagnostics);
     Ok(parse_diagnostics)
+}
+
+/// Parse the file at `path` into `arena`, and format it and emit the result if
+/// it parsed without errors. Returns the diagnostics from parsing it, and from
+/// formatting it.
+fn format_file(
+    workspace: &mut Workspace,
+    path: PathBuf,
+    arena: &Arena,
+    options: FormatterOptions,
+) -> (Reports, Reports) {
+    // We first need to convert this to a workspace member.
+    let Ok(contents) = fs::read_to_string(&path) else {
+        // @@Todo: add an error for the queue.
+        return Default::default();
+    };
+
+    let source = workspace.reserve_member(path, contents);
+    let member = workspace.members.member(source);
+
+    let ParseQueryResult { node, diagnostics } =
+        parse_source(ParseQuery::new(source, member), arena);
+
+    // Files that failed to parse aren't formatted: the formatter would drop the
+    // parts that it couldn't parse.
+    let has_errors = diagnostics.iter().any(|report| report.is_error());
+    let Some(document) = node.filter(|_| !has_errors) else {
+        return (diagnostics, Reports::default());
+    };
+
+    let FormatQueryResult { buffer, diagnostics: format_diagnostics } =
+        fmt_module(FormatQuery { member, source, options, document });
+    emit_formatted(workspace, member, &buffer);
+
+    (diagnostics, format_diagnostics)
 }
 
 /// Emit the formatted `buffer` of `member` as the fix mode asks: as a diff, as

@@ -8,6 +8,7 @@ license = { workspace = true }
 repository = { workspace = true }
 
 [dependencies]
+bl_arena = { workspace = true }
 bl_ast = { workspace = true }
 bl_fmt = { workspace = true }
 bl_lints = { workspace = true }

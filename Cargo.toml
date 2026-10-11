@@ -16,6 +16,7 @@ repository = "https://github.com/feds01/bracketlint"
 
 
 [workspace.dependencies]
+bl_arena = { path = "crates/bl_arena" }
 bl_ast  = {  path = "crates/bl_ast" }
 bl_ast_utils = { path = "crates/bl_ast_utils" }
 bl_fmt = { path = "crates/bl_fmt" }

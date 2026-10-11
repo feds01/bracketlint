@@ -1,8 +1,7 @@
 //! Contains all of the parsing logic for the `bl` project.
 
-use bl_ast::{
-    Arena, AstNode, AstNodeRef, AstVisitor, Dialect, Document, SourceId, Span, TempSourceMap,
-};
+use bl_arena::Arena;
+use bl_ast::{AstNode, AstNodeRef, AstVisitor, Dialect, Document, SourceId, Span, TempSourceMap};
 use bl_ast_utils::{AstTreePrinter, TreeWriter, TreeWriterConfig};
 use bl_lexer::{Lexer, LexerMetadata, token::Token};
 use bl_reporting::{

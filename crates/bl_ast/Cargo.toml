@@ -5,10 +5,10 @@ authors = { workspace = true }
 edition = { workspace = true }
 
 [dependencies]
+bl_arena = { workspace = true }
 bl_utils = { workspace = true }
 bl_macros = { workspace = true }
 
-bumpalo = { workspace = true }
 bytecount = { workspace = true }
 derive_more = { workspace = true }
 index_vec = { workspace = true }

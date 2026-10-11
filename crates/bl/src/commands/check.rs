@@ -3,7 +3,7 @@
 use std::{fs, path::PathBuf};
 
 use anyhow::Result;
-use bl_ast::Arena;
+use bl_arena::Arena;
 use bl_parse::{ParseQuery, ParseQueryResult, emit_source_tree, parse_source};
 use bl_reporting::Reports;
 use bl_utils::timed;
@@ -43,26 +43,11 @@ pub fn check(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
             for file in files {
                 match file {
                     Ok(file) => {
-                        // We first need to convert this to a workspace member.
-                        let Ok(contents) = fs::read_to_string(file.path()) else {
-                            // @@Todo: add an error for the queue.
-                            continue;
-                        };
-
-                        let id = workspace.reserve_member(file.into_path(), contents);
-                        let member = workspace.members.member(id);
-
-                        let ParseQueryResult { node, diagnostics } =
-                            parse_source(ParseQuery::new(id, member), &arena);
-
-                        pipeline_diagnostics.extend(diagnostics);
-
-                        if let Some(document) = node
-                            && workspace.settings.should_dump_ast()
-                        {
-                            emit_source_tree(member, document);
-                        }
-
+                        pipeline_diagnostics.extend(check_file(
+                            workspace,
+                            file.into_path(),
+                            &arena,
+                        ));
                         arena.reset();
                     }
                     Err(err) => {
@@ -79,4 +64,27 @@ pub fn check(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
     );
 
     Ok(pipeline_diagnostics)
+}
+
+/// Parse the file at `path` into `arena`, dump its tree if the settings ask
+/// for it, and return the diagnostics from parsing it.
+fn check_file(workspace: &mut Workspace, path: PathBuf, arena: &Arena) -> Reports {
+    // We first need to convert this to a workspace member.
+    let Ok(contents) = fs::read_to_string(&path) else {
+        // @@Todo: add an error for the queue.
+        return Reports::default();
+    };
+
+    let id = workspace.reserve_member(path, contents);
+    let member = workspace.members.member(id);
+
+    let ParseQueryResult { node, diagnostics } = parse_source(ParseQuery::new(id, member), arena);
+
+    if let Some(document) = node
+        && workspace.settings.should_dump_ast()
+    {
+        emit_source_tree(member, document);
+    }
+
+    diagnostics
 }

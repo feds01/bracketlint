@@ -94,7 +94,7 @@ fn many_tags(lines: usize) -> String {
 
 #[cfg(test)]
 mod tests {
-    use bl_ast::Arena;
+    use bl_arena::Arena;
     use bl_fmt::{FormatQuery, FormatterOptions, fmt_module};
     use bl_parse::{ParseQuery, parse_source};
 

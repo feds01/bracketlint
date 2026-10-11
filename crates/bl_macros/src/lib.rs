@@ -54,24 +54,20 @@ macro_rules! try_syn_err {
 /// }
 /// ```
 ///
-/// will generate nodes `Foo`, `Bar`, and `Baz`, with the structure above, using
-/// the `AstNode` and `AstNodes` types for nodes and node lists. A tree lives in
-/// an arena, and each node that holds a child, or holds a node that does, takes
-/// the arena's lifetime `'a`, e.g. `Foo<'a>`.
+/// will generate the nodes `Foo`, `Bar` and `Baz`, with `AstNode` for each
+/// child and `AstNodes` for each list of children. A tree lives in an arena, so
+/// each node that holds a child, directly or through another node, takes the
+/// arena's lifetime, e.g. `Foo<'a>`.
 ///
-/// It will also generate:
-/// - A visitor trait for the tree (configurable name by `opts!` macro), which
-///   contains `visit_*` methods for each tree node. Each visit method has a
-///   different return type (declared in the trait). A version of this trait
-///   that takes `&self`, and one that takes `&mut self`, are created. The nodes
-///   are never mutable, since they are shared references into the arena.
-/// - A walker module for the tree (`walk`/`walk_mut_self`), which contains
-///   `walk_*` methods for each tree node. Each walk method visits its children
-///   (using the visitor) and returns the result as a structure mirroring the
-///   original node definition. For enums with variants all having a single
-///   member, the walker will also generate a `walk_*_same_children` function
-///   that will visit the enum member after matching on it, and return the
-///   result directly.
+/// It also generates:
+/// - The visitor traits `AstVisitor` and `AstVisitorMutSelf`, named after
+///   `visitor_trait_base_name`, with a `visit_*` method for each node, which
+///   takes `&self` or `&mut self`, and has a return type of its own. Nodes are
+///   never mutable, since they are shared references into the arena.
+/// - The walker modules `walk` and `walk_mut_self`, with a `walk_*` function
+///   for each node, which visits its children and returns their results in a
+///   structure that mirrors the node. For an enum whose every variant holds one
+///   node, `walk_*_same_children` returns that node's result directly.
 #[proc_macro]
 pub fn define_tree(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let def = parse_macro_input!(input as TreeDef);

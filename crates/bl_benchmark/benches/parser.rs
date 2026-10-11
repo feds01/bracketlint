@@ -1,4 +1,4 @@
-use bl_ast::Arena;
+use bl_arena::Arena;
 use bl_benchmark::TestCase;
 use bl_parse::{ParseQuery, parse_source};
 use divan::Bencher;

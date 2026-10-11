@@ -8,9 +8,10 @@
 
 use std::cell::Cell;
 
+use bl_arena::{Arena, ArenaVec};
 use bl_ast::{
-    self as ast, Arena, AstNode, AstNodes, ByteRange, Identifier, Keyword, SourceId, Span,
-    SpannedSource, VarExpr,
+    self as ast, AstNode, AstNodes, ByteRange, Identifier, Keyword, SourceId, Span, SpannedSource,
+    VarExpr,
 };
 use bl_lexer::{
     kw, tok,
@@ -20,7 +21,6 @@ use bl_reporting::{
     HasDiagnosticsMut,
     inline::{InlineSnippet, note_on_span},
 };
-use bumpalo::collections::Vec as ArenaVec;
 use derive_more::Deref;
 
 use crate::{
@@ -271,7 +271,7 @@ impl<'s, 'a> Parser<'s, 'a> {
         nodes: ArenaVec<'a, AstNode<'a, T>>,
         location: ByteRange,
     ) -> AstNodes<'a, T> {
-        AstNodes::new(nodes.into_bump_slice(), location)
+        AstNodes::new(nodes.into_slice(), location)
     }
 
     /// Create [AstNodes] with a span that ranges from the start [ByteRange] to
@@ -281,7 +281,7 @@ impl<'s, 'a> Parser<'s, 'a> {
         nodes: ArenaVec<'a, AstNode<'a, T>>,
         start: ByteRange,
     ) -> AstNodes<'a, T> {
-        AstNodes::new(nodes.into_bump_slice(), start.join(self.previous_pos()))
+        AstNodes::new(nodes.into_slice(), start.join(self.previous_pos()))
     }
 
     /// Create an error without wrapping it in an [Err] variant
@@ -512,7 +512,7 @@ impl<'s, 'a> Parser<'s, 'a> {
         // }
 
         let start = self.current_pos();
-        let mut children = bumpalo::vec![in self.arena];
+        let mut children = self.arena.vec();
 
         while self.peek().is_some() {
             match self.parse_statement() {
@@ -989,7 +989,8 @@ impl<'s, 'a> Parser<'s, 'a> {
         let name = self.parse_name()?;
         let args = if self.parse_token_fast(TokenKind::Colon).is_some() {
             let start = self.current_pos();
-            let mut args = bumpalo::vec![in self.arena; self.parse_filter_arg()?];
+            let mut args = self.arena.vec();
+            args.push(self.parse_filter_arg()?);
 
             // [Liquid filters] take a list of arguments, e.g. `f: a, b`.
             //
@@ -1202,7 +1203,7 @@ impl<'s, 'a> Parser<'s, 'a> {
         &mut self,
     ) -> ParseResult<(Option<AstNode<'a, ast::Name>>, AstNodes<'a, ast::Arg<'a>>)> {
         let mut reverse_modifier = None;
-        let mut params = bumpalo::vec![in self.arena];
+        let mut params = self.arena.vec();
         let start = self.current_pos();
 
         loop {
@@ -1270,7 +1271,8 @@ impl<'s, 'a> Parser<'s, 'a> {
     fn parse_for_target(&mut self) -> ParseResult<AstNode<'a, ast::ForTarget<'a>>> {
         let start = self.current_pos();
         let key = self.parse_name()?;
-        let mut items = bumpalo::vec![in self.arena; key];
+        let mut items = self.arena.vec();
+        items.push(key);
 
         loop {
             if self.parse_token_fast(TokenKind::Comma).is_none() {
@@ -1292,7 +1294,7 @@ impl<'s, 'a> Parser<'s, 'a> {
         stop: impl Fn(Keyword) -> bool,
     ) -> ParseResult<AstNode<'a, ast::Body<'a>>> {
         let start = self.current_pos();
-        let mut contents = bumpalo::vec![in self.arena];
+        let mut contents = self.arena.vec();
 
         while let Some(token) = self.peek() {
             if token.kind.is_tag_tree()
@@ -1315,7 +1317,7 @@ impl<'s, 'a> Parser<'s, 'a> {
     /// Parse an `if` block, or a Liquid `unless` block, which is written the
     /// same way apart from its opening and closing tags.
     fn parse_if_block(&mut self) -> ParseResult<AstNode<'a, ast::Statement<'a>>> {
-        let mut clauses = bumpalo::vec![in self.arena];
+        let mut clauses = self.arena.vec();
         let mut otherwise = None;
         let mut else_trim = ast::TrimMarker::default();
         let mut end_trim = None;
@@ -1416,7 +1418,7 @@ impl<'s, 'a> Parser<'s, 'a> {
 
         let leading = self.parse_body_until(is_clause)?;
 
-        let mut branches = bumpalo::vec![in self.arena];
+        let mut branches = self.arena.vec();
         let mut otherwise = None;
         let mut else_trim = ast::TrimMarker::default();
         let mut end_trim = None;
@@ -1498,7 +1500,8 @@ impl<'s, 'a> Parser<'s, 'a> {
     /// or `or`.
     fn parse_when_values(&mut self) -> ParseResult<AstNodes<'a, ast::Expr<'a>>> {
         let start = self.current_pos();
-        let mut values = bumpalo::vec![in self.arena; self.parse_expr()?];
+        let mut values = self.arena.vec();
+        values.push(self.parse_expr()?);
 
         while self
             .parse_token_fast(TokenKind::Comma)
@@ -1676,7 +1679,7 @@ impl<'s, 'a> Parser<'s, 'a> {
         peek_fn: impl Fn(TokenKind) -> bool,
         g: impl FnMut(&mut Self) -> ParseResult<U>,
     ) -> ParseResult<(AstNode<'a, ast::Body<'a>>, TokenKind, U)> {
-        let mut statements = bumpalo::vec![in self.arena];
+        let mut statements = self.arena.vec();
         let start = self.current_pos();
         let mut end: Option<_> = None;
 
@@ -1718,7 +1721,7 @@ impl<'s, 'a> Parser<'s, 'a> {
     }
 
     fn parse_args(&mut self) -> ParseResult<AstNodes<'a, ast::Arg<'a>>> {
-        let mut args = bumpalo::vec![in self.arena];
+        let mut args = self.arena.vec();
         let start = self.current_pos();
 
         while self.peek().is_some() {
@@ -1874,7 +1877,7 @@ impl<'s, 'a> Parser<'s, 'a> {
             {
                 g.parse_args()?
             } else {
-                g.nodes_with_span(bumpalo::vec![in g.arena], g.range())
+                g.nodes_with_span(g.arena.vec(), g.range())
             };
 
             Ok(g.node_with_span(
@@ -1916,7 +1919,7 @@ impl<'s, 'a> Parser<'s, 'a> {
                 g.parse_names()?
             } else {
                 // This is effectively a dummy range, since we don't have an alias.
-                g.nodes_with_span(bumpalo::vec![in g.arena], g.range())
+                g.nodes_with_span(g.arena.vec(), g.range())
             };
 
             Ok(g.node_with_span(
@@ -1927,7 +1930,7 @@ impl<'s, 'a> Parser<'s, 'a> {
     }
 
     fn parse_names(&mut self) -> ParseResult<AstNodes<'a, ast::Name>> {
-        let mut names = bumpalo::vec![in self.arena];
+        let mut names = self.arena.vec();
         let start = self.current_pos();
 
         while self.peek().is_some() {
@@ -2037,7 +2040,7 @@ impl<'s, 'a> Parser<'s, 'a> {
     }
 
     fn parse_assignments(&mut self) -> ParseResult<AstNodes<'a, ast::Assignment<'a>>> {
-        let mut assignments = bumpalo::vec![in self.arena];
+        let mut assignments = self.arena.vec();
         let start = self.current_pos();
 
         while self.peek().is_some() {

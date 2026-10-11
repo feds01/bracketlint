@@ -614,12 +614,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ded4057c258ba199e2d26386d3af3780957ecaee6c4ef4041c6b4b8b97c0b06"
 
 [[package]]
+name = "bl_arena"
+version = "0.1.0"
+dependencies = [
+ "bumpalo",
+]
+
+[[package]]
 name = "bl_ast"
 version = "0.1.0"
 dependencies = [
+ "bl_arena",
  "bl_macros",
  "bl_utils",
- "bumpalo",
  "bytecount",
  "derive_more",
  "index_vec",
@@ -646,6 +653,7 @@ dependencies = [
 name = "bl_benchmark"
 version = "0.1.0"
 dependencies = [
+ "bl_arena",
  "bl_ast",
  "bl_fmt",
  "bl_lexer",
@@ -713,12 +721,12 @@ name = "bl_parse"
 version = "0.1.0"
 dependencies = [
  "bitflags",
+ "bl_arena",
  "bl_ast",
  "bl_ast_utils",
  "bl_lexer",
  "bl_reporting",
  "bl_workspace",
- "bumpalo",
  "crossbeam-channel",
  "derive_more",
  "log",
@@ -770,6 +778,7 @@ dependencies = [
 name = "bl_tests"
 version = "0.1.0"
 dependencies = [
+ "bl_arena",
  "bl_ast",
  "bl_fmt",
  "bl_lints",
@@ -841,6 +850,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "argfile",
+ "bl_arena",
  "bl_ast",
  "bl_fmt",
  "bl_lints",

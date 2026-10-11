@@ -7,7 +7,8 @@ use std::{
     path::PathBuf,
 };
 
-use bl_ast::{Arena, Dialect};
+use bl_arena::Arena;
+use bl_ast::Dialect;
 use bl_fmt::{FormatQuery, FormatQueryResult, FormatterOptions, fmt_module};
 use bl_parse::{ParseQuery, ParseQueryResult, parse_source};
 use bl_reporting::Reports;

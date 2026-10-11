@@ -1,7 +1,7 @@
 //! The module contains all of the AST definitions for the templates that
 //! `bracketlint` supports parsing.
 //!
-//! A tree lives in an arena, a [bumpalo::Bump] that the parser is given, and
+//! A tree lives in an arena, a [bl_arena::Arena] that the parser is given, and
 //! each node refers to its children by reference into it. A tree isn't changed
 //! once it is parsed, and none of its nodes need dropping, so the whole tree is
 //! freed at once, with its arena.

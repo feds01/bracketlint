@@ -1,0 +1,8 @@
+[package]
+name = "bl_arena"
+version = "0.1.0"
+authors = { workspace = true }
+edition = { workspace = true }
+
+[dependencies]
+bumpalo = { workspace = true }
