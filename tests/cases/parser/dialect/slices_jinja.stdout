@@ -1,0 +1,47 @@
+info: parsed module '$DIR/slices_jinja.html' as jinja:
+body
+├─inline
+│ └─index_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "links"
+│   └─index
+│     └─slice_expr
+│       └─start
+│         └─lit_expr
+│           └─int_lit 1
+├─inline
+│ └─index_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "items"
+│   └─index
+│     └─slice_expr
+│       └─stop
+│         └─lit_expr
+│           └─int_lit 2
+├─inline
+│ └─index_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "items"
+│   └─index
+│     └─slice_expr
+│       └─step
+│         └─lit_expr
+│           └─int_lit 2
+└─inline
+  └─index_expr
+    ├─subject
+    │ └─var_expr
+    │   └─name "items"
+    └─index
+      └─bin_expr
+        ├─lhs
+        │ └─var_expr
+        │   └─name "i"
+        ├─operator `+`
+        └─rhs
+          └─lit_expr
+            └─int_lit 1
+

@@ -549,7 +549,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         &mut self,
         node: bl_ast::AstNodeRef<bl_ast::Block>,
     ) -> Result<Self::BlockRet, Self::Error> {
-        let bl_ast::Block { label, block_body, end_label, trim } = node.body();
+        let bl_ast::Block { label, scoped, required, block_body, end_label, trim } = node.body();
         let open = self.ctx.open_elements.clone();
 
         self.start_item(node.range().start());
@@ -558,6 +558,14 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             if let Some(label) = label {
                 this.push_hunk(" ");
                 this.visit_name(label.ast_ref())?;
+            }
+
+            if *scoped {
+                this.push_hunk(" scoped");
+            }
+
+            if *required {
+                this.push_hunk(" required");
             }
 
             Ok(())

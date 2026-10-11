@@ -348,6 +348,23 @@ impl AstVisitor for AstTreePrinter<'_> {
         Ok(TreeNode::branch("array_expr", children))
     }
 
+    type SliceExprRet = TreeNode;
+
+    fn visit_slice_expr(
+        &self,
+        node: ast::AstNodeRef<ast::SliceExpr>,
+    ) -> Result<Self::SliceExprRet, Self::Error> {
+        let walk::SliceExpr { start, stop, step } = walk::walk_slice_expr(self, node)?;
+
+        let parts = [("start", start), ("stop", stop), ("step", step)];
+        let children = parts
+            .into_iter()
+            .filter_map(|(label, part)| part.map(|part| TreeNode::branch(label, vec![part])))
+            .collect();
+
+        Ok(TreeNode::branch("slice_expr", children))
+    }
+
     type ArrowExprRet = TreeNode;
 
     fn visit_arrow_expr(
@@ -456,6 +473,12 @@ impl AstVisitor for AstTreePrinter<'_> {
         let walk::Block { label, block_body, end_label } = walk::walk_block(self, node)?;
 
         let mut children = label.into_iter().collect::<Vec<_>>();
+        if node.body().scoped {
+            children.push(TreeNode::leaf("scoped"));
+        }
+        if node.body().required {
+            children.push(TreeNode::leaf("required"));
+        }
         children.push(block_body);
         children.extend(end_label.map(|name| TreeNode::branch("end_label", vec![name])));
 

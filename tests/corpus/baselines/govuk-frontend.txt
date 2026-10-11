@@ -13,7 +13,7 @@ parse-error   packages/govuk-frontend/src/govuk/components/checkboxes/template.n
 ok            packages/govuk-frontend/src/govuk/components/cookie-banner/macro.njk
 ok            packages/govuk-frontend/src/govuk/components/cookie-banner/template.njk
 ok            packages/govuk-frontend/src/govuk/components/date-input/macro.njk
-parse-error   packages/govuk-frontend/src/govuk/components/date-input/template.njk
+ok            packages/govuk-frontend/src/govuk/components/date-input/template.njk
 ok            packages/govuk-frontend/src/govuk/components/details/macro.njk
 ok            packages/govuk-frontend/src/govuk/components/details/template.njk
 ok            packages/govuk-frontend/src/govuk/components/error-message/macro.njk
@@ -41,7 +41,7 @@ parse-error   packages/govuk-frontend/src/govuk/components/input/template.njk
 ok            packages/govuk-frontend/src/govuk/components/inset-text/macro.njk
 ok            packages/govuk-frontend/src/govuk/components/inset-text/template.njk
 ok            packages/govuk-frontend/src/govuk/components/label/macro.njk
-parse-error   packages/govuk-frontend/src/govuk/components/label/template.njk
+ok            packages/govuk-frontend/src/govuk/components/label/template.njk
 ok            packages/govuk-frontend/src/govuk/components/language-navigation/macro.njk
 ok            packages/govuk-frontend/src/govuk/components/language-navigation/template.njk
 ok            packages/govuk-frontend/src/govuk/components/notification-banner/macro.njk

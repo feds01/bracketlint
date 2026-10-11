@@ -22,7 +22,7 @@ ok            django/contrib/admin/templates/admin/edit_inline/tabular.html
 ok            django/contrib/admin/templates/admin/filter.html
 ok            django/contrib/admin/templates/admin/includes/fieldset.html
 ok            django/contrib/admin/templates/admin/includes/object_delete_summary.html
-parse-error   django/contrib/admin/templates/admin/index.html
+ok            django/contrib/admin/templates/admin/index.html
 ok            django/contrib/admin/templates/admin/invalid_setup.html
 ok            django/contrib/admin/templates/admin/login.html
 ok            django/contrib/admin/templates/admin/nav_sidebar.html

@@ -747,6 +747,17 @@ impl<'s, 'a> Parser<'s, 'a> {
 
                     let name = g.parse_name()?;
 
+                    // A custom tag can take more after the name, e.g. Django's
+                    // `{% get_admin_log 10 as log for_user user %}`, which is
+                    // kept as it is written.
+                    if !g.exhausted() {
+                        g.exhaust();
+                        return Ok(g.node_with_joined_span(
+                            ast::Statement::Tag(ast::Tag::Unprocessable(ast::UnprocessableTag {})),
+                            g.current_pos(),
+                        ));
+                    }
+
                     Ok(g.node_with_joined_span(
                         ast::Statement::Tag(ast::Tag::Assignment(ast::Assignment { name, value })),
                         g.range(),
@@ -1152,6 +1163,42 @@ impl<'s, 'a> Parser<'s, 'a> {
         Ok(self.node_with_span(ast::Expr::Range(ast::RangeExpr { start, end }), token.span))
     }
 
+    /// Parse a subscript in [Jinja] and [Twig], which is an expression, e.g.
+    /// `i + 1` in `items[i + 1]`, or a slice, e.g. `1:` in `items[1:]`, whose
+    /// parts can be left out, and which can have a step in Jinja.
+    ///
+    /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L840-L870
+    /// [Twig]: https://twig.symfony.com/doc/3.x/filters/slice.html
+    fn parse_subscript(&mut self) -> ParseResult<AstNode<'a, ast::Expr<'a>>> {
+        let span = self.current_pos();
+        let start = self.parse_slice_part()?;
+        if self.parse_token_fast(TokenKind::Colon).is_none() {
+            // Without a `:`, the subscript is an expression, which an empty
+            // subscript, e.g. `items[]`, is missing.
+            return match start {
+                Some(expr) => Ok(expr),
+                None => self.parse_compound_expr(0),
+            };
+        }
+
+        let stop = self.parse_slice_part()?;
+        let step = match self.parse_token_fast(TokenKind::Colon) {
+            Some(()) => self.parse_slice_part()?,
+            None => None,
+        };
+
+        Ok(self.node_with_joined_span(ast::Expr::Slice(ast::SliceExpr { start, stop, step }), span))
+    }
+
+    /// Parse a part of a slice, see [Self::parse_subscript], which is left out
+    /// when a `:` or the end of the subscript is next.
+    fn parse_slice_part(&mut self) -> ParseResult<Option<AstNode<'a, ast::Expr<'a>>>> {
+        match self.peek_kind() {
+            None | Some(TokenKind::Colon) => Ok(None),
+            Some(_) => Ok(Some(self.parse_compound_expr(0)?)),
+        }
+    }
+
     /// Parse an arrow function, e.g. `x => x.name`, or `(a, b) => a + b`
     /// with its parameters in parentheses.
     fn parse_arrow_function(&mut self, token: Token) -> ParseResult<AstNode<'a, ast::Expr<'a>>> {
@@ -1435,7 +1482,13 @@ impl<'s, 'a> Parser<'s, 'a> {
                 TokenKind::Dot => self.parse_property_access(subject, subject_span)?,
                 // Array index access syntax: ident[...]
                 TokenKind::Tree(Delimiter::Bracket, _) => {
-                    let index = self.in_tree(Delimiter::Bracket, None, |g| g.parse_expr())?;
+                    let index = self.in_tree(Delimiter::Bracket, None, |g| {
+                        if g.options.dialect.has_slices() {
+                            g.parse_subscript()
+                        } else {
+                            g.parse_expr()
+                        }
+                    })?;
 
                     self.node_with_joined_span(
                         ast::Expr::Index(ast::IndexExpr { subject, index }),
@@ -1500,6 +1553,16 @@ impl<'s, 'a> Parser<'s, 'a> {
             kind if kind.is_ident_like() => {
                 let field = self.parse_name()?;
 
+                Ok(self.node_with_joined_span(
+                    ast::Expr::Access(ast::AccessExpr { subject, field }),
+                    subject_span,
+                ))
+            }
+            // A keyword is a name after a `.`, e.g. `params.for`.
+            TokenKind::Keyword(keyword) => {
+                self.skip_fast(TokenKind::Keyword(keyword)); // `<kw>` Skip the keyword token.
+
+                let field = self.node_with_span(ast::Name::new(Identifier::from(0u32)), token.span);
                 Ok(self.node_with_joined_span(
                     ast::Expr::Access(ast::AccessExpr { subject, field }),
                     subject_span,
@@ -2190,7 +2253,7 @@ impl<'s, 'a> Parser<'s, 'a> {
         let token = *self.current_token();
 
         // Parse the header first, we should get `block <name>`.
-        let ((label, value), trim) = self.in_tag(Delimiter::Percent, |g| {
+        let ((label, scoped, required, value), trim) = self.in_tag(Delimiter::Percent, |g| {
             g.parse_token(TokenKind::Keyword(Keyword::Block))?;
 
             // If the next token is a string literal, we still accept it but
@@ -2205,6 +2268,24 @@ impl<'s, 'a> Parser<'s, 'a> {
 
             let label = g.parse_name_or_string()?;
 
+            // A [Jinja] block can be `scoped` and `required`, in that order.
+            //
+            // [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L296-L300
+            let modifiers = g.options.dialect.has_block_modifiers();
+            let modifier = |g: &mut Self, name: &str| {
+                let found = modifiers
+                    && g.peek().is_some_and(|token| {
+                        token.kind == TokenKind::Ident && g._source.hunk(token.span) == name
+                    });
+                if found {
+                    g.skip_fast(TokenKind::Ident); // `scoped` | `required` Skip the modifier.
+                }
+
+                found
+            };
+            let scoped = modifier(g, "scoped");
+            let required = modifier(g, "required");
+
             // A [Twig] block can be a single tag whose content is the value of
             // an expression, e.g. `{% block title page_title|title %}`.
             //
@@ -2215,7 +2296,7 @@ impl<'s, 'a> Parser<'s, 'a> {
                 None
             };
 
-            Ok((label, value))
+            Ok((label, scoped, required, value))
         })?;
 
         if let Some(value) = value {
@@ -2240,6 +2321,8 @@ impl<'s, 'a> Parser<'s, 'a> {
         let block = self.node_with_joined_span(
             ast::Block {
                 label: Some(label),
+                scoped,
+                required,
                 block_body,
                 end_label,
                 trim: ast::TrimTag { start: trim, end: end_trim },
