@@ -14,7 +14,7 @@ use bl_utils::stream::CompilerOutputStream;
 use index_vec::IndexVec;
 pub use member::Member;
 use member::MemberSourceMetadata;
-use settings::Settings;
+use settings::{DialectSource, Settings};
 
 #[derive(Default, Debug)]
 pub struct WorkspaceMembers {
@@ -30,12 +30,14 @@ impl WorkspaceMembers {
     }
 
     /// Reserve a member ready for setting its contents after it has completed
-    /// the first stage, i.e. the parsing.
+    /// the first stage, i.e. the parsing. The member is parsed in `dialect`,
+    /// which is picked as `dialect_source` says.
     pub fn reserve_member(
         &mut self,
         path: PathBuf,
         contents: String,
         dialect: Dialect,
+        dialect_source: DialectSource,
     ) -> SourceId {
         // Calculate the "line_map" for the member.
         //
@@ -43,7 +45,13 @@ impl WorkspaceMembers {
         let line_map = LineRanges::new_from_str(&contents);
         let metadata = MemberSourceMetadata::new(line_map);
 
-        let id = self.members.push(Member::new(path.clone(), contents, dialect, metadata));
+        let id = self.members.push(Member::new(
+            path.clone(),
+            contents,
+            dialect,
+            dialect_source,
+            metadata,
+        ));
         self.member_map.insert(path, id);
 
         id
@@ -110,8 +118,8 @@ impl Workspace {
     /// Reserve a member for the file at `path`, in the dialect that the
     /// [Settings] pick for it.
     pub fn reserve_member(&mut self, path: PathBuf, contents: String) -> SourceId {
-        let dialect = self.settings.parser_settings.dialect_for(&path);
-        self.members.reserve_member(path, contents, dialect)
+        let (dialect, dialect_source) = self.settings.parser_settings.dialect_for(&path);
+        self.members.reserve_member(path, contents, dialect, dialect_source)
     }
 
     pub fn output_stream(&self) -> CompilerOutputStream {

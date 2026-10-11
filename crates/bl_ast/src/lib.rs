@@ -8,7 +8,7 @@ mod location;
 mod source;
 
 pub use ast::*;
-pub use dialect::Dialect;
+pub use dialect::{Dialect, ForeignSyntax, Syntax};
 pub use keywords::Keyword;
 pub use location::{ByteRange, SourceId, Span, SpannedSource};
 pub use source::{HasSource, LineRanges, TempSourceMap};

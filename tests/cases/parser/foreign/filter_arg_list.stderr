@@ -1,0 +1,16 @@
+error: unexpectedly encountered a `,`
+ --> $DIR/filter_arg_list.html:1:24
+  |
+1 | {{ price | money: "USD", 2 }}
+  |                        -
+  |
+  = help: a filter's list of arguments, e.g. `f: a, key: b`, is Liquid syntax, pass `--dialect liquid` if this is a Liquid template
+  = note: this file is parsed as Django, the default, since neither `--dialect` nor its extension names a dialect
+error: unexpectedly encountered a `:`
+ --> $DIR/filter_arg_list.html:2:44
+  |
+2 | {{ product.available | default: allow_false: true }}
+  |                                            -
+  |
+  = help: a filter's list of arguments, e.g. `f: a, key: b`, is Liquid syntax, pass `--dialect liquid` if this is a Liquid template
+  = note: this file is parsed as Django, the default, since neither `--dialect` nor its extension names a dialect

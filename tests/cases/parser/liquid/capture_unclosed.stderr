@@ -3,3 +3,5 @@ error: expected a closing `{% endcapture %}` tag
   |
 1 | {% capture greeting %}Hello {{ name }}
   |                                       -
+  |
+  = note: this file is parsed as Liquid, from `--dialect liquid`

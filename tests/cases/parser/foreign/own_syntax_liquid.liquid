@@ -1,0 +1,9 @@
+// run=pass, stage=check
+
+{%- include "card", product: product, show: true -%}
+{{ price | money: "USD", 2 }}
+{% if a %}x{% elsif b %}y{% else %}z{% endif %}
+{% for item in items %}{{ item }}{% else %}No items{% endfor %}
+{% raw %}{{ x }}{% endraw %}
+{% comment %}{# Liquid leaves out a comment's contents #}{% endcomment %}
+{% raw %}{# Output as it is written #}{% endraw %}

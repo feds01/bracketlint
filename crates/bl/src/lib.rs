@@ -20,20 +20,33 @@ use bl_workspace::{Workspace, WorkspaceBuilder, settings::Settings};
 use cli::LintCommand;
 use crash::crash_handler;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ExitStatus {
-    /// Linting was successful and there were no linting errors.
+    /// Linting was successful and there were no linting errors or warnings.
     Success,
+    /// Linting was successful and there were linting warnings, but no errors.
+    /// A warning doesn't fail the run, unless `--deny-warnings` is passed.
+    Warnings,
     /// Linting was successful but there were linting errors.
     Failure,
     /// Linting failed.
     Error,
 }
 
+impl ExitStatus {
+    /// The status when warnings fail the run, as `--deny-warnings` asks.
+    fn deny_warnings(self) -> Self {
+        match self {
+            ExitStatus::Warnings => ExitStatus::Failure,
+            status => status,
+        }
+    }
+}
+
 impl From<ExitStatus> for ExitCode {
     fn from(status: ExitStatus) -> Self {
         match status {
-            ExitStatus::Success => ExitCode::from(0),
+            ExitStatus::Success | ExitStatus::Warnings => ExitCode::from(0),
             ExitStatus::Failure => ExitCode::from(1),
             ExitStatus::Error => ExitCode::from(2),
         }
@@ -106,7 +119,8 @@ pub fn check(args: LintCommand) -> Result<ExitStatus> {
     let mut workspace = builder.build();
 
     let messages = commands::check::check(&files, &mut workspace)?;
-    consume_diagnostics(&workspace, messages)
+    let status = consume_diagnostics(&workspace, messages)?;
+    Ok(if args.deny_warnings { status.deny_warnings() } else { status })
 }
 
 fn fmt(args: LintCommand) -> Result<ExitStatus> {
@@ -135,7 +149,8 @@ fn fmt(args: LintCommand) -> Result<ExitStatus> {
     let mut workspace = builder.build();
 
     let messages = commands::fmt::fmt(&files, &mut workspace)?;
-    consume_diagnostics(&workspace, messages)
+    let status = consume_diagnostics(&workspace, messages)?;
+    Ok(if args.deny_warnings { status.deny_warnings() } else { status })
 }
 
 fn version() -> Result<ExitStatus> {
@@ -172,9 +187,29 @@ fn consume_diagnostics(workspace: &Workspace, diagnostics: Reports) -> Result<Ex
             pluralise!(err_count),
             pluralise!(warn_count)
         );
-
-        return Ok(ExitStatus::Failure);
     }
 
-    Ok(ExitStatus::Success)
+    // A warning points out something that is likely wrong, such as another
+    // dialect's syntax, but doesn't stop a template from being checked or
+    // formatted, so only errors fail the run, unless `--deny-warnings` is
+    // passed.
+    if err_count != 0 {
+        Ok(ExitStatus::Failure)
+    } else if warn_count != 0 {
+        Ok(ExitStatus::Warnings)
+    } else {
+        Ok(ExitStatus::Success)
+    }
+}
+
+#[cfg(test)]
+mod test_super {
+    use super::*;
+
+    #[test]
+    fn test_deny_warnings() {
+        assert_eq!(ExitStatus::Warnings.deny_warnings(), ExitStatus::Failure);
+        assert_eq!(ExitStatus::Success.deny_warnings(), ExitStatus::Success);
+        assert_eq!(ExitStatus::Failure.deny_warnings(), ExitStatus::Failure);
+    }
 }

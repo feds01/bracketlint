@@ -1,0 +1,8 @@
+error: unexpectedly encountered a `:`
+ --> $DIR/colon_args.html:1:36
+  |
+1 | {% include "card.html" with product: product %}
+  |                                    -
+  |
+  = help: `name: value` arguments are Liquid syntax, pass `--dialect liquid` if this is a Liquid template
+  = note: this file is parsed as Django, the default, since neither `--dialect` nor its extension names a dialect

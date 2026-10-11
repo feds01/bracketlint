@@ -9,7 +9,7 @@ use bl_reporting::{
     inline::{InlineSnippet, note_on_span},
 };
 use bl_workspace::Member;
-use diagnostics::ParserDiagnostics;
+use diagnostics::{ParserDiagnostics, note_dialect};
 use parser::Parser;
 
 mod diagnostics;
@@ -90,6 +90,8 @@ pub fn parse_source<'a>(query: ParseQuery, arena: &'a Arena) -> ParseQueryResult
     // Lex the contents of the module or interactive block
     let LexerMetadata { tokens, mut diagnostics } =
         Lexer::new(spanned, id, member.dialect).tokenise();
+    let has_lexer_errors = diagnostics.has_errors();
+    let mut reports = diagnostics.into_reports(Reports::from, Reports::from);
 
     // @@Todo: Make this a query instead so that we can call it as a debugging
     // tool.
@@ -99,11 +101,9 @@ pub fn parse_source<'a>(query: ParseQuery, arena: &'a Arena) -> ParseQueryResult
     // emit_tokens(id, member, &tokens);
 
     // Check if the lexer has errors...
-    if diagnostics.has_errors() {
-        return ParseQueryResult {
-            node: None,
-            diagnostics: diagnostics.into_reports(Reports::from, Reports::from),
-        };
+    if has_lexer_errors {
+        note_dialect(&mut reports, member);
+        return ParseQueryResult { node: None, diagnostics: reports };
     }
 
     // Create a new import resolver in the event of more modules that
@@ -115,10 +115,9 @@ pub fn parse_source<'a>(query: ParseQuery, arena: &'a Arena) -> ParseQueryResult
     // message queue, regardless of it being an error or not.
     let node = parser.parse_document();
 
-    ParseQueryResult {
-        node: Some(node),
-        diagnostics: diagnostics.into_reports(Reports::from, Reports::from),
-    }
+    reports.extend(diagnostics.into_reports(Reports::from, Reports::from));
+    note_dialect(&mut reports, member);
+    ParseQueryResult { node: Some(node), diagnostics: reports }
 }
 
 pub fn emit_source_tree(member: &Member, document: AstNodeRef<Document>) {

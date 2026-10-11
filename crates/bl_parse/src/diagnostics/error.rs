@@ -1,6 +1,6 @@
 //! Any parser errors that the parser can emit and report.
 
-use bl_ast::{Keyword, Span};
+use bl_ast::{ForeignSyntax, Keyword, Span};
 use bl_lexer::token::TokenKind;
 use bl_reporting::{ReportBuilder, Reports, help};
 use derive_more::Constructor;
@@ -22,6 +22,10 @@ pub struct ParseError {
 
     /// An optional token in question that was received byt shouldn't of been
     received: Option<TokenKind>,
+
+    /// The syntax of another dialect that the error is at, if any, e.g. a `,`
+    /// between a tag's arguments in Jinja, which the error names.
+    foreign: Option<ForeignSyntax>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -88,6 +92,10 @@ impl From<ParseError> for Reports {
         // If the generated error has suggested tokens that aren't empty.
         if !expected.is_empty() {
             help_notes.push(help!("expected {expected}"));
+        }
+
+        if let Some(foreign) = err.foreign {
+            help_notes.push(help!("{}", foreign.help()));
         }
 
         // Now actually build the report

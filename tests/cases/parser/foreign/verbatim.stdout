@@ -1,0 +1,12 @@
+info: parsed module '$DIR/verbatim.jinja' as jinja:
+body
+├─generic_tag
+│ ├─name "verbatim"
+│ └─args
+├─inline
+│ └─var_expr
+│   └─name "x"
+└─generic_tag
+  ├─name "endverbatim"
+  └─args
+

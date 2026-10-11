@@ -1,0 +1,4 @@
+// run=fail, stage=check
+
+{{ price | money: "USD", 2 }}
+{{ product.available | default: allow_false: true }}

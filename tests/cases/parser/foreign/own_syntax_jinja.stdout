@@ -1,0 +1,40 @@
+info: parsed module '$DIR/own_syntax_jinja.jinja' as jinja:
+body
+├─if
+│ ├─clauses
+│ │ ├─if_clause
+│ │ │ ├─condition
+│ │ │ │ └─var_expr
+│ │ │ │   └─name "a"
+│ │ │ └─clause_body
+│ │ │   └─body
+│ │ │     └─text
+│ │ └─elif_clause
+│ │   ├─condition
+│ │   │ └─var_expr
+│ │   │   └─name "b"
+│ │   └─clause_body
+│ │     └─body
+│ │       └─text
+│ └─otherwise
+│   └─body
+│     └─text
+├─for
+│ ├─target
+│ │ └─name "item"
+│ ├─iterator
+│ │ └─var_expr
+│ │   └─name "items"
+│ ├─loop_body
+│ │ └─body
+│ │   └─inline
+│ │     └─var_expr
+│ │       └─name "item"
+│ └─loop_empty
+│   └─body
+│     └─text
+├─raw
+│ └─body
+│   └─text
+└─comment
+

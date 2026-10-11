@@ -1,0 +1,10 @@
+info: parsed module '$DIR/trim_marker_plus.liquid' as liquid:
+body
+└─inline
+  └─access_expr
+    ├─subject
+    │ └─var_expr
+    │   └─name "user"
+    └─field
+      └─name "name"
+

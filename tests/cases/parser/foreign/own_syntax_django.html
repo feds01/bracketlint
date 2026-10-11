@@ -1,0 +1,8 @@
+// run=pass, stage=check
+
+{% include "card.html" with product=product %}
+{{ price|floatformat:2 }}
+{% if a %}x{% elif b %}y{% else %}z{% endif %}
+{% for item in items %}{{ item }}{% empty %}No items{% endfor %}
+{% verbatim %}{{ x }}{% endverbatim %}
+{# A comment #}

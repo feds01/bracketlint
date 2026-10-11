@@ -5,3 +5,5 @@ error: expected a closing `{% endif %}` tag
   |  ________________-
 4 | | %}
   | |_-
+  |
+  = note: this file is parsed as Liquid, from `--dialect liquid`

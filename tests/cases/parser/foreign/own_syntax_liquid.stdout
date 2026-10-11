@@ -1,0 +1,69 @@
+info: parsed module '$DIR/own_syntax_liquid.liquid' as liquid:
+body
+├─include
+│ ├─lit_expr
+│ │ └─str_lit "card"
+│ └─context
+│   ├─arg
+│   │ ├─name "product"
+│   │ └─var_expr
+│   │   └─name "product"
+│   └─arg
+│     ├─name "show"
+│     └─lit_expr
+│       └─bool_lit true
+├─inline
+│ └─filtered_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "price"
+│   └─filter
+│     ├─name "money"
+│     └─args
+│       ├─arg
+│       │ └─lit_expr
+│       │   └─str_lit "USD"
+│       └─arg
+│         └─lit_expr
+│           └─int_lit 2
+├─if
+│ ├─clauses
+│ │ ├─if_clause
+│ │ │ ├─condition
+│ │ │ │ └─var_expr
+│ │ │ │   └─name "a"
+│ │ │ └─clause_body
+│ │ │   └─body
+│ │ │     └─text
+│ │ └─elif_clause
+│ │   ├─condition
+│ │   │ └─var_expr
+│ │   │   └─name "b"
+│ │   └─clause_body
+│ │     └─body
+│ │       └─text
+│ └─otherwise
+│   └─body
+│     └─text
+├─for
+│ ├─target
+│ │ └─name "item"
+│ ├─iterator
+│ │ └─var_expr
+│ │   └─name "items"
+│ ├─loop_body
+│ │ └─body
+│ │   └─inline
+│ │     └─var_expr
+│ │       └─name "item"
+│ └─loop_empty
+│   └─body
+│     └─text
+├─raw
+│ └─body
+│   └─text
+├─comment
+└─raw
+  └─body
+    └─text
+

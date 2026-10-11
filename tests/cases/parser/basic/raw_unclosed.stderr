@@ -3,3 +3,5 @@ error: expected a closing `{% endraw %}` tag
   |
 1 | {% raw %}<p>{{ user.name }}</p>
   |                                -
+  |
+  = note: this file is parsed as Jinja, from `--dialect jinja`

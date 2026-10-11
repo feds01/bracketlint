@@ -18,7 +18,7 @@ pub struct TestingInput {
     /// filename of the test, useful for when looking for resources
     /// that have been generated that are related to the file.
     ///
-    /// N.B. the `filename` does not contain `.html` prefix.
+    /// N.B. the `filename` does not contain the extension, e.g. `.html`.
     pub filename: String,
 
     /// Generated test metadata for the case

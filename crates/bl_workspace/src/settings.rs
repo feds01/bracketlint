@@ -148,10 +148,30 @@ pub struct ParserSettings {
 }
 
 impl ParserSettings {
-    /// The dialect to parse the file at `path` in.
-    pub fn dialect_for(&self, path: &Path) -> Dialect {
-        self.dialect.or_else(|| Dialect::from_path(path)).unwrap_or_default()
+    /// The dialect to parse the file at `path` in, and how it is picked.
+    pub fn dialect_for(&self, path: &Path) -> (Dialect, DialectSource) {
+        if let Some(dialect) = self.dialect {
+            return (dialect, DialectSource::Flag);
+        }
+
+        match Dialect::from_path(path) {
+            Some(dialect) => (dialect, DialectSource::Extension),
+            None => (Dialect::default(), DialectSource::Default),
+        }
     }
+}
+
+/// How the dialect of a file is picked, see [ParserSettings::dialect_for].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DialectSource {
+    /// `--dialect` names it.
+    Flag,
+
+    /// The file's extension identifies it, see [Dialect::from_path].
+    Extension,
+
+    /// Nothing names it, so it is the default, Django.
+    Default,
 }
 
 pub struct Settings {
@@ -211,12 +231,24 @@ mod test_super {
     #[test]
     fn test_dialect_for() {
         let by_extension = ParserSettings { dump_ast: false, dialect: None };
-        assert_eq!(by_extension.dialect_for(Path::new("cart.liquid")), Dialect::Liquid);
-        assert_eq!(by_extension.dialect_for(Path::new("index.html")), Dialect::Django);
+        assert_eq!(
+            by_extension.dialect_for(Path::new("cart.liquid")),
+            (Dialect::Liquid, DialectSource::Extension)
+        );
+        assert_eq!(
+            by_extension.dialect_for(Path::new("index.html")),
+            (Dialect::Django, DialectSource::Default)
+        );
 
         // `--dialect` wins over the extension.
         let overridden = ParserSettings { dump_ast: false, dialect: Some(Dialect::Twig) };
-        assert_eq!(overridden.dialect_for(Path::new("cart.liquid")), Dialect::Twig);
-        assert_eq!(overridden.dialect_for(Path::new("index.html")), Dialect::Twig);
+        assert_eq!(
+            overridden.dialect_for(Path::new("cart.liquid")),
+            (Dialect::Twig, DialectSource::Flag)
+        );
+        assert_eq!(
+            overridden.dialect_for(Path::new("index.html")),
+            (Dialect::Twig, DialectSource::Flag)
+        );
     }
 }

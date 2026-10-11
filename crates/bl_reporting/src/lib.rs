@@ -62,6 +62,16 @@ pub enum ReportNoteKind {
     Note,
 }
 
+impl From<&ReportNoteKind> for Level<'static> {
+    fn from(kind: &ReportNoteKind) -> Self {
+        match kind {
+            ReportNoteKind::Help => Level::HELP,
+            ReportNoteKind::Info => Level::INFO,
+            ReportNoteKind::Note => Level::NOTE,
+        }
+    }
+}
+
 impl ReportNoteKind {
     /// Get the string representation of the label.
     pub fn as_str(&self) -> &'static str {

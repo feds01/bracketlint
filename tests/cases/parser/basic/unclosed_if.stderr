@@ -3,3 +3,5 @@ error: expected a closing `{% endif %}` tag
   |
 4 | </div>
   |       -
+  |
+  = note: this file is parsed as Django, the default, since neither `--dialect` nor its extension names a dialect

@@ -1,5 +1,5 @@
 //! UI Test runner, this file will read the `cases` directory for
-//! `.html` files.
+//! `.html`, `.jinja`, `.liquid` and `.twig` files.
 //!
 //! In the event of a `should_pass` case, the resultant run should not return
 //! any errors. However, it's possible for the case to generate warnings
@@ -27,7 +27,9 @@
 //! snapshots count from the first line of the template.
 //!
 //! A case can also set the template dialect to parse it in, e.g.
-//! `dialect=liquid`. Otherwise it is parsed as Django, like any `.html` file.
+//! `dialect=liquid`, as `--dialect` does. Otherwise it is parsed in the
+//! dialect that its extension names, e.g. `.liquid`, or as Django, like any
+//! `.html` file.
 #![cfg(test)]
 
 use std::{
@@ -312,4 +314,4 @@ fn assert_formats_stably(test: &TestingInput, case: &CaseCopy) {
 }
 
 // Generate all the tests
-generate_tests!("./cases/", r"^*\.html$", "ui", handle_test);
+generate_tests!("./cases/", r"\.(html|jinja|liquid|twig)$", "ui", handle_test);

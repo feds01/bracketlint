@@ -12,7 +12,7 @@ use bl_ast::Dialect;
 use bl_fmt::{FormatQuery, FormatQueryResult, FormatterOptions, fmt_module};
 use bl_parse::{ParseQuery, ParseQueryResult, parse_source};
 use bl_reporting::Reports;
-use bl_workspace::WorkspaceMembers;
+use bl_workspace::{WorkspaceMembers, settings::DialectSource};
 use strum::{EnumString, IntoStaticStr};
 
 use super::source::Source;
@@ -125,7 +125,12 @@ fn check(dialect: Dialect, contents: &str) -> Outcome {
 /// Parse and format `contents` in `dialect`, as `bracketlint fmt` does.
 pub(crate) fn format(dialect: Dialect, contents: &str) -> Result<String, Outcome> {
     let mut members = WorkspaceMembers::new();
-    let id = members.reserve_member(PathBuf::from("template"), contents.to_string(), dialect);
+    let id = members.reserve_member(
+        PathBuf::from("template"),
+        contents.to_string(),
+        dialect,
+        DialectSource::Flag,
+    );
     let member = members.member(id);
     let arena = Arena::new();
 

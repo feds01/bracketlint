@@ -3,10 +3,13 @@ error: unexpectedly reached the end of input
   |
 2 | {% for item in %}
   |               -
+  |
+  = note: this file is parsed as Django, the default, since neither `--dialect` nor its extension names a dialect
 error: expected a tag, however received the keyword `endfor`
  --> $DIR/parse_error.html:4:4
   |
 4 | {% endfor %}
   |    ------
   |
-  = info: expected a `identifier`
+  = help: expected a `identifier`
+  = note: this file is parsed as Django, the default, since neither `--dialect` nor its extension names a dialect

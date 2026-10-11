@@ -1,0 +1,16 @@
+warning: `{% verbatim %}` isn't a tag in Jinja
+ --> $DIR/verbatim.jinja:1:4
+  |
+1 | {% verbatim %}{{ x }}{% endverbatim %}
+  |    --------
+  |
+  = help: `{% verbatim %}` is how Django and Twig write `{% raw %}`, pass `--dialect` with the template's dialect if it is one of them
+  = note: this file is parsed as Jinja, from its `.jinja` extension
+warning: `{% endverbatim %}` isn't a tag in Jinja
+ --> $DIR/verbatim.jinja:1:25
+  |
+1 | {% verbatim %}{{ x }}{% endverbatim %}
+  |                         -----------
+  |
+  = help: `{% endverbatim %}` is how Django and Twig write `{% endraw %}`, pass `--dialect` with the template's dialect if it is one of them
+  = note: this file is parsed as Jinja, from its `.jinja` extension
