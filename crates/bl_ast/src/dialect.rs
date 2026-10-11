@@ -321,6 +321,26 @@ impl Dialect {
         matches!(self, Dialect::Twig)
     }
 
+    /// Whether a subscript can be a slice, e.g. `items[1:]`, as in [Jinja],
+    /// whose slices can also have a step, e.g. `items[::2]`, and [Twig]. A
+    /// subscript is an expression there, e.g. `items[i + 1]`, rather than a
+    /// value, as in Django and Liquid.
+    ///
+    /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L840-L870
+    /// [Twig]: https://twig.symfony.com/doc/3.x/filters/slice.html
+    pub fn has_slices(self) -> bool {
+        matches!(self, Dialect::Jinja | Dialect::Twig)
+    }
+
+    /// Whether a block can be `scoped`, which gives it the variables of the
+    /// scope that it is in, or `required`, which a child template has to
+    /// override, as in [Jinja], e.g. `{% block item scoped required %}`.
+    ///
+    /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L296-L300
+    pub fn has_block_modifiers(self) -> bool {
+        matches!(self, Dialect::Jinja)
+    }
+
     /// Whether a value can be an arrow function, as in [Twig], e.g.
     /// `x => x.name` or `(a, b) => a + b`, which filters such as `map` take.
     ///
@@ -488,6 +508,12 @@ impl Dialect {
             // `a == b and b > c`, which is `(a == b) > c` here. Unlike in
             // Python, `**` is left-associative, so `a ** b ** c` is
             // `(a ** b) ** c`. A test binds tighter than any operator.
+            //
+            // Nunjucks, which GOV.UK's templates in the corpus are written in,
+            // also has JavaScript's `===` and `!==`, and takes a name as the
+            // key of a mapping, e.g. `{for: id}`. Jinja has neither, so those
+            // templates don't parse as Jinja, and Nunjucks isn't a dialect of
+            // its own yet.
             //
             // [Jinja's parser]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L536-L624
             Dialect::Jinja => match op {

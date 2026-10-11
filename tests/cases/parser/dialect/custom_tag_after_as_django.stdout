@@ -1,0 +1,4 @@
+info: parsed module '$DIR/custom_tag_after_as_django.html' as django:
+body
+└─unprocessable_tag
+

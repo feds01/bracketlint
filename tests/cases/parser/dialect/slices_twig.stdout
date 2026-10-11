@@ -1,0 +1,26 @@
+info: parsed module '$DIR/slices_twig.html' as twig:
+body
+├─inline
+│ └─index_expr
+│   ├─subject
+│   │ └─lit_expr
+│   │   └─str_lit '12345'
+│   └─index
+│     └─slice_expr
+│       ├─start
+│       │ └─lit_expr
+│       │   └─int_lit 1
+│       └─stop
+│         └─lit_expr
+│           └─int_lit 2
+└─inline
+  └─index_expr
+    ├─subject
+    │ └─var_expr
+    │   └─name "items"
+    └─index
+      └─slice_expr
+        └─stop
+          └─var_expr
+            └─name "length"
+

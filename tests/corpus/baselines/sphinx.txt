@@ -3,9 +3,9 @@ ok            sphinx/themes/basic/changes/rstsource.html
 ok            sphinx/themes/basic/changes/versionchanges.html
 ok            sphinx/themes/basic/defindex.html
 ok            sphinx/themes/basic/domainindex.html
-parse-error   sphinx/themes/basic/genindex-single.html
+ok            sphinx/themes/basic/genindex-single.html
 ok            sphinx/themes/basic/genindex-split.html
-parse-error   sphinx/themes/basic/genindex.html
+ok            sphinx/themes/basic/genindex.html
 ok            sphinx/themes/basic/globaltoc.html
 ok            sphinx/themes/basic/layout.html
 ok            sphinx/themes/basic/localtoc.html

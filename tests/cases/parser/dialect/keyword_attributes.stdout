@@ -1,0 +1,22 @@
+info: parsed module '$DIR/keyword_attributes.html' as django:
+body
+├─inline
+│ └─access_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "params"
+│   └─field
+│     └─name "for"
+└─if
+  └─clauses
+    └─if_clause
+      ├─condition
+      │ └─access_expr
+      │   ├─subject
+      │   │ └─var_expr
+      │   │   └─name "params"
+      │   └─field
+      │     └─name "if"
+      └─clause_body
+        └─body
+

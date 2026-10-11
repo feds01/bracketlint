@@ -332,6 +332,16 @@ define_tree! {
         pub otherwise: OptionalChild!(Expr),
     }
 
+    /// A slice of a sequence, e.g. `items[1:]`, in Jinja and Twig. Each part
+    /// can be left out, and only Jinja's slices have a step, e.g. `[::2]`.
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct SliceExpr {
+        pub start: OptionalChild!(Expr),
+        pub stop: OptionalChild!(Expr),
+        pub step: OptionalChild!(Expr),
+    }
+
     /// An arrow function in Twig, e.g. `x => x.name` or `(a, b) => a + b`.
     #[derive(Clone, Debug, PartialEq)]
     #[node]
@@ -493,6 +503,7 @@ define_tree! {
         Mapping(MappingExpr),
         Cond(CondExpr),
         Arrow(ArrowExpr),
+        Slice(SliceExpr),
         Bin(BinExpr),
         Var(VarExpr),
         Call(CallExpr),
@@ -528,6 +539,13 @@ define_tree! {
     #[node]
     pub struct Block {
         pub label: OptionalChild!(Name),
+
+        /// Whether the block is `scoped`, as Jinja can make it.
+        pub scoped: bool,
+
+        /// Whether the block is `required`, as Jinja can make it.
+        pub required: bool,
+
         pub block_body: Child!(Body),
 
         /// The label repeated in `{% endblock label %}`, if there is one.

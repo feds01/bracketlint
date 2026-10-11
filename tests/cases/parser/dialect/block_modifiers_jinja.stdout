@@ -1,0 +1,12 @@
+info: parsed module '$DIR/block_modifiers_jinja.html' as jinja:
+body
+├─block
+│ ├─name "item"
+│ ├─scoped
+│ └─body
+└─block
+  ├─name "body"
+  ├─scoped
+  ├─required
+  └─body
+

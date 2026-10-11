@@ -1,0 +1,6 @@
+// run=pass, stage=fmt, dialect=jinja
+
+{%- block cell scoped -%}
+<div>{{ cell.source }}</div>
+{%- endblock cell -%}
+{% block body scoped required %}{% endblock %}
