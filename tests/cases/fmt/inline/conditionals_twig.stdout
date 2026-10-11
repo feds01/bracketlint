@@ -1,0 +1,2 @@
+<p class="{{ active ? 'on' : 'off' }}">{{ name ?? 'Anonymous' }}</p>
+

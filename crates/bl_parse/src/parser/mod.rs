@@ -885,6 +885,10 @@ impl<'s, 'a> Parser<'s, 'a> {
             .node_with_joined_span(ast::Statement::Inline(ast::Inline { expr, trim }), token.span))
     }
 
+    /// Parse an expression with the binary operators that bind at least as
+    /// tightly as `min_precedence`, see [ast::Dialect::infix_binding_power].
+    /// At the lowest precedence, it can also be a conditional expression, see
+    /// [Parser::parse_conditional], which binds looser than any operator.
     fn parse_compound_expr(
         &mut self,
         min_precedence: u8,
@@ -898,6 +902,13 @@ impl<'s, 'a> Parser<'s, 'a> {
             // handled at the statement level, since it isn't really a binary
             // operator...
             let (Some(op), consumed_tokens) = self.parse_bin_op() else {
+                if min_precedence == ast::Dialect::CONDITIONAL_BINDING_POWER
+                    && self.at_conditional()
+                {
+                    lhs = self.parse_conditional(lhs, lhs_span)?;
+                    continue;
+                }
+
                 break;
             };
 
@@ -934,6 +945,58 @@ impl<'s, 'a> Parser<'s, 'a> {
         }
 
         Ok(lhs)
+    }
+
+    /// Whether a conditional expression continues the expression before it,
+    /// see [Parser::parse_conditional].
+    fn at_conditional(&self) -> bool {
+        match self.peek_kind() {
+            Some(TokenKind::Keyword(Keyword::If)) => self.options.dialect.has_inline_if(),
+            Some(TokenKind::Question) => self.options.dialect.has_conditional_operators(),
+            _ => false,
+        }
+    }
+
+    /// Parse the rest of a conditional expression after `expr`, at `span`:
+    /// `then if condition else otherwise` in [Jinja], whose `else` part can be
+    /// left out, and `condition ? then : otherwise` in [Twig], whose `:` part
+    /// can be left out. Each part can be a conditional expression too, apart
+    /// from Jinja's condition, so `a if b else c if d else e` is
+    /// `a if b else (c if d else e)`.
+    ///
+    /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L521-L534
+    /// [Twig]: https://github.com/twigphp/Twig/blob/v3.30.0/src/ExpressionParser/Infix/ConditionalTernaryExpressionParser.php#L29-L41
+    fn parse_conditional(
+        &mut self,
+        expr: AstNode<'a, ast::Expr<'a>>,
+        span: ByteRange,
+    ) -> ParseResult<AstNode<'a, ast::Expr<'a>>> {
+        let dialect = self.options.dialect;
+
+        let (condition, then) = if self.parse_token_fast(TokenKind::Keyword(Keyword::If)).is_some()
+        {
+            (self.parse_compound_expr(ast::Dialect::CONDITIONAL_BINDING_POWER + 1)?, expr)
+        } else {
+            self.skip_fast(TokenKind::Question); // `?` Skip the operator.
+            (expr, self.parse_compound_expr(0)?)
+        };
+
+        let otherwise = match self.peek_kind() {
+            Some(TokenKind::Keyword(Keyword::Else)) if dialect.has_inline_if() => {
+                self.skip_fast(TokenKind::Keyword(Keyword::Else)); // `else` Skip the keyword.
+                Some(self.parse_compound_expr(0)?)
+            }
+            Some(TokenKind::Colon) if dialect.has_conditional_operators() => {
+                self.skip_fast(TokenKind::Colon); // `:` Skip the separator.
+                Some(self.parse_compound_expr(0)?)
+            }
+            _ => None,
+        };
+
+        Ok(self.node_with_joined_span(
+            ast::Expr::Cond(ast::CondExpr { condition, then, otherwise }),
+            span,
+        ))
     }
 
     fn parse_expr(&mut self) -> ParseResult<AstNode<'a, ast::Expr<'a>>> {
@@ -1456,6 +1519,11 @@ impl<'s, 'a> Parser<'s, 'a> {
             TokenKind::Percent => (Some(ast::BinOp::Mod), 1),
             TokenKind::StarStar => (Some(ast::BinOp::Pow), 1),
             TokenKind::Tilde => (Some(ast::BinOp::Concat), 1),
+            TokenKind::QuestionQuestion => (Some(ast::BinOp::Coalesce), 1),
+            TokenKind::Question => match self.peek_second() {
+                Some(tok!(Colon)) => (Some(ast::BinOp::Elvis), 2),
+                _ => (None, 0),
+            },
 
             TokenKind::Keyword(Keyword::And) => (Some(ast::BinOp::And), 1),
             TokenKind::Keyword(Keyword::Or) => (Some(ast::BinOp::Or), 1),

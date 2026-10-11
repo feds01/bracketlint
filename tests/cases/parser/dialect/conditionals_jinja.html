@@ -1,0 +1,7 @@
+// run=pass, stage=check, dialect=jinja
+
+{{ a if b else c }}
+{{ a if b }}
+{{ a if b else c if d else e }}
+{{ f(a if b else c) }}
+{% if (a if b else c) %}{% endif %}

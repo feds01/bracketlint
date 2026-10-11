@@ -182,6 +182,10 @@ define_tree! {
         Pow,
         /// `~`, which concatenates strings, in Jinja and Twig
         Concat,
+        /// `??`, the value on its left unless it is null or undefined, in Twig
+        Coalesce,
+        /// `?:`, the value on its left if it is truthy, in Twig
+        Elvis,
     }
 
     impl fmt::Display for BinOp {
@@ -208,6 +212,8 @@ define_tree! {
                 BinOp::Mod => write!(f, "%"),
                 BinOp::Pow => write!(f, "**"),
                 BinOp::Concat => write!(f, "~"),
+                BinOp::Coalesce => write!(f, "??"),
+                BinOp::Elvis => write!(f, "?:"),
             }
         }
     }
@@ -300,6 +306,18 @@ define_tree! {
     #[node]
     pub struct ArrayExpr {
         pub children: Children!(Expr),
+    }
+
+    /// A conditional expression, which is `then` if `condition` is true, and
+    /// `otherwise` if not, e.g. `then if condition else otherwise` in Jinja,
+    /// and `condition ? then : otherwise` in Twig. Without `otherwise`, it is
+    /// undefined in Jinja, and an empty string in Twig.
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct CondExpr {
+        pub condition: Child!(Expr),
+        pub then: Child!(Expr),
+        pub otherwise: OptionalChild!(Expr),
     }
 
     /// A mapping, e.g. `{'a': 1, b: 2}` in Jinja, where it is a dict, and Twig.
@@ -453,6 +471,7 @@ define_tree! {
         Tuple(TupleExpr),
         Group(GroupExpr),
         Mapping(MappingExpr),
+        Cond(CondExpr),
         Bin(BinExpr),
         Var(VarExpr),
         Call(CallExpr),

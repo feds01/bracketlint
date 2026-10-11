@@ -1,0 +1,7 @@
+error: unexpectedly encountered the keyword `if`
+ --> $DIR/conditionals_django.html:1:6
+  |
+1 | {{ a if b else c }}
+  |      --
+  |
+  = note: this file is parsed as Django, from `--dialect django`

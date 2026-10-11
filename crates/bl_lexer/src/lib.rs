@@ -356,6 +356,18 @@ impl<'lex> Lexer<'lex> {
                 },
                 ':' => TokenKind::Colon,
                 ',' => TokenKind::Comma,
+                // The conditional `a ? b : c`, and `a ?? b`, in [Twig]. The
+                // `?:` in `a ?: b` is a `?` and a `:`, since it can also be
+                // written `? :`.
+                //
+                // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#other-operators
+                '?' if self.dialect.has_conditional_operators() => match self.peek() {
+                    '?' => {
+                        self.skip_ascii();
+                        TokenKind::QuestionQuestion
+                    }
+                    _ => TokenKind::Question,
+                },
                 '.' => match self.peek() {
                     '.' => {
                         self.skip_ascii();

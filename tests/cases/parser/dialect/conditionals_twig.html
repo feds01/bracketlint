@@ -1,0 +1,9 @@
+// run=pass, stage=check, dialect=twig
+
+{{ a ? b : c }}
+{{ a ? 'yes' }}
+{{ a ? b ? c : d : e }}
+{{ a ?: 'no' }}
+{{ a ? : 'no' }}
+{{ a ?? b ?? 'none' }}
+{{ {key: a ? b : c} }}

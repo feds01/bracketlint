@@ -304,6 +304,23 @@ impl Dialect {
         matches!(self, Dialect::Django)
     }
 
+    /// Whether `then if condition else otherwise` is an expression, as in
+    /// [Jinja], whose `else otherwise` can be left out.
+    ///
+    /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#if-expression
+    pub fn has_inline_if(self) -> bool {
+        matches!(self, Dialect::Jinja)
+    }
+
+    /// Whether `?` is an operator, as in [Twig]: the conditional
+    /// `condition ? then : otherwise`, whose `: otherwise` can be left out,
+    /// and the binary `a ?: b` and `a ?? b`.
+    ///
+    /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#other-operators
+    pub fn has_conditional_operators(self) -> bool {
+        matches!(self, Dialect::Twig)
+    }
+
     /// Whether [`nil`], `null`, `blank` and [`empty`] are literals, along with
     /// `true` and `false`, e.g. `{% if items == empty %}`. The other dialects
     /// read them as names like any other.
@@ -411,7 +428,9 @@ impl Dialect {
                 | BinOp::FloorDiv
                 | BinOp::Mod
                 | BinOp::Pow
-                | BinOp::Concat => return None,
+                | BinOp::Concat
+                | BinOp::Coalesce
+                | BinOp::Elvis => return None,
             },
 
             // [Jinja's parser] has a function for each level, from `parse_or`
@@ -438,7 +457,7 @@ impl Dialect {
                 BinOp::Mul | BinOp::Div | BinOp::FloorDiv | BinOp::Mod => left_assoc(70),
                 BinOp::Pow => left_assoc(80),
                 BinOp::Is | BinOp::IsNot => left_assoc(100),
-                BinOp::Contains => return None,
+                BinOp::Contains | BinOp::Coalesce | BinOp::Elvis => return None,
             },
 
             // Liquid has no precedence between `and` and `or`, and evaluates
@@ -461,16 +480,21 @@ impl Dialect {
                 | BinOp::FloorDiv
                 | BinOp::Mod
                 | BinOp::Pow
-                | BinOp::Concat => return None,
+                | BinOp::Concat
+                | BinOp::Coalesce
+                | BinOp::Elvis => return None,
             },
 
             // Twig's own precedences, from [`CoreExtension`]. A test binds
             // tighter than the comparisons, `not` and the arithmetic below
             // `**`. Twig 3.15 deprecates `~` at 40 in favour of 27, below `+`
-            // and `-`, but 40 is what it still parses with.
+            // and `-`, but 40 is what it still parses with. It does the same
+            // with `??` at 300, which is more than a `u8` holds, so it is 250
+            // here, which still binds tighter than `**` and looser than `-`.
             //
             // [`CoreExtension`]: https://github.com/twigphp/Twig/blob/v3.30.0/src/Extension/CoreExtension.php#L343-L391
             Dialect::Twig => match op {
+                BinOp::Elvis => right_assoc(5),
                 BinOp::Or => left_assoc(10),
                 BinOp::And => left_assoc(15),
                 BinOp::Eq
@@ -486,12 +510,22 @@ impl Dialect {
                 BinOp::Mul | BinOp::Div | BinOp::FloorDiv | BinOp::Mod => left_assoc(60),
                 BinOp::Is | BinOp::IsNot => left_assoc(100),
                 BinOp::Pow => right_assoc(200),
+                BinOp::Coalesce => right_assoc(250),
                 BinOp::Contains => return None,
             },
         };
 
         Some(power)
     }
+
+    /// How tightly a conditional expression binds, e.g. [Jinja]'s
+    /// `a if b else c` and [Twig]'s `b ? a : c`: looser than any binary
+    /// operator, so `a or b if c` is `(a or b) if c`, see
+    /// [Dialect::infix_binding_power].
+    ///
+    /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L521-L534
+    /// [Twig]: https://github.com/twigphp/Twig/blob/v3.30.0/src/ExpressionParser/Infix/ConditionalTernaryExpressionParser.php#L53-L56
+    pub const CONDITIONAL_BINDING_POWER: u8 = 0;
 
     /// How tightly the prefix operator `op` binds: its operand takes every
     /// binary operator whose left binding power is at least this, see
@@ -797,6 +831,11 @@ mod test_super {
 
             let power = dialect.infix_binding_power(BinOp::Contains);
             assert_eq!(power.is_some(), dialect.is_liquid(), "`contains` in {dialect}");
+
+            for op in [BinOp::Coalesce, BinOp::Elvis] {
+                let power = dialect.infix_binding_power(op);
+                assert_eq!(power.is_some(), dialect == Dialect::Twig, "`{op}` in {dialect}");
+            }
         }
     }
 
