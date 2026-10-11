@@ -138,8 +138,11 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         }
     }
 
-    /// Push a newline into the buffer.
+    /// End the current line, without any spaces at its end, e.g. the one
+    /// that a piece of HTML ends with before a tag that starts a line.
     pub fn end_line(&mut self) {
+        let len = self.buffer.trim_end_matches([' ', '\t']).len();
+        self.buffer.truncate(len);
         self.buffer.push('\n');
     }
 
