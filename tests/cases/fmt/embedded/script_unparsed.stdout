@@ -1,0 +1,8 @@
+<div>
+    <script>
+const total = ;
+render(total);
+    </script>
+    <p>{{ total }}</p>
+</div>
+

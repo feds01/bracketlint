@@ -4,7 +4,7 @@
 
 use adapters::ExternalLanguagesEngineAdaptor;
 use bl_ast::{AstNodeRef, AstVisitorMutSelf, Document, SourceId};
-use bl_reporting::Reports;
+use bl_reporting::{DiagnosticsMut, Reports};
 use bl_workspace::Member;
 
 pub use crate::options::FormatterOptions;
@@ -48,10 +48,12 @@ pub fn fmt_module(query: FormatQuery) -> FormatQueryResult {
     let mut formatter =
         visitor::Formatter::new(engine, options, source, spanned, member.dialect, buffer);
 
-    match formatter.visit_document(document) {
-        Ok(_) => FormatQueryResult { buffer: formatter.into_buffer(), diagnostics: Reports::new() },
-        Err(error) => {
-            FormatQueryResult { buffer: formatter.into_buffer(), diagnostics: Reports::from(error) }
-        }
+    let result = formatter.visit_document(document);
+    let (buffer, mut diagnostics) = formatter.finish();
+    diagnostics.maybe_add_error(result);
+
+    FormatQueryResult {
+        buffer,
+        diagnostics: diagnostics.into_reports(Reports::from, Reports::from),
     }
 }

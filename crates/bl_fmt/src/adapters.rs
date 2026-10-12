@@ -260,9 +260,11 @@ pub enum HtmlPart {
     Html { range: ByteRange, formatted: Option<Formatted>, opens: Vec<String> },
 
     /// The content at `range` in the piece of one of the verbatim elements,
-    /// see [is_verbatim], e.g. the code of a `<script>`, which is kept exactly
-    /// as it is written.
-    Verbatim { range: ByteRange },
+    /// see [is_verbatim], e.g. the code of a `<script>` that a tag splits,
+    /// which is kept exactly as it is written. The code of a `<script>` or
+    /// `<style>` that no tag splits is too when it doesn't parse, as
+    /// `unparsed` reports.
+    Verbatim { range: ByteRange, unparsed: Option<Unparsed> },
 
     /// The closing tag at `range` in the piece of an element `name` that opens
     /// before the piece, e.g. the `</li>` in `{% endif %}</li>`.
@@ -278,10 +280,29 @@ impl HtmlPart {
             HtmlPart::Html { range, formatted, opens } => {
                 HtmlPart::Html { range: shift(range), formatted, opens }
             }
-            HtmlPart::Verbatim { range } => HtmlPart::Verbatim { range: shift(range) },
+            HtmlPart::Verbatim { range, unparsed } => {
+                let unparsed =
+                    unparsed.map(|unparsed| Unparsed { range: shift(unparsed.range), ..unparsed });
+                HtmlPart::Verbatim { range: shift(range), unparsed }
+            }
             HtmlPart::Close { range, name } => HtmlPart::Close { range: shift(range), name },
         }
     }
+}
+
+/// The code of a `<script>` or `<style>` that no template tag splits, i.e.
+/// whose opening and closing tags are both in a piece of HTML, which doesn't
+/// parse as the code of its element.
+#[derive(Debug)]
+pub struct Unparsed {
+    /// The language of the code, e.g. JavaScript in a `<script>`.
+    pub language: LanguageType,
+
+    /// Where the engine first fails to parse the code, in the piece.
+    pub range: ByteRange,
+
+    /// Why the engine fails to parse it there.
+    pub message: String,
 }
 
 /// A trait that represents a type that has the capability to parse HTML.
@@ -289,7 +310,9 @@ pub trait HasHTMLParsing<'ctx> {
     /// Format `contents`, a piece of HTML between template tags, in its
     /// parts: the closing tags of elements that open before it, the content
     /// of the verbatim elements in it, see [is_verbatim], and the HTML between
-    /// them. A part is never empty.
+    /// them. A part is never empty. The code of a `<script>` or `<style>` that
+    /// no template tag splits is formatted with the HTML around it, or is a
+    /// verbatim part when it doesn't parse.
     fn format(&mut self, contents: &str) -> FmtResult<Vec<HtmlPart>>;
 }
 

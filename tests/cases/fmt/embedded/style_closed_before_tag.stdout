@@ -1,4 +1,8 @@
-<style>p { margin: 0 }</style>
+<style>
+p {
+    margin: 0;
+}
+</style>
 {% if x %}
     <p>{{ x }}</p>
 {% endif %}
