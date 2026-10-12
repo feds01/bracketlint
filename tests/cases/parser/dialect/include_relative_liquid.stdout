@@ -1,0 +1,17 @@
+info: parsed module '$DIR/include_relative_liquid.html' as liquid:
+body
+├─include_relative
+│ ├─path somedir/footer.html
+│ └─context
+├─capture
+│ ├─name "content"
+│ └─body
+│   └─include_relative
+│     ├─path {{ profile.content }}
+│     └─context
+├─text
+├─inline
+│ └─var_expr
+│   └─name "include_relative"
+└─text
+

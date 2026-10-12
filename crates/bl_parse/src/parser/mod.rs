@@ -836,7 +836,7 @@ impl<'s, 'a> Parser<'s, 'a> {
 
                 // Effectively, special functions that we keep track of.
                 Keyword::Extends => self.parse_extends_statement(),
-                Keyword::Include => self.parse_include_statement(),
+                Keyword::Include | Keyword::IncludeRelative => self.parse_include_statement(),
                 Keyword::Load => self.parse_load_statement(),
                 Keyword::Import => self.parse_import_statement(),
                 _ => {
@@ -2896,18 +2896,35 @@ impl<'s, 'a> Parser<'s, 'a> {
         })
     }
 
-    /// Parse an [`include`] statement, i.e.
+    /// Parse an [`include`] statement, or Jekyll's [`include_relative`], i.e.
     ///
     /// ```html
     /// {% include "header.html" with title="Header" %}
+    /// {% include_relative sections/intro.md %}
     /// ```
     ///
     /// [`include`]: https://docs.djangoproject.com/en/stable/ref/templates/builtins/#include
+    /// [`include_relative`]: https://jekyllrb.com/docs/includes/#including-files-relative-to-another-file
     fn parse_include_statement(&mut self) -> ParseResult<AstNode<'a, ast::Statement<'a>>> {
         // Parse the header first, we should get `block <name>`.
         self.in_tree(Delimiter::Percent, None, |g| {
-            g.parse_token(TokenKind::Keyword(Keyword::Include))?;
-            let template = g.parse_template_name()?;
+            let relative =
+                g.parse_token_fast(TokenKind::Keyword(Keyword::IncludeRelative)).is_some();
+            if !relative {
+                g.parse_token(TokenKind::Keyword(Keyword::Include))?;
+            }
+
+            // Jekyll's [`include`] can name the file with a path, which the
+            // lexer reads as one token, e.g. `nav/{{ name }}.html`.
+            //
+            // [`include`]: https://jekyllrb.com/docs/includes/#using-variables-names-for-the-include-file
+            let template = match g.peek().copied() {
+                Some(Token { kind: TokenKind::Path, span }) => {
+                    g.skip_fast(TokenKind::Path); // `<path>` Skip the path token.
+                    g.node_with_span(ast::Expr::Path(ast::PathExpr {}), span)
+                }
+                _ => g.parse_template_name()?,
+            };
 
             // A [Jinja] `include` can end with `with context` or
             // `without context`, rather than the variables to pass.
@@ -2921,7 +2938,8 @@ impl<'s, 'a> Parser<'s, 'a> {
 
             // With comma separated arguments, the comma after the template
             // starts them rather than `with`, as in Liquid's [`render`], e.g.
-            // `{% include "card", product: product %}`.
+            // `{% include "card", product: product %}`. Jekyll's parameters
+            // are arguments too, written `name=value`, e.g. `title="Docs"`.
             //
             // [`render`]: https://shopify.github.io/liquid/tags/template/#render-parameters
             let context = if with_context.is_some() {
@@ -2940,6 +2958,7 @@ impl<'s, 'a> Parser<'s, 'a> {
                     template,
                     context,
                     with_context,
+                    relative,
                 })),
                 g.range(),
             ))

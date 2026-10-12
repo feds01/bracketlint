@@ -650,6 +650,14 @@ define_tree! {
         pub end: Child!(Expr),
     }
 
+    /// A path that names a file without quotes, e.g. `nav/links.html` in
+    /// Jekyll's `{% include nav/links.html %}`. It can have variables in it,
+    /// e.g. `icons/{{ icon }}.svg`, and is kept as it is written.
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct PathExpr {
+    }
+
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub enum Expr {
@@ -669,7 +677,8 @@ define_tree! {
         MacroCall(MacroCallExpr),
         Access(AccessExpr),
         Index(IndexExpr),
-        FilteredExpr(FilteredExpr)
+        FilteredExpr(FilteredExpr),
+        Path(PathExpr)
     }
 
     impl Expr<'_> {
@@ -748,6 +757,11 @@ define_tree! {
         ///
         /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#import-context-behavior
         pub with_context: Option<bool>,
+
+        /// Whether the tag is Jekyll's `include_relative`, which names a file
+        /// relative to this template, rather than in the site's `_includes`
+        /// directory.
+        pub relative: bool,
     }
 
     /// A Liquid [`render`] tag, which renders another template with variables of

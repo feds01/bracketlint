@@ -1,0 +1,19 @@
+info: parsed module '$DIR/include_variable_path_liquid.html' as liquid:
+body
+├─include
+│ ├─path {{ page.my_variable }}
+│ └─context
+├─include
+│ ├─path analytics/{{ platform }}.html
+│ └─context
+├─include
+│ ├─path {{ _include_path }}
+│ └─context
+│   └─arg
+│     ├─name "lang"
+│     └─var_expr
+│       └─name "lang"
+└─include
+  ├─path {{ file | append: ".html" }}
+  └─context
+

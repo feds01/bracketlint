@@ -10,12 +10,7 @@ body
 │     └─name "username"
 ├─text
 ├─include
-│ ├─access_expr
-│ │ ├─subject
-│ │ │ └─var_expr
-│ │ │   └─name "icon-github"
-│ │ └─field
-│ │   └─name "svg"
+│ ├─path icon-github.svg
 │ └─context
 └─text
 

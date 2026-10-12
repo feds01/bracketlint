@@ -1,0 +1,12 @@
+<head>
+    {%- include head.html -%}
+    {% include analytics/{{ platform }}.html %}
+</head>
+<body>
+    {% include vendor/anchor_headings.html html=content beforeHeading="true" anchorBody="<svg viewBox=\"0 0 16 16\"></svg>" %}
+    <div>{% capture body %}{% include_relative {{ page.body }} %}{% endcapture %}</div>
+{% include image.html url="https://jekyllrb.com"
+max-width="200px" %}
+    {% include   {{ file }}   lang=lang %}
+</body>
+

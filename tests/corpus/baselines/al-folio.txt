@@ -44,14 +44,14 @@ ok            _includes/selected_papers.liquid
 ok            _includes/video.liquid
 ok            _layouts/about.liquid
 ok            _layouts/archive.liquid
-parse-error   _layouts/bib.liquid
+ok            _layouts/bib.liquid
 ok            _layouts/book-review.liquid
 ok            _layouts/book-shelf.liquid
 ok            _layouts/course.liquid
-parse-error   _layouts/cv.liquid
+ok            _layouts/cv.liquid
 ok            _layouts/default.liquid
 ok            _layouts/distill.liquid
 ok            _layouts/none.liquid
 ok            _layouts/page.liquid
 ok            _layouts/post.liquid
-parse-error   _layouts/profiles.liquid
+ok            _layouts/profiles.liquid

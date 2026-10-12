@@ -320,7 +320,9 @@ impl AstVisitor for AstTreePrinter<'_> {
 
         let mut children = vec![template, TreeNode::branch("context", context)];
         children.extend(TreeNode::context_leaf(node.body().with_context));
-        Ok(TreeNode::branch("include", children))
+
+        let label = if node.body().relative { "include_relative" } else { "include" };
+        Ok(TreeNode::branch(label, children))
     }
 
     type IntLitRet = TreeNode;
@@ -356,6 +358,15 @@ impl AstVisitor for AstTreePrinter<'_> {
         node: ast::AstNodeRef<ast::StrLit>,
     ) -> Result<Self::StrLitRet, Self::Error> {
         Ok(TreeNode::leaf(labelled("str_lit", self.source.hunk(node.range()), "")))
+    }
+
+    type PathExprRet = TreeNode;
+
+    fn visit_path_expr(
+        &self,
+        node: ast::AstNodeRef<ast::PathExpr>,
+    ) -> Result<Self::PathExprRet, Self::Error> {
+        Ok(TreeNode::leaf(labelled("path", self.source.hunk(node.range()), "")))
     }
 
     type ArrayExprRet = TreeNode;

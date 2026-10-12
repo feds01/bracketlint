@@ -299,7 +299,9 @@ impl<'lex> Lexer<'lex> {
             ));
         }
 
-        let kind = if let Some(mut info) = self.tree.get() {
+        let kind = if self.at_include_path() {
+            self.include_path()
+        } else if let Some(mut info) = self.tree.get() {
             match self.next()? {
                 '%' => match self.peek() {
                     '}' => {
@@ -773,14 +775,19 @@ impl<'lex> Lexer<'lex> {
     fn name_kind(&self, name: &str) -> TokenKind {
         // Some keywords are only keywords as the name of a tag, so that they are
         // still names elsewhere, e.g. in `{{ liquid }}`: Liquid's [`liquid`]
-        // tag, and the tags of Twig's [`guard`] blocks.
+        // tag, the tags of Twig's [`guard`] blocks, and Jekyll's
+        // [`include_relative`].
         //
         // [`liquid`]: https://shopify.github.io/liquid/tags/template/#liquid
         // [`guard`]: https://twig.symfony.com/doc/3.x/tags/guard.html
+        // [`include_relative`]: https://jekyllrb.com/docs/includes/#including-files-relative-to-another-file
         let tag_keyword = match name {
             "liquid" if self.dialect.has_liquid_tag() => Some(Keyword::Liquid),
             "guard" if self.dialect.has_guard_blocks() => Some(Keyword::Guard),
             "endguard" if self.dialect.has_guard_blocks() => Some(Keyword::EndGuard),
+            "include_relative" if self.dialect.include_takes_paths() => {
+                Some(Keyword::IncludeRelative)
+            }
             _ => None,
         };
 
@@ -827,6 +834,65 @@ impl<'lex> Lexer<'lex> {
                     TokenKind::Tree(Delimiter::Percent, _)
                 )
         })
+    }
+
+    /// Whether the file that an `include` or `include_relative` tag names is
+    /// next, after the tag's name, as a path rather than a string. Jekyll's
+    /// [`include`] names it with a path in Liquid, e.g.
+    /// `{% include nav/links.html %}`, and Shopify's with a string, e.g.
+    /// `{% include 'product' %}`, which is lexed as usual.
+    ///
+    /// [`include`]: https://jekyllrb.com/docs/includes/
+    fn at_include_path(&self) -> bool {
+        self.dialect.include_takes_paths()
+            && self.tree.get().is_some_and(|info| {
+                matches!(
+                    self.tokens[info.start - 1..],
+                    [tok!(Tree(Delimiter::Percent, _)), kw!(Include) | kw!(IncludeRelative)]
+                )
+            })
+            && !self.is_eof()
+            && !matches!(self.peek(), '"' | '\'')
+            && !self.at_closing_delimiter(0)
+            && !(self.is_trim_marker(self.peek()) && self.at_closing_delimiter(1))
+    }
+
+    /// Lex the path that Jekyll's `include` names a file with, up to the
+    /// whitespace or the end of the tag after it. A `{{ }}` in it is part of
+    /// it, spaces and all, e.g. `{{ page.lang }}/head.html`, as
+    /// [Jekyll's source] reads it.
+    ///
+    /// [Jekyll's source]: https://github.com/jekyll/jekyll/blob/v4.4.1/lib/jekyll/tags/include.rb#L10-L28
+    fn include_path(&mut self) -> TokenKind {
+        let rest = unsafe { self.as_slice() };
+        let mut len = 0;
+
+        while let Some(c) = rest[len..].chars().next() {
+            let ahead = &rest[len..];
+
+            // A variable runs up to its `}}`. A `{{` without one before the
+            // end of the tag is a character of the path, as it is in Jekyll.
+            if let Some(inner) = ahead.strip_prefix("{{")
+                && let Some(close) = inner.find("}}")
+                && inner.find("%}").is_none_or(|end| close < end)
+            {
+                len += "{{".len() + close + "}}".len();
+                continue;
+            }
+
+            // A comma ends it too, since Jekyll's [file names] have none, and
+            // it starts Shopify's arguments, e.g. `{% include card, a: 1 %}`.
+            //
+            // [file names]: https://github.com/jekyll/jekyll/blob/v4.4.1/lib/jekyll/tags/include.rb#L16
+            if c.is_whitespace() || c == ',' || self.strip_trim_marker(ahead).starts_with("%}") {
+                break;
+            }
+
+            len += c.len_utf8();
+        }
+
+        self.offset.update(|x| x + len);
+        TokenKind::Path
     }
 
     /// Whether a line of a `liquid` tag starts here, i.e. the tree is a `{% %}`
@@ -1175,6 +1241,67 @@ mod tests {
 
         // The other dialects have no `guard` blocks.
         assert!(matches!(lex("{% guard %}", Dialect::Jinja)[..], tree!(Percent, [tok!(Ident)])));
+    }
+
+    #[test]
+    fn include_names_a_path_in_liquid() {
+        use crate::kw;
+
+        // The path is one token, up to the whitespace or the end of the tag
+        // after it, with the spaces in its `{{ }}`.
+        for source in [
+            "{% include /nav/links.html %}",
+            "{%- include {{ page.lang }}/head.html -%}",
+            "{% include icons/{{ icon | append: '.svg' }}%}",
+        ] {
+            assert!(
+                matches!(
+                    lex(source, Dialect::Liquid)[..],
+                    tree!(Percent, [kw!(Include), tok!(Path)])
+                ),
+                "{source}"
+            );
+        }
+
+        assert!(matches!(
+            lex("{% include_relative a.md title=\"A\" -%}", Dialect::Liquid)[..],
+            tree!(Percent, [kw!(IncludeRelative), tok!(Path), tok!(Ident), tok!(Eq), tok!(Str)])
+        ));
+
+        // A `{{` without its `}}` before the end of the tag is part of a word.
+        assert!(matches!(
+            lex("{% include {{ file %}", Dialect::Liquid)[..],
+            tree!(Percent, [kw!(Include), tok!(Path), tok!(Ident)])
+        ));
+
+        // A file named with a string is lexed as usual, as Shopify names it.
+        assert!(matches!(
+            lex("{% include 'product' with p %}", Dialect::Liquid)[..],
+            tree!(Percent, [kw!(Include), tok!(Str), kw!(With), tok!(Ident)])
+        ));
+
+        // A comma ends the path, and starts Shopify's arguments.
+        assert!(matches!(
+            lex("{% include card, a: 1 %}", Dialect::Liquid)[..],
+            tree!(
+                Percent,
+                [kw!(Include), tok!(Path), tok!(Comma), tok!(Ident), tok!(Colon), tok!(Number(_))]
+            )
+        ));
+
+        // `include_relative` is a name elsewhere, and the other dialects have
+        // no paths.
+        assert!(matches!(
+            lex("{{ include_relative }}", Dialect::Liquid)[..],
+            tree!(Brace, [tok!(Ident)])
+        ));
+        assert!(matches!(
+            lex("{% include nav/links.html %}", Dialect::Jinja)[..],
+            tree!(
+                Percent,
+                [kw!(Include), tok!(Ident), tok!(Slash), tok!(Ident), tok!(Dot), tok!(Ident)]
+            )
+        ));
     }
 
     #[test]

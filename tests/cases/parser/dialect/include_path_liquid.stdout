@@ -1,0 +1,18 @@
+info: parsed module '$DIR/include_path_liquid.html' as liquid:
+body
+├─include
+│ ├─path footer.html
+│ └─context
+├─include
+│ ├─path /analytics-providers/google.html
+│ └─context
+├─include
+│ ├─path components/nav/children.html
+│ └─context
+├─include
+│ ├─path css/activation.scss.liquid
+│ └─context
+└─include
+  ├─path product
+  └─context
+

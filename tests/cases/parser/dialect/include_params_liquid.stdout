@@ -1,0 +1,59 @@
+info: parsed module '$DIR/include_params_liquid.html' as liquid:
+body
+├─include
+│ ├─path note.html
+│ └─context
+│   └─arg
+│     ├─name "content"
+│     └─lit_expr
+│       └─str_lit "A \"quoted\" note"
+├─include
+│ ├─path note.html
+│ └─context
+│   └─arg
+│     ├─name "content"
+│     └─lit_expr
+│       └─str_lit 'It\'s a note'
+├─include
+│ ├─path nav.html
+│ └─context
+│   ├─arg
+│   │ ├─name "all"
+│   │ └─access_expr
+│   │   ├─subject
+│   │   │ └─var_expr
+│   │   │   └─name "include"
+│   │   └─field
+│   │     └─name "all"
+│   ├─arg
+│   │ ├─name "lang"
+│   │ └─access_expr
+│   │   ├─subject
+│   │   │ └─var_expr
+│   │   │   └─name "page"
+│   │   └─field
+│   │     └─name "lang"
+│   └─arg
+│     ├─name "max-width"
+│     └─lit_expr
+│       └─int_lit 200
+└─include
+  ├─path image.html
+  └─context
+    ├─arg
+    │ ├─name "url"
+    │ └─lit_expr
+    │   └─str_lit "https://jekyllrb.com"
+    ├─arg
+    │ ├─name "max-width"
+    │ └─lit_expr
+    │   └─str_lit "200px"
+    └─arg
+      ├─name "alt"
+      └─access_expr
+        ├─subject
+        │ └─var_expr
+        │   └─name "site"
+        └─field
+          └─name "title"
+
