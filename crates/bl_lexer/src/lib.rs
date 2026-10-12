@@ -754,36 +754,29 @@ impl<'lex> Lexer<'lex> {
         }
 
         let name = &self.spanned.source[start..self.offset.get()];
+        self.name_kind(name)
+    }
 
-        // `liquid` is only a keyword as the name of a [`liquid` tag], so that it
-        // is still a name elsewhere, e.g. in `{{ liquid }}`.
+    /// What the name `name` is: a keyword that is only one as the name of a
+    /// tag, one of the dialect's other keywords, or a name.
+    fn name_kind(&self, name: &str) -> TokenKind {
+        // Some keywords are only keywords as the name of a tag, so that they are
+        // still names elsewhere, e.g. in `{{ liquid }}`: Liquid's [`liquid`]
+        // tag, and the tags of Twig's [`guard`] blocks.
         //
-        // [`liquid` tag]: https://shopify.github.io/liquid/tags/template/#liquid
-        if name == "liquid" && self.dialect.has_liquid_tag() && self.at_tag_name() {
-            return TokenKind::Keyword(Keyword::Liquid);
-        }
-
-        // `guard` and `endguard` are only keywords as the names of the tags of
-        // a `{% guard %}` block, as in [Twig], so that they are still names
-        // elsewhere, e.g. in `{{ guard }}`.
-        //
-        // [Twig]: https://twig.symfony.com/doc/3.x/tags/guard.html
-        let guard = match name {
-            "guard" => Some(Keyword::Guard),
-            "endguard" => Some(Keyword::EndGuard),
+        // [`liquid`]: https://shopify.github.io/liquid/tags/template/#liquid
+        // [`guard`]: https://twig.symfony.com/doc/3.x/tags/guard.html
+        let tag_keyword = match name {
+            "liquid" if self.dialect.has_liquid_tag() => Some(Keyword::Liquid),
+            "guard" if self.dialect.has_guard_blocks() => Some(Keyword::Guard),
+            "endguard" if self.dialect.has_guard_blocks() => Some(Keyword::EndGuard),
             _ => None,
         };
-        if let Some(keyword) = guard
-            && self.dialect.has_guard_blocks()
-            && self.at_tag_name()
-        {
-            return TokenKind::Keyword(keyword);
-        }
 
-        if let Some(keyword) = self.dialect.keyword(name) {
-            TokenKind::Keyword(keyword)
-        } else {
-            TokenKind::Ident
+        match (tag_keyword, self.dialect.keyword(name)) {
+            (Some(keyword), _) if self.at_tag_name() => TokenKind::Keyword(keyword),
+            (_, Some(keyword)) => TokenKind::Keyword(keyword),
+            (_, None) => TokenKind::Ident,
         }
     }
 
