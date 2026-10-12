@@ -6,7 +6,7 @@ ok            src/moj/components/alert/template.njk
 ok            src/moj/components/badge/macro.njk
 ok            src/moj/components/badge/template.njk
 ok            src/moj/components/banner/macro.njk
-unstable      src/moj/components/banner/template.njk
+ok            src/moj/components/banner/template.njk
 ok            src/moj/components/button-menu/macro.njk
 ok            src/moj/components/button-menu/template.njk
 ok            src/moj/components/cookie-banner/macro.njk

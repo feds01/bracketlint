@@ -8,8 +8,8 @@ use bl_reporting::inline::{InlineSnippet, note_on_span};
 
 use crate::{
     adapters::{
-        ExternalLanguagesEngineAdaptor, FormatterContext, HasHTMLParsing, HtmlPart, LanguageType,
-        TerminalState,
+        ExternalLanguagesEngineAdaptor, Formatted, FormatterContext, HasHTMLParsing, HtmlPart,
+        LanguageType, TerminalState,
     },
     diagnostics::FmtError,
     options::FormatterOptions,
@@ -279,7 +279,9 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
             // own without changing it: Biome drops the `;` of `{{ data }};`,
             // and makes `{{ f }}\n(x)`, a call, into `{{ f }}\nx;`.
             LanguageType::Css | LanguageType::Js => self.push_exact(start, text),
-            LanguageType::Text => self.push_piece(start, text, Some(text.to_string())),
+            LanguageType::Text => {
+                self.push_piece(start, text, Some(Formatted::new(text.to_string())))
+            }
         }
 
         Ok(())
@@ -360,7 +362,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
 
     /// Push `text`, which starts at `start` in the source, as `formatted`, or
     /// as it is written if that is `None`.
-    fn push_piece(&mut self, start: usize, text: &str, formatted: Option<String>) {
+    fn push_piece(&mut self, start: usize, text: &str, formatted: Option<Formatted>) {
         let start = start + (text.len() - text.trim_start().len());
 
         // The text starts a line when the source starts one with it.
@@ -394,9 +396,11 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
     /// The last line is left open so that a following inline tag can continue
     /// it. Any line that starts a new line in the buffer gets the current
     /// indent, the first one may instead continue a line that an inline tag
-    /// left open.
-    fn push_lines(&mut self, formatted: &str) {
-        let mut lines: Vec<_> = formatted.lines().collect();
+    /// left open. A line that `formatted` keeps as it is written, e.g. the
+    /// second line of a comment, has the indent of the source instead, which
+    /// indenting again would add to each time the template is formatted.
+    fn push_lines(&mut self, formatted: &Formatted) {
+        let mut lines: Vec<_> = formatted.code.lines().collect();
         while lines.last().is_some_and(|line| line.trim().is_empty()) {
             lines.pop();
         }
@@ -406,7 +410,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
                 self.end_line();
             }
 
-            if self.at_line_start() && !line.is_empty() {
+            if self.at_line_start() && !line.is_empty() && !formatted.keeps_line(index) {
                 self.add_indent();
             }
 

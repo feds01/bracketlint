@@ -225,6 +225,31 @@ impl<'s> FormatterContext<'s> {
     }
 }
 
+/// Code that an engine formatted, e.g. a piece of HTML, at no indent.
+#[derive(Debug, Default)]
+pub struct Formatted {
+    /// The formatted code.
+    pub code: String,
+
+    /// The lines of the code that are kept as they are written, by their
+    /// index, in order. Biome prints a comment or an attribute value that
+    /// spans several lines as it is written, so the lines after its first
+    /// have the indent of the source, to which the formatter adds none.
+    pub kept_lines: Vec<usize>,
+}
+
+impl Formatted {
+    /// The code `code`, none of whose lines is kept as it is written.
+    pub fn new(code: String) -> Self {
+        Formatted { code, kept_lines: vec![] }
+    }
+
+    /// Whether the line at `index` is kept as it is written.
+    pub fn keeps_line(&self, index: usize) -> bool {
+        self.kept_lines.binary_search(&index).is_ok()
+    }
+}
+
 /// A part of a piece of HTML between template tags, see
 /// [HasHTMLParsing::format].
 #[derive(Debug)]
@@ -232,7 +257,7 @@ pub enum HtmlPart {
     /// The HTML at `range` in the piece, formatted, or `None` if it doesn't
     /// parse, in which case it is kept as it is written. It leaves the
     /// elements `opens` open, outermost first.
-    Html { range: ByteRange, formatted: Option<String>, opens: Vec<String> },
+    Html { range: ByteRange, formatted: Option<Formatted>, opens: Vec<String> },
 
     /// The content at `range` in the piece of one of the verbatim elements,
     /// see [is_verbatim], e.g. the code of a `<script>`, which is kept exactly

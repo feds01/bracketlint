@@ -5,7 +5,7 @@ use std::{cell::RefCell, ops::Range, rc::Rc};
 
 use biome_css_formatter::{self as css_formatter, context::CssFormatOptions};
 use biome_css_parser::{self as css_parser, CssParserOptions};
-use biome_formatter::{FormatError, IndentStyle};
+use biome_formatter::{FormatError, IndentStyle, SourceMapGeneration, SourceMarker};
 use biome_html_formatter::{HtmlFormatOptions, format_node};
 use biome_html_parser::{HtmlParse, HtmlParserOptions, parse_html_with_cache};
 use biome_html_syntax::{
@@ -19,7 +19,7 @@ use bl_ast::ByteRange;
 
 use crate::{
     adapters::{
-        ExternalLanguagesEngineAdaptor, FormatterContext, HasCSSParsing, HasHTMLParsing,
+        ExternalLanguagesEngineAdaptor, Formatted, FormatterContext, HasCSSParsing, HasHTMLParsing,
         HasJSParsing, HtmlPart, LanguageType, TerminalState,
     },
     diagnostics::{FmtError, FmtErrorKind, FmtResult},
@@ -106,7 +106,7 @@ impl HTMLBiomeFormatter {
 
         let html = &contents[range];
         let formatted = if html.trim().is_empty() {
-            Some(String::new())
+            Some(Formatted::default())
         } else if broken {
             None
         } else if let Some(parsed) = parsed {
@@ -124,10 +124,16 @@ impl HTMLBiomeFormatter {
 
     /// Format `parsed`, which has no tag that Biome can't parse, or return
     /// `None` if Biome still can't format it.
-    fn format_parsed(&self, parsed: &HtmlParse) -> FmtResult<Option<String>> {
+    fn format_parsed(&self, parsed: &HtmlParse) -> FmtResult<Option<Formatted>> {
         let language = LanguageType::Html;
         match format_node(self.options.html.clone(), &parsed.syntax(), vec![]) {
-            Ok(formatted) => Ok(Some(formatted.print().unwrap().into_code())),
+            // The source map only marks where each text starts and ends in the
+            // code, which tells the lines that Biome keeps as they are written.
+            Ok(formatted) => {
+                let printed = formatted.print_with_indent(0, SourceMapGeneration::Enabled).unwrap();
+                let kept_lines = kept_lines(printed.as_code(), printed.sourcemap());
+                Ok(Some(Formatted { code: printed.into_code(), kept_lines }))
+            }
             // A tag without its `>`, e.g. `<div ` before `{{ attributes }}`,
             // has no node that Biome can format.
             Err(FormatError::SyntaxError) => Ok(None),
@@ -208,6 +214,31 @@ impl<'ctx> HasHTMLParsing<'ctx> for HTMLBiomeFormatter {
         parts.extend(self.html_part(contents, rest, broken, open_elements(html), None)?);
         Ok(parts)
     }
+}
+
+/// The lines of `code`, which Biome printed with the source `markers`, that
+/// it keeps as they are written, by their index: each line after the first of
+/// a text that spans several lines, e.g. a comment or an attribute value.
+///
+/// Biome marks where each text that it prints starts and ends, and prints its
+/// own line breaks, indents and spaces between them. So a line break between
+/// two markers with more than whitespace between them is one in a text.
+fn kept_lines(code: &str, markers: &[SourceMarker]) -> Vec<usize> {
+    let marks: Vec<usize> = markers.iter().map(|marker| marker.dest.into()).collect();
+    let in_text = |newline: usize| {
+        let next = marks.partition_point(|&mark| mark <= newline);
+        match (next.checked_sub(1).map(|previous| marks[previous]), marks.get(next)) {
+            (Some(start), Some(&end)) => !code[start..end].trim().is_empty(),
+            _ => false,
+        }
+    };
+
+    let newlines = code.match_indices('\n').map(|(newline, _)| newline);
+    newlines
+        .enumerate()
+        .filter(|&(_, newline)| in_text(newline))
+        .map(|(line, _)| line + 1)
+        .collect()
 }
 
 /// The [ByteRange] of `range`, unless it is empty.

@@ -1,5 +1,5 @@
 ok            src/templates/404.html
-unstable      src/templates/base.html
+ok            src/templates/base.html
 ok            src/templates/blog-post.html
 ok            src/templates/blog.html
 ok            src/templates/fragments/tags/default/listing.html
@@ -110,6 +110,6 @@ ok            src/templates/partials/tabs-item.html
 ok            src/templates/partials/tabs.html
 ok            src/templates/partials/tags.html
 ok            src/templates/partials/toc-item.html
-unstable      src/templates/partials/toc.html
+ok            src/templates/partials/toc.html
 ok            src/templates/partials/top.html
 ok            src/templates/redirect.html
