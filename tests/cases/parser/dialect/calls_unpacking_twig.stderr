@@ -1,0 +1,8 @@
+error: unexpectedly encountered a `**`
+ --> $DIR/calls_unpacking_twig.html:1:19
+  |
+1 | {{ path('export', **args) }}
+  |                   --
+  |
+  = help: expected either `identifier`, `literal`, `(`, `{`, or `[`
+  = note: this file is parsed as Twig, from `--dialect twig`

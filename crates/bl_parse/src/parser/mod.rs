@@ -1286,9 +1286,10 @@ impl<'s, 'a> Parser<'s, 'a> {
             self.options.dialect.infix_binding_power(ast::BinOp::Is).map_or(0, |(_, right)| right),
         )?;
         let mut args = self.arena.vec();
-        args.push(
-            self.node_with_joined_span(ast::Arg { name: None, value: Some(value) }, arg_start),
-        );
+        args.push(self.node_with_joined_span(
+            ast::Arg { name: None, value: Some(value), unpack: None },
+            arg_start,
+        ));
         let args = self.nodes_with_joined_span(args, arg_start);
 
         Ok(self
@@ -1414,6 +1415,7 @@ impl<'s, 'a> Parser<'s, 'a> {
     /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#named-arguments
     fn parse_call_args(&mut self) -> ParseResult<AstNodes<'a, ast::Arg<'a>>> {
         let colon = self.options.dialect.call_args_named_with_colon();
+        let unpacking = self.options.dialect.call_args_can_be_unpacked();
 
         self.in_tree(Delimiter::Paren, None, |g| {
             let start = g.current_pos();
@@ -1434,10 +1436,25 @@ impl<'s, 'a> Parser<'s, 'a> {
                     None
                 };
 
+                // An argument is unpacked into several in [Jinja]: the items
+                // of `*args`, and the pairs of `**kwargs`.
+                //
+                // [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L899-L906
+                let unpack = match token.kind {
+                    _ if !unpacking => None,
+                    TokenKind::Star => Some(ast::Unpack::Items),
+                    TokenKind::StarStar => Some(ast::Unpack::Pairs),
+                    _ => None,
+                };
+                if unpack.is_some() {
+                    g.skip_token(); // `*` | `**` Skip the unpacking operator.
+                }
+
                 let value = g.parse_compound_expr(0)?;
-                args.push(
-                    g.node_with_joined_span(ast::Arg { name, value: Some(value) }, token.span),
-                );
+                args.push(g.node_with_joined_span(
+                    ast::Arg { name, value: Some(value), unpack },
+                    token.span,
+                ));
 
                 if g.parse_token_fast(TokenKind::Comma).is_none() {
                     break;
@@ -1683,7 +1700,8 @@ impl<'s, 'a> Parser<'s, 'a> {
         };
 
         let value = self.parse_value()?;
-        Ok(self.node_with_joined_span(ast::Arg { name, value: Some(value) }, start.span))
+        Ok(self
+            .node_with_joined_span(ast::Arg { name, value: Some(value), unpack: None }, start.span))
     }
 
     fn parse_bin_op(&mut self) -> (Option<ast::BinOp>, u8) {
@@ -1910,7 +1928,7 @@ impl<'s, 'a> Parser<'s, 'a> {
                     let value = self.parse_loop_param_value()?;
 
                     params.push(self.node_with_joined_span(
-                        ast::Arg { name: Some(name), value: Some(value) },
+                        ast::Arg { name: Some(name), value: Some(value), unpack: None },
                         span,
                     ));
                 }
@@ -2832,7 +2850,7 @@ impl<'s, 'a> Parser<'s, 'a> {
                 let value = self.parse_expr()?;
 
                 Ok(Some(self.node_with_joined_span(
-                    ast::Arg { name: Some(name), value: Some(value) },
+                    ast::Arg { name: Some(name), value: Some(value), unpack: None },
                     span,
                 )))
             }
@@ -2852,15 +2870,16 @@ impl<'s, 'a> Parser<'s, 'a> {
                 let value = self.parse_expr()?;
 
                 Ok(Some(self.node_with_joined_span(
-                    ast::Arg { name: Some(name), value: Some(value) },
+                    ast::Arg { name: Some(name), value: Some(value), unpack: None },
                     span,
                 )))
             }
             (Some(Token { kind, span }), _) if self.starts_expr(kind) => {
                 let value = self.parse_expr()?;
-                Ok(Some(
-                    self.node_with_joined_span(ast::Arg { name: None, value: Some(value) }, span),
-                ))
+                Ok(Some(self.node_with_joined_span(
+                    ast::Arg { name: None, value: Some(value), unpack: None },
+                    span,
+                )))
             }
             _ => Ok(None),
         }

@@ -1,0 +1,49 @@
+info: parsed module '$DIR/calls_unpacking_jinja.html' as jinja:
+body
+├─inline
+│ └─call_expr
+│   ├─subject
+│   │ └─var_expr
+│   │   └─name "url_for"
+│   └─args
+│     ├─arg
+│     │ └─lit_expr
+│     │   └─str_lit '.export'
+│     ├─arg
+│     │ ├─name "export_type"
+│     │ └─var_expr
+│     │   └─name "export_type"
+│     └─arg
+│       ├─unpack `**`
+│       └─access_expr
+│         ├─subject
+│         │ └─var_expr
+│         │   └─name "request"
+│         └─field
+│           └─name "args"
+└─inline
+  └─call_expr
+    ├─subject
+    │ └─access_expr
+    │   ├─subject
+    │   │ └─var_expr
+    │   │   └─name "h"
+    │   └─field
+    │     └─name "snippet"
+    └─args
+      ├─arg
+      │ └─var_expr
+      │   └─name "form_snippet"
+      ├─arg
+      │ ├─unpack `*`
+      │ └─var_expr
+      │   └─name "items"
+      ├─arg
+      │ ├─name "pkg_dict"
+      │ └─var_expr
+      │   └─name "pkg_dict"
+      └─arg
+        ├─unpack `**`
+        └─var_expr
+          └─name "form_vars"
+

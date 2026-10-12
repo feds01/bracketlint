@@ -435,6 +435,19 @@ define_tree! {
     pub struct Arg {
         pub name: OptionalChild!(Name),
         pub value: OptionalChild!(Expr),
+
+        /// How the argument is unpacked into several, if it is, e.g. Jinja's
+        /// `**kwargs`.
+        pub unpack: Option<Unpack>,
+    }
+
+    /// How an argument of a call is unpacked into several, as in Jinja.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum Unpack {
+        /// `*args`, whose items are positional arguments.
+        Items,
+        /// `**kwargs`, whose pairs are named arguments.
+        Pairs,
     }
 
     #[derive(Clone, Debug, PartialEq)]

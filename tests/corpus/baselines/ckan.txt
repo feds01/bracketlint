@@ -93,13 +93,13 @@ ok            ckan/templates/organization/snippets/organization_form.html
 parse-error   ckan/templates/organization/snippets/organization_item.html
 ok            ckan/templates/organization/snippets/organization_list.html
 ok            ckan/templates/package/base.html
-parse-error   ckan/templates/package/base_form_page.html
+ok            ckan/templates/package/base_form_page.html
 ok            ckan/templates/package/collaborators/collaborator_new.html
 ok            ckan/templates/package/collaborators/collaborators.html
 ok            ckan/templates/package/collaborators/confirm_delete.html
 ok            ckan/templates/package/confirm_delete.html
 ok            ckan/templates/package/confirm_delete_resource.html
-parse-error   ckan/templates/package/edit.html
+ok            ckan/templates/package/edit.html
 ok            ckan/templates/package/edit_base.html
 ok            ckan/templates/package/edit_view.html
 ok            ckan/templates/package/followers.html
