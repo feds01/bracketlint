@@ -152,23 +152,46 @@ define_tree! {
         Eq,
         /// !=
         NotEq,
-        /// `===`, equal without converting either side, in Nunjucks
+        /// `===`, equal without converting either side, in [Nunjucks] and
+        /// [Twig]
+        ///
+        /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#comparisons
+        /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#comparisons
         StrictEq,
-        /// `!==`, not equal without converting either side, in Nunjucks
+        /// `!==`, not equal without converting either side, in [Nunjucks] and
+        /// [Twig]
+        ///
+        /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#comparisons
+        /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#comparisons
         StrictNotEq,
-        /// `<=>`, which compares its sides as `-1`, `0` or `1`, in Twig
+        /// `<=>`, which compares its sides as `-1`, `0` or `1`, in [Twig]
+        ///
+        /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#spaceship-operator
         Spaceship,
-        /// `xor`, whether exactly one of its sides is true, in Twig
+        /// `xor`, whether exactly one of its sides is true, in [Twig]
+        ///
+        /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#logic
         Xor,
-        /// `b-and`, the bitwise and, in Twig
+        /// `b-and`, the bitwise and, in [Twig]
+        ///
+        /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#logic
         BitAnd,
-        /// `b-or`, the bitwise or, in Twig
+        /// `b-or`, the bitwise or, in [Twig]
+        ///
+        /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#logic
         BitOr,
-        /// `b-xor`, the bitwise exclusive or, in Twig
+        /// `b-xor`, the bitwise exclusive or, in [Twig]
+        ///
+        /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#logic
         BitXor,
-        /// `has some`, whether an arrow function holds for some item, in Twig
+        /// `has some`, whether an arrow function holds for some item, in [Twig]
+        ///
+        /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#iterable-operators
         HasSome,
-        /// `has every`, whether an arrow function holds for every item, in Twig
+        /// `has every`, whether an arrow function holds for every item, in
+        /// [Twig]
+        ///
+        /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#iterable-operators
         HasEvery,
         /// `and``
         And,
@@ -182,35 +205,82 @@ define_tree! {
         Is,
         /// `is not`
         IsNot,
-        /// `contains`, in Liquid
+        /// `contains`, in [Liquid]
+        ///
+        /// [Liquid]: https://shopify.github.io/liquid/basics/operators/#contains
         Contains,
-        /// `+`, in Jinja, Nunjucks and Twig
+        /// `+`, in [Jinja], [Nunjucks] and [Twig]
+        ///
+        /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#math
+        /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#math
+        /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#math
         Add,
-        /// `-`, in Jinja, Nunjucks and Twig
+        /// `-`, in [Jinja], [Nunjucks] and [Twig]
+        ///
+        /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#math
+        /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#math
+        /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#math
         Sub,
-        /// `*`, in Jinja, Nunjucks and Twig
+        /// `*`, in [Jinja], [Nunjucks] and [Twig]
+        ///
+        /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#math
+        /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#math
+        /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#math
         Mul,
-        /// `/`, in Jinja, Nunjucks and Twig
+        /// `/`, in [Jinja], [Nunjucks] and [Twig]
+        ///
+        /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#math
+        /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#math
+        /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#math
         Div,
-        /// `//`, in Jinja, Nunjucks and Twig
+        /// `//`, in [Jinja], [Nunjucks] and [Twig]
+        ///
+        /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#math
+        /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#math
+        /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#math
         FloorDiv,
-        /// `%`, in Jinja, Nunjucks and Twig
+        /// `%`, in [Jinja], [Nunjucks] and [Twig]
+        ///
+        /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#math
+        /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#math
+        /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#math
         Mod,
-        /// `**`, in Jinja, Nunjucks and Twig
+        /// `**`, in [Jinja], [Nunjucks] and [Twig]
+        ///
+        /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#math
+        /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#math
+        /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#math
         Pow,
-        /// `~`, which concatenates strings, in Jinja, Nunjucks and Twig
+        /// `~`, which concatenates strings, in [Jinja], [Nunjucks] and [Twig]
+        ///
+        /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#other-operators
+        /// [Nunjucks]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/parser.js#L897-L908
+        /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#other-operators
         Concat,
-        /// `??`, the value on its left unless it is null or undefined, in Twig
+        /// `??`, the value on its left unless it is null or undefined, in
+        /// [Twig]
+        ///
+        /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#other-operators
         Coalesce,
-        /// `?:`, the value on its left if it is truthy, in Twig
+        /// `?:`, the value on its left if it is truthy, in [Twig]
+        ///
+        /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#other-operators
         Elvis,
-        /// `..`, the integers from its left to its right, in Twig
+        /// `..`, the integers from its left to its right, in [Twig]
+        ///
+        /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#other-operators
         Range,
-        /// `matches`, whether a string matches a regular expression, in Twig
+        /// `matches`, whether a string matches a regular expression, in [Twig]
+        ///
+        /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#containment-operators
         Matches,
-        /// `starts with`, in Twig
+        /// `starts with`, in [Twig]
+        ///
+        /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#containment-operators
         StartsWith,
-        /// `ends with`, in Twig
+        /// `ends with`, in [Twig]
+        ///
+        /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#containment-operators
         EndsWith,
     }
 
@@ -300,14 +370,20 @@ define_tree! {
     pub struct StrLit {
     }
 
-    /// Liquid's `nil`, which can also be written `null`.
+    /// Liquid's [`nil`], which can also be written [`null`].
+    ///
+    /// [`nil`]: https://shopify.github.io/liquid/basics/types/#nil
+    /// [`null`]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/expression.rb#L9-L10
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct NilLit {
     }
 
-    /// Liquid's `empty` or `blank`, which values are only compared to, e.g.
+    /// Liquid's [`empty`] or [`blank`], which values are only compared to, e.g.
     /// `x == empty`.
+    ///
+    /// [`empty`]: https://shopify.github.io/liquid/basics/types/#emptydrop
+    /// [`blank`]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/expression.rb#L14-L15
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct EmptyLit {
@@ -340,8 +416,12 @@ define_tree! {
         pub lit: Lit
     }
 
-    /// A list, e.g. `['a', 'b']` in Jinja, which Nunjucks calls an array and
-    /// Twig a sequence.
+    /// A list, e.g. `['a', 'b']` in [Jinja], which [Nunjucks] calls an array
+    /// and [Twig] a sequence.
+    ///
+    /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#literals
+    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#expressions
+    /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#literals
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct ArrayExpr {
@@ -349,9 +429,15 @@ define_tree! {
     }
 
     /// A conditional expression, which is `then` if `condition` is true, and
-    /// `otherwise` if not, e.g. `then if condition else otherwise` in Jinja,
-    /// and `condition ? then : otherwise` in Twig. Without `otherwise`, it is
-    /// undefined in Jinja, and an empty string in Twig.
+    /// `otherwise` if not, e.g. `then if condition else otherwise` in [Jinja]
+    /// and [Nunjucks], and `condition ? then : otherwise` in [Twig]. Without
+    /// `otherwise`, it is undefined in Jinja, and an empty string in Twig and
+    /// in Nunjucks, which [compiles] it to `""`.
+    ///
+    /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#if-expression
+    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#if-expression
+    /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#other-operators
+    /// [compiles]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/compiler.js#L332-L344
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct CondExpr {
@@ -360,8 +446,12 @@ define_tree! {
         pub otherwise: OptionalChild!(Expr),
     }
 
-    /// A slice of a sequence, e.g. `items[1:]`, in Jinja and Twig. Each part
-    /// can be left out, and only Jinja's slices have a step, e.g. `[::2]`.
+    /// A slice of a sequence, e.g. `items[1:]`, in [Jinja] and [Twig]. Each
+    /// part can be left out, and only Jinja's slices have a step, e.g.
+    /// `[::2]`.
+    ///
+    /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L840-L870
+    /// [Twig]: https://twig.symfony.com/doc/3.x/filters/slice.html
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct SliceExpr {
@@ -370,7 +460,9 @@ define_tree! {
         pub step: OptionalChild!(Expr),
     }
 
-    /// An arrow function in Twig, e.g. `x => x.name` or `(a, b) => a + b`.
+    /// An arrow function in [Twig], e.g. `x => x.name` or `(a, b) => a + b`.
+    ///
+    /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#other-operators
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct ArrowExpr {
@@ -378,16 +470,23 @@ define_tree! {
         pub expr: Child!(Expr),
     }
 
-    /// A mapping, e.g. `{'a': 1, b: 2}` in Jinja and Nunjucks, where it is a
-    /// dict, and Twig.
+    /// A mapping, e.g. `{'a': 1, b: 2}` in [Jinja] and [Nunjucks], where it is
+    /// a dict, and [Twig].
+    ///
+    /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#literals
+    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#expressions
+    /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#literals
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct MappingExpr {
         pub pairs: Children!(Pair),
     }
 
-    /// A key and its value in a mapping, e.g. `'a': 1`. In Twig, the value of a
-    /// name is left out when it is the variable of the same name, e.g. `{post}`.
+    /// A key and its value in a mapping, e.g. `'a': 1`. In [Twig], the value
+    /// of a name is left out when it is the variable of the same name, e.g.
+    /// `{post}`.
+    ///
+    /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#literals
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct Pair {
@@ -395,25 +494,35 @@ define_tree! {
         pub value: OptionalChild!(Expr),
     }
 
-    /// An expression in parentheses, e.g. `(a or b)` in Jinja, Nunjucks and
-    /// Twig, which groups it.
+    /// An expression in parentheses, e.g. `(a or b)` in [Jinja], [Nunjucks]
+    /// and [Twig], which groups it.
+    ///
+    /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#logic
+    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#logic
+    /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#logic
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct GroupExpr {
         pub expr: Child!(Expr),
     }
 
-    /// A tuple, e.g. `('a', 'b')` in Jinja, or a group of several expressions
-    /// in Nunjucks, e.g. `(rows.unshift(row), rows)`, whose value is the last
-    /// one's.
+    /// A tuple, e.g. `('a', 'b')` in [Jinja], or a group of several expressions
+    /// in [Nunjucks], e.g. `(rows.unshift(row), rows)`, which it [compiles] to
+    /// JavaScript's, whose value is the last one's.
+    ///
+    /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#literals
+    /// [Nunjucks]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/parser.js#L1147-L1176
+    /// [compiles]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/compiler.js#L302-L304
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct TupleExpr {
         pub children: Children!(Expr),
     }
 
-    /// A binary operation, e.g. `a == b`. Jinja chains comparisons, so in
+    /// A binary operation, e.g. `a == b`. [Jinja] chains comparisons, so in
     /// Jinja `(a == b) > c` means `a == b and b > c`.
+    ///
+    /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L560-L581
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct BinExpr {
@@ -459,12 +568,16 @@ define_tree! {
         pub name: OptionalChild!(Name),
         pub value: OptionalChild!(Expr),
 
-        /// How the argument is unpacked into several, if it is, e.g. Jinja's
+        /// How the argument is unpacked into several, if it is, e.g. [Jinja]'s
         /// `**kwargs`.
+        ///
+        /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L899-L906
         pub unpack: Option<Unpack>,
     }
 
-    /// How an argument of a call is unpacked into several, as in Jinja.
+    /// How an argument of a call is unpacked into several, as in [Jinja].
+    ///
+    /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L899-L906
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     pub enum Unpack {
         /// `*args`, whose items are positional arguments.
@@ -527,7 +640,9 @@ define_tree! {
         pub index: Child!(Expr),
     }
 
-    /// A range of integers, i.e. `(1..n)` in Liquid.
+    /// A range of integers, i.e. `(1..n)` in [Liquid].
+    ///
+    /// [Liquid]: https://shopify.github.io/liquid/tags/iteration/#range
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct RangeExpr {
@@ -563,8 +678,10 @@ define_tree! {
         }
     }
 
-    /// A Twig block whose content is the value of an expression, e.g.
+    /// A [Twig] block whose content is the value of an expression, e.g.
     /// `{% block title page_title|title %}`, which has no `{% endblock %}`.
+    ///
+    /// [Twig]: https://twig.symfony.com/doc/3.x/tags/extends.html#block-shortcuts
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct BlockShortcut {
@@ -584,10 +701,14 @@ define_tree! {
     pub struct Block {
         pub label: OptionalChild!(Name),
 
-        /// Whether the block is `scoped`, as Jinja can make it.
+        /// Whether the block is `scoped`, as [Jinja] can make it.
+        ///
+        /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#block-nesting-and-scope
         pub scoped: bool,
 
-        /// Whether the block is `required`, as Jinja can make it.
+        /// Whether the block is `required`, as [Jinja] can make it.
+        ///
+        /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#required-blocks
         pub required: bool,
 
         pub block_body: Child!(Body),
@@ -623,7 +744,9 @@ define_tree! {
         pub context: Children!(Arg),
 
         /// Whether the template sees this one's variables, when the tag says
-        /// so with `with context` or `without context`, as in Jinja.
+        /// so with `with context` or `without context`, as in [Jinja].
+        ///
+        /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#import-context-behavior
         pub with_context: Option<bool>,
     }
 
@@ -671,7 +794,7 @@ define_tree! {
         pub trim: TrimTag,
     }
 
-    /// A Liquid `liquid` tag, which holds a tag on each of its lines, i.e.
+    /// A Liquid [`liquid`] tag, which holds a tag on each of its lines, i.e.
     ///
     /// ```liquid
     /// {% liquid
@@ -679,6 +802,8 @@ define_tree! {
     ///   echo total
     /// %}
     /// ```
+    ///
+    /// [`liquid`]: https://shopify.github.io/liquid/tags/template/#liquid
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct LiquidTag {
@@ -700,8 +825,11 @@ define_tree! {
         pub names: Children!(Name),
 
         /// Whether the template sees this one's variables, when the tag says
-        /// so with `with context` or `without context`, as in Jinja and
-        /// Nunjucks.
+        /// so with `with context` or `without context`, as in [Jinja] and
+        /// [Nunjucks].
+        ///
+        /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#import-context-behavior
+        /// [Nunjucks]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/parser.js#L263-L302
         pub with_context: Option<bool>,
     }
 
@@ -722,13 +850,17 @@ define_tree! {
     pub struct With {
         pub assignments: Children!(Assignment),
 
-        /// The variables of the block in Twig, which is an expression whose
+        /// The variables of the block in [Twig], which is an expression whose
         /// value is a mapping, e.g. `{% with {a: 1} %}`, rather than
         /// assignments.
+        ///
+        /// [Twig]: https://twig.symfony.com/doc/3.x/tags/with.html
         pub value: OptionalChild!(Expr),
 
         /// Whether the block only has its own variables, as `only` makes it in
-        /// Twig, e.g. `{% with {a: 1} only %}`.
+        /// [Twig], e.g. `{% with {a: 1} only %}`.
+        ///
+        /// [Twig]: https://twig.symfony.com/doc/3.x/tags/with.html
         pub only: bool,
 
         pub block_body: Child!(Body),
@@ -825,8 +957,10 @@ define_tree! {
     pub enum ClauseKind {
         If,
         Elif,
-        /// The opening clause of a Liquid `unless` block, which renders when
+        /// The opening clause of a Liquid [`unless`] block, which renders when
         /// its condition is false.
+        ///
+        /// [`unless`]: https://shopify.github.io/liquid/tags/control-flow/#unless
         Unless,
     }
 
@@ -853,8 +987,10 @@ define_tree! {
     }
 
     /// An `if` block consisting of the condition, block and an optional else clause
-    /// e.g. `{% if x %} ...  {% else %}  y {% endif %}`. A Liquid `unless` block
-    /// is one too, whose first clause is [ClauseKind::Unless].
+    /// e.g. `{% if x %} ...  {% else %}  y {% endif %}`. A Liquid [`unless`]
+    /// block is one too, whose first clause is [ClauseKind::Unless].
+    ///
+    /// [`unless`]: https://shopify.github.io/liquid/tags/control-flow/#unless
     #[derive(Debug, PartialEq, Clone)]
     #[node]
     pub struct If {
@@ -870,7 +1006,9 @@ define_tree! {
     #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum LoopKind {
         For,
-        /// A Liquid `tablerow` loop, which renders a table row per item.
+        /// A Liquid [`tablerow`] loop, which renders a table row per item.
+        ///
+        /// [`tablerow`]: https://shopify.github.io/liquid/tags/iteration/#tablerow
         TableRow,
     }
 
@@ -883,12 +1021,18 @@ define_tree! {
         pub guard: OptionalChild!(Expr),
         pub reverse_modifier: OptionalChild!(Name),
 
-        /// The parameters of a Liquid loop, e.g. `limit: 2` or `cols: 3`.
+        /// The parameters of a Liquid [`for`] or [`tablerow`] loop, e.g.
+        /// `limit: 2` or `cols: 3`.
+        ///
+        /// [`for`]: https://shopify.github.io/liquid/tags/iteration/#for-parameters
+        /// [`tablerow`]: https://shopify.github.io/liquid/tags/iteration/#tablerow-parameters
         pub params: Children!(Arg),
         pub loop_body: Child!(Body),
 
-        /// The body after `{% empty %}`, or `{% else %}` outside Django, which
-        /// renders when there is nothing to loop over.
+        /// The body after `{% empty %}`, or `{% else %}` outside [Django],
+        /// which renders when there is nothing to loop over.
+        ///
+        /// [Django]: https://docs.djangoproject.com/en/stable/ref/templates/builtins/#for-empty
         pub loop_empty: OptionalChild!(Body),
 
         /// The whitespace control of the opening, `{% empty %}` and closing
@@ -897,8 +1041,8 @@ define_tree! {
         pub empty_trim: TrimMarker,
     }
 
-    /// A Liquid `case` block, which renders the first `when` clause with a value
-    /// equal to its subject, or else its `else` clause.
+    /// A Liquid [`case`] block, which renders the first `when` clause with a
+    /// value equal to its subject, or else its `else` clause.
     ///
     /// ```liquid
     /// {% case product.type %}
@@ -906,13 +1050,17 @@ define_tree! {
     ///     {% else %} Other
     /// {% endcase %}
     /// ```
+    ///
+    /// [`case`]: https://shopify.github.io/liquid/tags/control-flow/#casewhen
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct Case {
         pub subject: Child!(Expr),
 
         /// Anything between `{% case %}` and the first `{% when %}`, which
-        /// Liquid doesn't render.
+        /// [Liquid] doesn't render.
+        ///
+        /// [Liquid]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/tags/case.rb#L37-L48
         pub leading: Child!(Body),
         pub branches: Children!(When),
         pub otherwise: OptionalChild!(Body),
@@ -1045,7 +1193,9 @@ define_tree! {
         /// The `{% block name %}` tag, ending with `{% endblock %}`
         Block(Child!(Block)),
 
-        /// The Twig `{% block name value %}` tag, which has no end
+        /// The [Twig] `{% block name value %}` tag, which has no end
+        ///
+        /// [Twig]: https://twig.symfony.com/doc/3.x/tags/extends.html#block-shortcuts
         BlockShortcut(BlockShortcut),
 
         /// The `{% with x = 10 %}` tag, ending with `{% endwith %}`
@@ -1076,19 +1226,31 @@ define_tree! {
         /// The `{% for item in items %}` tag
         For(Child!(For)),
 
-        /// The Liquid `{% case subject %}` tag
+        /// The [Liquid] `{% case subject %}` tag
+        ///
+        /// [Liquid]: https://shopify.github.io/liquid/tags/control-flow/#casewhen
         Case(Child!(Case)),
 
-        /// The Twig `{% guard function name %}` tag, ending with `{% endguard %}`
+        /// The [Twig] `{% guard function name %}` tag, ending with
+        /// `{% endguard %}`
+        ///
+        /// [Twig]: https://twig.symfony.com/doc/3.x/tags/guard.html
         Guard(Child!(Guard)),
 
-        /// The Liquid `{% render "file" %}` tag
+        /// The [Liquid] `{% render "file" %}` tag
+        ///
+        /// [Liquid]: https://shopify.github.io/liquid/tags/template/#render
         Render(Child!(Render)),
 
-        /// The Liquid `{% capture name %}` tag, ending with `{% endcapture %}`
+        /// The [Liquid] `{% capture name %}` tag, ending with
+        /// `{% endcapture %}`
+        ///
+        /// [Liquid]: https://shopify.github.io/liquid/tags/variable/#capture
         Capture(Capture),
 
-        /// The Liquid `{% liquid %}` tag, with a tag on each of its lines
+        /// The [Liquid] `{% liquid %}` tag, with a tag on each of its lines
+        ///
+        /// [Liquid]: https://shopify.github.io/liquid/tags/template/#liquid
         Liquid(LiquidTag),
 
         /// The `{% continue %}` tag
