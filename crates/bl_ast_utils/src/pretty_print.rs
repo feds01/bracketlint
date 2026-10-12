@@ -20,10 +20,17 @@ fn labelled(label: impl ToString, contents: impl ToString, quote_str: &str) -> S
     format!("{} {quote_str}{}{quote_str}", label.to_string(), contents.to_string())
 }
 
-/// The leaf for an `import` or `include` that says whether the template sees
-/// the variables of the one that names it, if it says so.
-fn context_leaf(with_context: Option<bool>) -> Option<TreeNode> {
-    with_context.map(|with| TreeNode::leaf(if with { "with context" } else { "without context" }))
+/// Ways to build the [TreeNode]s that several AST nodes print.
+trait TreeNodeUtils {
+    /// The leaf for an `import` or `include` that says whether the template
+    /// sees the variables of the one that names it, if it says so.
+    fn context_leaf(with_context: Option<bool>) -> Option<TreeNode>;
+}
+
+impl TreeNodeUtils for TreeNode {
+    fn context_leaf(with_context: Option<bool>) -> Option<TreeNode> {
+        with_context.map(|with| Self::leaf(if with { "with context" } else { "without context" }))
+    }
 }
 
 impl AstVisitor for AstTreePrinter<'_> {
@@ -215,7 +222,7 @@ impl AstVisitor for AstTreePrinter<'_> {
 
         let mut children =
             vec![TreeNode::branch("template", vec![template]), TreeNode::branch("names", names)];
-        children.extend(context_leaf(node.body().with_context));
+        children.extend(TreeNode::context_leaf(node.body().with_context));
         Ok(TreeNode::branch("import", children))
     }
 
@@ -306,7 +313,7 @@ impl AstVisitor for AstTreePrinter<'_> {
         let walk::Include { template, context } = walk::walk_include(self, node)?;
 
         let mut children = vec![template, TreeNode::branch("context", context)];
-        children.extend(context_leaf(node.body().with_context));
+        children.extend(TreeNode::context_leaf(node.body().with_context));
         Ok(TreeNode::branch("include", children))
     }
 
