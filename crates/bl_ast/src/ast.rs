@@ -662,8 +662,11 @@ define_tree! {
     }
 
     /// The markup of a tag or a `{{ }}` that doesn't parse, which is kept as it
-    /// is written, e.g. `(a == b) or c` in `{% if (a == b) or c %}` in Liquid,
-    /// see [crate::Dialect::markup_can_be_lax].
+    /// is written, e.g. `(a == b) or c` in `{% if (a == b) or c %}` in
+    /// [Liquid], whose `warn` error mode reads it with its lax parser, see
+    /// [crate::Dialect::markup_can_be_lax].
+    ///
+    /// [Liquid]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/parser_switching.rb#L38-L44
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct UnparsedExpr {}
