@@ -1,9 +1,7 @@
 <div>
-{% # A note for whoever edits this next %}
-
+    {% # A note for whoever edits this next %}
     <p>{{ product.title }}</p>
 {%- # One that spans
     # two lines -%}
-
 </div>
 

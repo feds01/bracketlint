@@ -667,12 +667,23 @@ impl<'lex> Lexer<'lex> {
     }
 
     fn text(&mut self) -> TokenKind {
-        // Keep eating until we find the `{%` or `{{` of the next tag. A `{` is
-        // ASCII, so it can't be part of a multi-byte character, and the bytes
-        // can be searched directly.
+        // Keep eating until we find the `{%` or `{{` of the next tag, or the
+        // `{#` of a comment, as in [Django], [Jinja], [Nunjucks] and [Twig],
+        // whose contents aren't text. A `{` is ASCII, so it can't be part of a
+        // multi-byte character, and the bytes can be searched directly.
+        //
+        // [Django]: https://docs.djangoproject.com/en/stable/ref/templates/language/#comments
+        // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#comments
+        // [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#comments
+        // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#comments
+        let comments = self.dialect.has_hash_comments();
         let rest = unsafe { self.as_slice() }.as_bytes();
         let len = memchr::memchr_iter(b'{', rest)
-            .find(|&index| matches!(rest.get(index + 1), Some(b'%' | b'{')))
+            .find(|&index| match rest.get(index + 1) {
+                Some(b'%' | b'{') => true,
+                Some(b'#') => comments,
+                _ => false,
+            })
             .unwrap_or(rest.len());
 
         self.offset.update(|x| x + len);
@@ -1164,6 +1175,23 @@ mod tests {
 
         // The other dialects have no `guard` blocks.
         assert!(matches!(lex("{% guard %}", Dialect::Jinja)[..], tree!(Percent, [tok!(Ident)])));
+    }
+
+    #[test]
+    fn a_comment_after_text_holds_the_tags_in_it() {
+        let source = "<p>{# {% if a %} #}</p>";
+        for dialect in [Dialect::Django, Dialect::Jinja, Dialect::Nunjucks, Dialect::Twig] {
+            assert!(
+                matches!(lex(source, dialect)[..], [tok!(Text), tok!(Comment), tok!(Text)]),
+                "{dialect}"
+            );
+        }
+
+        // `{# #}` is text in Liquid, so the tag in it is a tag.
+        assert!(matches!(
+            lex(source, Dialect::Liquid)[..],
+            [tok!(Text), tok!(Tree(crate::token::Delimiter::Percent, _)), .., tok!(Text)]
+        ));
     }
 
     #[test]
