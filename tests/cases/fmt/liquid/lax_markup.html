@@ -1,0 +1,18 @@
+// run=pass, stage=fmt, dialect=liquid
+
+<table>
+{% for content in data %}
+{%
+  if (content[1] == "") or (skip contains
+  content[0])
+%}
+{% continue %}
+{% endif %}
+<tr><td><a href="{{ content.url | default: # }}">{{ content.name }}</a></td></tr>
+{% endfor %}
+</table>
+<span>{{ site.data.locales[lang].tabs.[tab_name]   | default: tab.title }}</span>
+{% case (kind) %}
+{% when 'a' 'b' %}
+A
+{% endcase %}

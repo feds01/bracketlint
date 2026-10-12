@@ -661,6 +661,13 @@ define_tree! {
     pub struct PathExpr {
     }
 
+    /// The markup of a tag or a `{{ }}` that doesn't parse, which is kept as it
+    /// is written, e.g. `(a == b) or c` in `{% if (a == b) or c %}` in Liquid,
+    /// see [crate::Dialect::markup_can_be_lax].
+    #[derive(Clone, Debug, PartialEq)]
+    #[node]
+    pub struct UnparsedExpr {}
+
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub enum Expr {
@@ -681,7 +688,8 @@ define_tree! {
         Access(AccessExpr),
         Index(IndexExpr),
         FilteredExpr(FilteredExpr),
-        Path(PathExpr)
+        Path(PathExpr),
+        Unparsed(UnparsedExpr)
     }
 
     impl Expr<'_> {

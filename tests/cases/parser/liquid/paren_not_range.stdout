@@ -1,3 +1,11 @@
 info: parsed module '$DIR/paren_not_range.html' as liquid:
 body
+└─if
+  └─clauses
+    └─if_clause
+      ├─condition
+      │ └─unparsed_expr `(product.available or product.preorder)`
+      └─clause_body
+        └─body
+          └─text
 

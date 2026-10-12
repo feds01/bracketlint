@@ -1,0 +1,15 @@
+error: unexpectedly encountered an identifier
+ --> $DIR/lax_markup_jinja.html:2:37
+  |
+2 |   {% if (content[1] == "") or (skip contains content[0]) %}{% continue %}{% endif %}
+  |                                     --------
+  |
+  = note: this file is parsed as Jinja, from `--dialect jinja`
+error: unexpectedly encountered a `[...]`
+ --> $DIR/lax_markup_jinja.html:4:33
+  |
+4 | {{ site.data.locales[lang].tabs.[tab_name] }}
+  |                                 ----------
+  |
+  = help: expected a `identifier`
+  = note: this file is parsed as Jinja, from `--dialect jinja`

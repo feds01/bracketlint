@@ -167,6 +167,24 @@ impl Dialect {
         matches!(self, Dialect::Liquid)
     }
 
+    /// Whether the markup of a tag or a `{{ }}` that doesn't parse is kept as
+    /// it is written, with a warning, as in [Liquid]'s `warn` error mode. It
+    /// parses the markup strictly, and if that fails, records a warning and
+    /// parses it again with its lax parser, which takes nearly any markup,
+    /// e.g. `{% if (a == b) or c %}`. [Jekyll] parses in this mode by default,
+    /// and [prints] each warning. Shopify's own formatter also keeps the markup
+    /// of a [tag] or an [output] that doesn't parse as it is written. The other
+    /// dialects have no lax parser.
+    ///
+    /// [Liquid]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/parser_switching.rb#L38-L44
+    /// [Jekyll]: https://github.com/jekyll/jekyll/blob/v4.4.1/lib/jekyll/configuration.rb#L61-L65
+    /// [prints]: https://github.com/jekyll/jekyll/blob/v4.4.1/lib/jekyll/renderer.rb#L125-L126
+    /// [tag]: https://github.com/Shopify/theme-tools/blob/%40shopify/liquid-html-parser%402.9.2/packages/liquid-html-parser/grammar/liquid-html.ohm#L68-L94
+    /// [output]: https://github.com/Shopify/theme-tools/blob/%40shopify/liquid-html-parser%402.9.2/packages/liquid-html-parser/grammar/liquid-html.ohm#L200-L201
+    pub fn markup_can_be_lax(self) -> bool {
+        matches!(self, Dialect::Liquid)
+    }
+
     /// The markers that control the whitespace around a tag when they are
     /// written next to its delimiters, e.g. the `-` in `{%- if x -%}`, as in
     /// [Jinja], [Liquid], [Nunjucks] and [Twig]. Django has none.
