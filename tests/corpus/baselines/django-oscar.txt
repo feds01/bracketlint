@@ -88,7 +88,7 @@ ok            src/oscar/templates/oscar/dashboard/catalogue/category_form.html
 ok            src/oscar/templates/oscar/dashboard/catalogue/category_list.html
 ok            src/oscar/templates/oscar/dashboard/catalogue/category_row_actions.html
 ok            src/oscar/templates/oscar/dashboard/catalogue/category_row_checkbox.html
-parse-error   src/oscar/templates/oscar/dashboard/catalogue/category_table.html
+ok            src/oscar/templates/oscar/dashboard/catalogue/category_table.html
 ok            src/oscar/templates/oscar/dashboard/catalogue/messages/product_saved.html
 ok            src/oscar/templates/oscar/dashboard/catalogue/option_delete.html
 ok            src/oscar/templates/oscar/dashboard/catalogue/option_form.html
@@ -182,14 +182,14 @@ ok            src/oscar/templates/oscar/dashboard/shipping/weight_based_delete.h
 ok            src/oscar/templates/oscar/dashboard/shipping/weight_based_detail.html
 ok            src/oscar/templates/oscar/dashboard/shipping/weight_based_form.html
 ok            src/oscar/templates/oscar/dashboard/shipping/weight_based_list.html
-parse-error   src/oscar/templates/oscar/dashboard/table.html
+ok            src/oscar/templates/oscar/dashboard/table.html
 ok            src/oscar/templates/oscar/dashboard/users/alerts/delete.html
 ok            src/oscar/templates/oscar/dashboard/users/alerts/list.html
 ok            src/oscar/templates/oscar/dashboard/users/alerts/partials/alert.html
 ok            src/oscar/templates/oscar/dashboard/users/alerts/update.html
 ok            src/oscar/templates/oscar/dashboard/users/detail.html
 ok            src/oscar/templates/oscar/dashboard/users/index.html
-parse-error   src/oscar/templates/oscar/dashboard/users/table.html
+ok            src/oscar/templates/oscar/dashboard/users/table.html
 ok            src/oscar/templates/oscar/dashboard/users/user_row_actions.html
 ok            src/oscar/templates/oscar/dashboard/users/user_row_checkbox.html
 ok            src/oscar/templates/oscar/dashboard/vouchers/partials/voucher_details_table.html

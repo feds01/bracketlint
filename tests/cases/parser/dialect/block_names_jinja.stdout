@@ -1,0 +1,6 @@
+info: parsed module '$DIR/block_names_jinja.html' as jinja:
+body
+└─block
+  ├─name "table"
+  └─body
+

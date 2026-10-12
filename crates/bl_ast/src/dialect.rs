@@ -458,6 +458,15 @@ impl Dialect {
         matches!(self, Dialect::Jinja)
     }
 
+    /// Whether a block's name is any word, up to a space, e.g.
+    /// `{% block table.caption %}`, as in [Django], which splits its tag on
+    /// spaces. The other dialects take a name.
+    ///
+    /// [Django]: https://github.com/django/django/blob/6.1.2/django/template/loader_tags.py#L221-L224
+    pub fn block_names_are_words(self) -> bool {
+        matches!(self, Dialect::Django)
+    }
+
     /// Whether a block can be `scoped`, which gives it the variables of the
     /// scope that it is in, or `required`, which a child template has to
     /// override, as in [Jinja], e.g. `{% block item scoped required %}`.

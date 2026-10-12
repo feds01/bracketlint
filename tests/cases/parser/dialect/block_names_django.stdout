@@ -1,0 +1,16 @@
+info: parsed module '$DIR/block_names_django.html' as django:
+body
+├─block
+│ ├─name "table.caption"
+│ ├─body
+│ │ ├─text
+│ │ ├─inline
+│ │ │ └─var_expr
+│ │ │   └─name "caption"
+│ │ └─text
+│ └─end_label
+│   └─name "table.caption"
+└─block
+  ├─name "nav-links"
+  └─body
+

@@ -1,0 +1,7 @@
+error: unexpectedly encountered a `.`
+ --> $DIR/block_names_jinja.html:1:15
+  |
+1 | {% block table.caption %}{% endblock %}
+  |               -
+  |
+  = note: this file is parsed as Jinja, from `--dialect jinja`
