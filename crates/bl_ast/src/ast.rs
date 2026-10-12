@@ -403,7 +403,9 @@ define_tree! {
         pub expr: Child!(Expr),
     }
 
-    /// A tuple, e.g. `('a', 'b')` in Jinja.
+    /// A tuple, e.g. `('a', 'b')` in Jinja, or a group of several expressions
+    /// in Nunjucks, e.g. `(rows.unshift(row), rows)`, whose value is the last
+    /// one's.
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct TupleExpr {

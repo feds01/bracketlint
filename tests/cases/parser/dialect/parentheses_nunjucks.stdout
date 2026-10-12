@@ -1,0 +1,49 @@
+info: parsed module '$DIR/parentheses_nunjucks.njk' as nunjucks:
+body
+├─generic_tag
+│ ├─name "set"
+│ └─args
+│   └─arg
+│     ├─name "rows"
+│     └─tuple_expr
+│       ├─call_expr
+│       │ ├─subject
+│       │ │ └─access_expr
+│       │ │   ├─subject
+│       │ │   │ └─var_expr
+│       │ │   │   └─name "rows"
+│       │ │   └─field
+│       │ │     └─name "unshift"
+│       │ └─args
+│       │   └─arg
+│       │     └─mapping_expr
+│       │       └─pair
+│       │         ├─key
+│       │         │ └─var_expr
+│       │         │   └─name "heading"
+│       │         └─value
+│       │           └─access_expr
+│       │             ├─subject
+│       │             │ └─var_expr
+│       │             │   └─name "params"
+│       │             └─field
+│       │               └─name "heading"
+│       └─var_expr
+│         └─name "rows"
+└─inline
+  └─bin_expr
+    ├─lhs
+    │ └─group_expr
+    │   └─bin_expr
+    │     ├─lhs
+    │     │ └─var_expr
+    │     │   └─name "a"
+    │     ├─operator `or`
+    │     └─rhs
+    │       └─var_expr
+    │         └─name "b"
+    ├─operator `and`
+    └─rhs
+      └─var_expr
+        └─name "c"
+

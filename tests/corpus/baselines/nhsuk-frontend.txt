@@ -41,7 +41,7 @@ ok            packages/nhsuk-frontend/src/nhsuk/components/header/template.njk
 ok            packages/nhsuk-frontend/src/nhsuk/components/heading/macro.njk
 ok            packages/nhsuk-frontend/src/nhsuk/components/heading/template.njk
 ok            packages/nhsuk-frontend/src/nhsuk/components/hero/macro.njk
-parse-error   packages/nhsuk-frontend/src/nhsuk/components/hero/template.njk
+ok            packages/nhsuk-frontend/src/nhsuk/components/hero/template.njk
 ok            packages/nhsuk-frontend/src/nhsuk/components/hint/macro.njk
 ok            packages/nhsuk-frontend/src/nhsuk/components/hint/template.njk
 ok            packages/nhsuk-frontend/src/nhsuk/components/images/macro.njk
