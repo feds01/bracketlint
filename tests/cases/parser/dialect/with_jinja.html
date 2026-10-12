@@ -1,0 +1,4 @@
+// run=pass, stage=check, dialect=jinja
+
+{% with classes = classes or [], hn = heading_level or 1 %}{{ hn }}{% endwith %}
+{% for e in field.errors if e is string %}{{ e }}{% endfor %}

@@ -5,12 +5,12 @@ ok            flask_admin/templates/bootstrap4/admin/file/list.html
 ok            flask_admin/templates/bootstrap4/admin/file/modals/form.html
 ok            flask_admin/templates/bootstrap4/admin/index.html
 ok            flask_admin/templates/bootstrap4/admin/layout.html
-parse-error   flask_admin/templates/bootstrap4/admin/lib.html
+ok            flask_admin/templates/bootstrap4/admin/lib.html
 ok            flask_admin/templates/bootstrap4/admin/master.html
 ok            flask_admin/templates/bootstrap4/admin/model/create.html
 ok            flask_admin/templates/bootstrap4/admin/model/details.html
 ok            flask_admin/templates/bootstrap4/admin/model/edit.html
-parse-error   flask_admin/templates/bootstrap4/admin/model/inline_field_list.html
+ok            flask_admin/templates/bootstrap4/admin/model/inline_field_list.html
 ok            flask_admin/templates/bootstrap4/admin/model/inline_form.html
 ok            flask_admin/templates/bootstrap4/admin/model/inline_list_base.html
 ok            flask_admin/templates/bootstrap4/admin/model/layout.html
