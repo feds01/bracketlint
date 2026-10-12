@@ -1,0 +1,5 @@
+// run=pass, stage=check, dialect=jinja
+
+{% macro input_block(for, label="", classes=[]) %}
+<label for="{{ for }}">{{ label or block }}</label>
+{% endmacro %}

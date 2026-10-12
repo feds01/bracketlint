@@ -1135,7 +1135,9 @@ impl<'s, 'a> Parser<'s, 'a> {
                 self.node_with_joined_span(ast::Expr::Lit(ast::LitExpr { lit }), token.span)
             }
 
-            kw @ TokenKind::Keyword(keyword) if keyword.identifier_like() => {
+            kw @ TokenKind::Keyword(keyword)
+                if keyword.identifier_like() || self.keyword_is_name(keyword) =>
+            {
                 self.skip_fast(kw); // `<kw>` Skip the identifier token.
                 self.node_with_joined_span(
                     ast::Expr::Var(ast::VarExpr {
@@ -1166,6 +1168,27 @@ impl<'s, 'a> Parser<'s, 'a> {
                 );
             }
         })
+    }
+
+    /// Whether `keyword` is a name in an expression, as any keyword is in
+    /// [Jinja] apart from those that its expressions have: `and`, `or`, `not`,
+    /// `in`, `is`, `if` and `else`, and `True` and `False`.
+    ///
+    /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L648-L661
+    fn keyword_is_name(&self, keyword: Keyword) -> bool {
+        self.options.dialect.keywords_are_names()
+            && !matches!(
+                keyword,
+                Keyword::And
+                    | Keyword::Or
+                    | Keyword::Not
+                    | Keyword::In
+                    | Keyword::Is
+                    | Keyword::If
+                    | Keyword::Else
+                    | Keyword::True
+                    | Keyword::False
+            )
     }
 
     /// The Liquid literal that `token` is, if any, e.g. [`nil`] or [`empty`].

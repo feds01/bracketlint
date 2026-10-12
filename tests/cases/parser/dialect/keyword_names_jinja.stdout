@@ -1,0 +1,40 @@
+info: parsed module '$DIR/keyword_names_jinja.html' as jinja:
+body
+├─generic_tag
+│ ├─name "macro"
+│ └─args
+│   └─arg
+│     └─call_expr
+│       ├─subject
+│       │ └─var_expr
+│       │   └─name "input_block"
+│       └─args
+│         ├─arg
+│         │ └─var_expr
+│         │   └─name "for"
+│         ├─arg
+│         │ ├─name "label"
+│         │ └─lit_expr
+│         │   └─str_lit ""
+│         └─arg
+│           ├─name "classes"
+│           └─array_expr
+├─text
+├─inline
+│ └─var_expr
+│   └─name "for"
+├─text
+├─inline
+│ └─bin_expr
+│   ├─lhs
+│   │ └─var_expr
+│   │   └─name "label"
+│   ├─operator `or`
+│   └─rhs
+│     └─var_expr
+│       └─name "block"
+├─text
+└─generic_tag
+  ├─name "endmacro"
+  └─args
+
