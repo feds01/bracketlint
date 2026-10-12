@@ -1,0 +1,7 @@
+// run=pass, stage=check, dialect=twig
+
+{% if a <=> b == 1 %}{% endif %}
+{% if a === b or c !== d %}{% endif %}
+{% if a xor b and c %}{% endif %}
+{{ constant('JSON_PRETTY_PRINT') b-or flags b-and mask b-xor 1 }}
+{% if items has some x => x > 1 and items has every x => x %}{% endif %}

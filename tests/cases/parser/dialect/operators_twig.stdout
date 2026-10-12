@@ -1,0 +1,136 @@
+info: parsed module '$DIR/operators_twig.html' as twig:
+body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─bin_expr
+│     │   │   ├─lhs
+│     │   │   │ └─var_expr
+│     │   │   │   └─name "a"
+│     │   │   ├─operator `<=>`
+│     │   │   └─rhs
+│     │   │     └─var_expr
+│     │   │       └─name "b"
+│     │   ├─operator `==`
+│     │   └─rhs
+│     │     └─lit_expr
+│     │       └─int_lit 1
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─bin_expr
+│     │   │   ├─lhs
+│     │   │   │ └─var_expr
+│     │   │   │   └─name "a"
+│     │   │   ├─operator `===`
+│     │   │   └─rhs
+│     │   │     └─var_expr
+│     │   │       └─name "b"
+│     │   ├─operator `or`
+│     │   └─rhs
+│     │     └─bin_expr
+│     │       ├─lhs
+│     │       │ └─var_expr
+│     │       │   └─name "c"
+│     │       ├─operator `!==`
+│     │       └─rhs
+│     │         └─var_expr
+│     │           └─name "d"
+│     └─clause_body
+│       └─body
+├─if
+│ └─clauses
+│   └─if_clause
+│     ├─condition
+│     │ └─bin_expr
+│     │   ├─lhs
+│     │   │ └─var_expr
+│     │   │   └─name "a"
+│     │   ├─operator `xor`
+│     │   └─rhs
+│     │     └─bin_expr
+│     │       ├─lhs
+│     │       │ └─var_expr
+│     │       │   └─name "b"
+│     │       ├─operator `and`
+│     │       └─rhs
+│     │         └─var_expr
+│     │           └─name "c"
+│     └─clause_body
+│       └─body
+├─inline
+│ └─bin_expr
+│   ├─lhs
+│   │ └─call_expr
+│   │   ├─subject
+│   │   │ └─var_expr
+│   │   │   └─name "constant"
+│   │   └─args
+│   │     └─arg
+│   │       └─lit_expr
+│   │         └─str_lit 'JSON_PRETTY_PRINT'
+│   ├─operator `b-or`
+│   └─rhs
+│     └─bin_expr
+│       ├─lhs
+│       │ └─bin_expr
+│       │   ├─lhs
+│       │   │ └─var_expr
+│       │   │   └─name "flags"
+│       │   ├─operator `b-and`
+│       │   └─rhs
+│       │     └─var_expr
+│       │       └─name "mask"
+│       ├─operator `b-xor`
+│       └─rhs
+│         └─lit_expr
+│           └─int_lit 1
+└─if
+  └─clauses
+    └─if_clause
+      ├─condition
+      │ └─bin_expr
+      │   ├─lhs
+      │   │ └─var_expr
+      │   │   └─name "items"
+      │   ├─operator `has some`
+      │   └─rhs
+      │     └─arrow_expr
+      │       ├─params
+      │       │ └─name "x"
+      │       └─expr
+      │         └─bin_expr
+      │           ├─lhs
+      │           │ └─bin_expr
+      │           │   ├─lhs
+      │           │   │ └─var_expr
+      │           │   │   └─name "x"
+      │           │   ├─operator `>`
+      │           │   └─rhs
+      │           │     └─lit_expr
+      │           │       └─int_lit 1
+      │           ├─operator `and`
+      │           └─rhs
+      │             └─bin_expr
+      │               ├─lhs
+      │               │ └─var_expr
+      │               │   └─name "items"
+      │               ├─operator `has every`
+      │               └─rhs
+      │                 └─arrow_expr
+      │                   ├─params
+      │                   │ └─name "x"
+      │                   └─expr
+      │                     └─var_expr
+      │                       └─name "x"
+      └─clause_body
+        └─body
+

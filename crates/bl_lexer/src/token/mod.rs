@@ -147,6 +147,9 @@ pub enum TokenKind {
     /// Less than or equal to, `<=`
     LtEq,
 
+    /// The spaceship operator, `<=>`, in Twig
+    Spaceship,
+
     /// Minus, `-`
     Minus,
 
@@ -298,6 +301,7 @@ impl fmt::Display for TokenKind {
             TokenKind::NotEqEq => write!(f, "!=="),
             TokenKind::Lt => write!(f, "<"),
             TokenKind::LtEq => write!(f, "<="),
+            TokenKind::Spaceship => write!(f, "<=>"),
             TokenKind::Gt => write!(f, ">"),
             TokenKind::GtEq => write!(f, ">="),
             TokenKind::Minus => write!(f, "-"),

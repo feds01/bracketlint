@@ -355,12 +355,21 @@ impl Dialect {
         matches!(self, Dialect::Twig)
     }
 
-    /// Whether `===` and `!==` are comparisons, as in [Nunjucks], which compare
-    /// as JavaScript's do, without converting either side.
+    /// Whether `===` and `!==` are comparisons, as in [Nunjucks] and [Twig],
+    /// which compare without converting either side.
     ///
     /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#comparisons
+    /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#comparisons
     pub fn has_strict_comparisons(self) -> bool {
-        matches!(self, Dialect::Nunjucks)
+        matches!(self, Dialect::Nunjucks | Dialect::Twig)
+    }
+
+    /// Whether `<=>` is an operator, as in [Twig], which compares two values
+    /// as `-1`, `0` or `1`.
+    ///
+    /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#spaceship-operator
+    pub fn has_spaceship_operator(self) -> bool {
+        matches!(self, Dialect::Twig)
     }
 
     /// Whether a keyword is a name in an expression, e.g. `{{ for }}` or the
@@ -680,7 +689,14 @@ impl Dialect {
                 | BinOp::StartsWith
                 | BinOp::EndsWith
                 | BinOp::StrictEq
-                | BinOp::StrictNotEq => return None,
+                | BinOp::StrictNotEq
+                | BinOp::Spaceship
+                | BinOp::Xor
+                | BinOp::BitAnd
+                | BinOp::BitOr
+                | BinOp::BitXor
+                | BinOp::HasSome
+                | BinOp::HasEvery => return None,
             },
 
             // [Jinja's parser] has a function for each level, from `parse_or`
@@ -715,7 +731,14 @@ impl Dialect {
                 | BinOp::StartsWith
                 | BinOp::EndsWith
                 | BinOp::StrictEq
-                | BinOp::StrictNotEq => return None,
+                | BinOp::StrictNotEq
+                | BinOp::Spaceship
+                | BinOp::Xor
+                | BinOp::BitAnd
+                | BinOp::BitOr
+                | BinOp::BitXor
+                | BinOp::HasSome
+                | BinOp::HasEvery => return None,
             },
 
             // Liquid has no precedence between `and` and `or`, and evaluates
@@ -746,7 +769,14 @@ impl Dialect {
                 | BinOp::StartsWith
                 | BinOp::EndsWith
                 | BinOp::StrictEq
-                | BinOp::StrictNotEq => return None,
+                | BinOp::StrictNotEq
+                | BinOp::Spaceship
+                | BinOp::Xor
+                | BinOp::BitAnd
+                | BinOp::BitOr
+                | BinOp::BitXor
+                | BinOp::HasSome
+                | BinOp::HasEvery => return None,
             },
 
             // [Nunjucks' parser] has a function for each level too, from
@@ -784,7 +814,14 @@ impl Dialect {
                 | BinOp::Range
                 | BinOp::Matches
                 | BinOp::StartsWith
-                | BinOp::EndsWith => return None,
+                | BinOp::EndsWith
+                | BinOp::Spaceship
+                | BinOp::Xor
+                | BinOp::BitAnd
+                | BinOp::BitOr
+                | BinOp::BitXor
+                | BinOp::HasSome
+                | BinOp::HasEvery => return None,
             },
 
             // Twig's own precedences, from [`CoreExtension`]. A test binds
@@ -798,9 +835,18 @@ impl Dialect {
             Dialect::Twig => match op {
                 BinOp::Elvis => right_assoc(5),
                 BinOp::Or => left_assoc(10),
+                BinOp::Xor => left_assoc(12),
                 BinOp::And => left_assoc(15),
+                BinOp::BitOr => left_assoc(16),
+                BinOp::BitXor => left_assoc(17),
+                BinOp::BitAnd => left_assoc(18),
                 BinOp::Eq
                 | BinOp::NotEq
+                | BinOp::StrictEq
+                | BinOp::StrictNotEq
+                | BinOp::Spaceship
+                | BinOp::HasSome
+                | BinOp::HasEvery
                 | BinOp::Lt
                 | BinOp::LtEq
                 | BinOp::Gt
@@ -817,7 +863,7 @@ impl Dialect {
                 BinOp::Is | BinOp::IsNot => left_assoc(100),
                 BinOp::Pow => right_assoc(200),
                 BinOp::Coalesce => right_assoc(250),
-                BinOp::Contains | BinOp::StrictEq | BinOp::StrictNotEq => return None,
+                BinOp::Contains => return None,
             },
         };
 
@@ -1144,6 +1190,13 @@ mod test_super {
             assert_eq!(power.is_some(), dialect.is_liquid(), "`contains` in {dialect}");
 
             let twig = [
+                BinOp::Spaceship,
+                BinOp::Xor,
+                BinOp::BitAnd,
+                BinOp::BitOr,
+                BinOp::BitXor,
+                BinOp::HasSome,
+                BinOp::HasEvery,
                 BinOp::Coalesce,
                 BinOp::Elvis,
                 BinOp::Range,
@@ -1158,7 +1211,8 @@ mod test_super {
 
             for op in [BinOp::StrictEq, BinOp::StrictNotEq] {
                 let power = dialect.infix_binding_power(op);
-                assert_eq!(power.is_some(), dialect == Dialect::Nunjucks, "`{op}` in {dialect}");
+                let strict = matches!(dialect, Dialect::Nunjucks | Dialect::Twig);
+                assert_eq!(power.is_some(), strict, "`{op}` in {dialect}");
             }
         }
     }

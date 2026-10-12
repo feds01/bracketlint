@@ -1798,6 +1798,7 @@ impl<'s, 'a> Parser<'s, 'a> {
             TokenKind::NotEq => (Some(ast::BinOp::NotEq), 1),
             TokenKind::EqEqEq => (Some(ast::BinOp::StrictEq), 1),
             TokenKind::NotEqEq => (Some(ast::BinOp::StrictNotEq), 1),
+            TokenKind::Spaceship => (Some(ast::BinOp::Spaceship), 1),
             TokenKind::Lt => (Some(ast::BinOp::Lt), 1),
             TokenKind::LtEq => (Some(ast::BinOp::LtEq), 1),
             TokenKind::Gt => (Some(ast::BinOp::Gt), 1),
@@ -1815,6 +1816,17 @@ impl<'s, 'a> Parser<'s, 'a> {
             TokenKind::DotDot => (Some(ast::BinOp::Range), 1),
             TokenKind::Ident => match (self._source.hunk(token.span), self.peek_second()) {
                 ("matches", _) => (Some(ast::BinOp::Matches), 1),
+                ("xor", _) => (Some(ast::BinOp::Xor), 1),
+                ("b-and", _) => (Some(ast::BinOp::BitAnd), 1),
+                ("b-or", _) => (Some(ast::BinOp::BitOr), 1),
+                ("b-xor", _) => (Some(ast::BinOp::BitXor), 1),
+                ("has", Some(second)) if second.kind == TokenKind::Ident => {
+                    match self._source.hunk(second.span) {
+                        "some" => (Some(ast::BinOp::HasSome), 2),
+                        "every" => (Some(ast::BinOp::HasEvery), 2),
+                        _ => (None, 0),
+                    }
+                }
                 ("starts", Some(kw!(With))) => (Some(ast::BinOp::StartsWith), 2),
                 ("ends", Some(kw!(With))) => (Some(ast::BinOp::EndsWith), 2),
                 _ => (None, 0),
