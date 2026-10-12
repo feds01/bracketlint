@@ -1,6 +1,6 @@
 ok            src/templates/404.html
-parse-error   src/templates/base.html
-parse-error   src/templates/blog-post.html
+unstable      src/templates/base.html
+ok            src/templates/blog-post.html
 ok            src/templates/blog.html
 ok            src/templates/fragments/tags/default/listing.html
 ok            src/templates/fragments/tags/default/tag.html
@@ -95,11 +95,11 @@ ok            src/templates/partials/languages/zh-TW.html
 ok            src/templates/partials/languages/zh.html
 ok            src/templates/partials/logo.html
 ok            src/templates/partials/nav-item.html
-parse-error   src/templates/partials/nav.html
+ok            src/templates/partials/nav.html
 ok            src/templates/partials/pagination.html
 ok            src/templates/partials/palette.html
 ok            src/templates/partials/path-item.html
-parse-error   src/templates/partials/path.html
+ok            src/templates/partials/path.html
 ok            src/templates/partials/post.html
 ok            src/templates/partials/progress.html
 ok            src/templates/partials/search.html
@@ -107,7 +107,7 @@ ok            src/templates/partials/social.html
 ok            src/templates/partials/source-file.html
 ok            src/templates/partials/source.html
 ok            src/templates/partials/tabs-item.html
-parse-error   src/templates/partials/tabs.html
+ok            src/templates/partials/tabs.html
 ok            src/templates/partials/tags.html
 ok            src/templates/partials/toc-item.html
 unstable      src/templates/partials/toc.html

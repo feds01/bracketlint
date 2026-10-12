@@ -1,0 +1,27 @@
+info: parsed module '$DIR/import_context_jinja.html' as jinja:
+body
+├─import
+│ ├─template
+│ │ └─lit_expr
+│ │   └─str_lit 'admin/lib.html'
+│ ├─names
+│ │ └─name "lib"
+│ └─with context
+├─import
+│ ├─template
+│ │ └─lit_expr
+│ │   └─str_lit "forms.html"
+│ ├─names
+│ │ └─name "forms"
+│ └─without context
+├─include
+│ ├─lit_expr
+│ │ └─str_lit "header.html"
+│ ├─context
+│ └─with context
+└─include
+  ├─lit_expr
+  │ └─str_lit "footer.html"
+  ├─context
+  └─without context
+
