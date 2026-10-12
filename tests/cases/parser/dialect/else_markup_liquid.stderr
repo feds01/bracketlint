@@ -1,0 +1,30 @@
+warning: Liquid ignores `if site.description` after `else`
+ --> $DIR/else_markup_liquid.html:1:56
+  |
+1 | {% if page.description %}{{ page.description }}{% else if site.description %}{{ site.description }}{% endif %}
+  |                                                        -------------------
+  |
+  = help: `{% elsif site.description %}` starts a branch with a condition
+  = note: this file is parsed as Liquid, from `--dialect liquid`
+warning: Liquid ignores `user.name` after `else`
+ --> $DIR/else_markup_liquid.html:2:31
+  |
+2 | {% unless user %}Guest{% else user.name %}{{ user.name }}{% endunless %}
+  |                               ---------
+  |
+  = note: this file is parsed as Liquid, from `--dialect liquid`
+warning: Liquid ignores `if items == empty` after `else`
+ --> $DIR/else_markup_liquid.html:3:42
+  |
+3 | {% for item in items %}{{ item }}{% else if items == empty %}None{% endfor %}
+  |                                          -----------------
+  |
+  = note: this file is parsed as Liquid, from `--dialect liquid`
+warning: Liquid ignores `if b` after `else`
+ --> $DIR/else_markup_liquid.html:7:8
+  |
+7 |   else if b
+  |        ----
+  |
+  = help: `{% elsif b %}` starts a branch with a condition
+  = note: this file is parsed as Liquid, from `--dialect liquid`

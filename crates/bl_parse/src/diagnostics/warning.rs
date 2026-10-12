@@ -1,17 +1,17 @@
 //! Any warning that the parser can emit and report.
 
-use bl_ast::{ForeignSyntax, Span};
+use bl_ast::{Dialect, ForeignSyntax, Keyword, Span};
 use bl_reporting::{ReportBuilder, ReportKind, Reports};
 
 use super::error::ParseError;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct ParseWarning {
     kind: ParseWarningKind,
     span: Span,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum ParseWarningKind {
     /// A block label is a string literal instead of being an identifier.
     ///
@@ -34,6 +34,23 @@ pub enum ParseWarningKind {
     /// holds the error that parsing the markup reported, whose title, span
     /// and help the warning has.
     LaxMarkup(ParseError),
+
+    /// Text after the name of an `{% else %}` or end tag, which `dialect`
+    /// ignores, e.g. the `if b` in Liquid's `{% else if b %}`, see
+    /// [Dialect::else_and_end_tags_ignore_markup].
+    IgnoredMarkup {
+        dialect: Dialect,
+
+        /// The name of the tag, e.g. `else`.
+        tag: Keyword,
+
+        /// The text, as it is written.
+        markup: Box<str>,
+
+        /// Whether the tag is the `{% else %}` of an `if` block, which could
+        /// be an `elif` clause instead.
+        in_if: bool,
+    },
 }
 
 impl ParseWarning {
@@ -80,6 +97,23 @@ impl From<ParseWarning> for Reports {
                 }
 
                 return reports;
+            }
+            ParseWarningKind::IgnoredMarkup { dialect, tag, markup, in_if } => {
+                report
+                    .title(format!("{} ignores `{markup}` after `{tag}`", dialect.title()))
+                    .add_span(span);
+
+                // An `if` after the `else` of an `if` block likely means a
+                // branch with a condition, e.g. `{% else if b %}`.
+                if in_if
+                    && let Some(condition) = markup.strip_prefix("if")
+                    && condition.starts_with(char::is_whitespace)
+                {
+                    let (elif, condition) = (dialect.elif_tag(), condition.trim_start());
+                    report.add_help(format!(
+                        "`{{% {elif} {condition} %}}` starts a branch with a condition"
+                    ));
+                }
             }
         }
 

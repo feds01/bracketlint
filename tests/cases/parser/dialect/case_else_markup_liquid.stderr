@@ -1,0 +1,7 @@
+error: unexpectedly encountered an identifier
+ --> $DIR/case_else_markup_liquid.html:1:36
+  |
+1 | {% case a %}{% when 1 %}one{% else x %}other{% endcase %}
+  |                                    -
+  |
+  = note: this file is parsed as Liquid, from `--dialect liquid`

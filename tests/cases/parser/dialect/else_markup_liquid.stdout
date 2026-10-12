@@ -1,0 +1,91 @@
+info: parsed module '$DIR/else_markup_liquid.html' as liquid:
+body
+├─if
+│ ├─clauses
+│ │ └─if_clause
+│ │   ├─condition
+│ │   │ └─access_expr
+│ │   │   ├─subject
+│ │   │   │ └─var_expr
+│ │   │   │   └─name "page"
+│ │   │   └─field
+│ │   │     └─name "description"
+│ │   └─clause_body
+│ │     └─body
+│ │       └─inline
+│ │         └─access_expr
+│ │           ├─subject
+│ │           │ └─var_expr
+│ │           │   └─name "page"
+│ │           └─field
+│ │             └─name "description"
+│ ├─otherwise
+│ │ └─body
+│ │   └─inline
+│ │     └─access_expr
+│ │       ├─subject
+│ │       │ └─var_expr
+│ │       │   └─name "site"
+│ │       └─field
+│ │         └─name "description"
+│ └─else_markup "if site.description"
+├─if
+│ ├─clauses
+│ │ └─unless_clause
+│ │   ├─condition
+│ │   │ └─var_expr
+│ │   │   └─name "user"
+│ │   └─clause_body
+│ │     └─body
+│ │       └─text
+│ ├─otherwise
+│ │ └─body
+│ │   └─inline
+│ │     └─access_expr
+│ │       ├─subject
+│ │       │ └─var_expr
+│ │       │   └─name "user"
+│ │       └─field
+│ │         └─name "name"
+│ └─else_markup "user.name"
+├─for
+│ ├─target
+│ │ └─name "item"
+│ ├─iterator
+│ │ └─var_expr
+│ │   └─name "items"
+│ ├─loop_body
+│ │ └─body
+│ │   └─inline
+│ │     └─var_expr
+│ │       └─name "item"
+│ ├─loop_empty
+│ │ └─body
+│ │   └─text
+│ └─empty_markup "if items == empty"
+└─liquid
+  └─body
+    └─if
+      ├─clauses
+      │ └─if_clause
+      │   ├─condition
+      │   │ └─var_expr
+      │   │   └─name "a"
+      │   └─clause_body
+      │     └─body
+      │       └─generic_tag
+      │         ├─name "echo"
+      │         └─args
+      │           └─arg
+      │             └─var_expr
+      │               └─name "a"
+      ├─otherwise
+      │ └─body
+      │   └─generic_tag
+      │     ├─name "echo"
+      │     └─args
+      │       └─arg
+      │         └─var_expr
+      │           └─name "b"
+      └─else_markup "if b"
+

@@ -1,0 +1,20 @@
+<ul>
+    {% for item in items %}
+        <li>{{ item }}</li>
+    {% else no items %}
+        <li>None</li>
+    {%- endfor- %}
+</ul>
+{% if page.description %}
+    <p>{{ page.description }}</p>
+{% else if site.description %}
+    <p>{{ site.description }}</p>
+{% endif page %}
+{% unless user %}
+    <p>Guest</p>
+{% endunless- -%}
+{% case a %}
+{% when 1 %}
+    <p>One</p>
+{% endcase a %}
+

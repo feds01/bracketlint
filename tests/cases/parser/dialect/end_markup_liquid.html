@@ -1,0 +1,11 @@
+// run=pass, stage=check, dialect=liquid
+
+{% for item in items %}{{ item }}{%- endfor- %}
+{% if a %}a{% endif a %}
+{% unless a %}b{% endunless - %}
+{% case a %}{% when 1 %}one{% endcase a %}
+{% capture x %}y{% endcapture x %}
+{% tablerow item in items %}{{ item }}{% endtablerow item %}
+{% raw %}{{ x }}{% endraw x %}
+{% comment %}note{% endcomment x %}
+{% doc %}@param {string} x{%- enddoc- %}

@@ -1,0 +1,63 @@
+warning: Liquid ignores `-` after `endfor`
+ --> $DIR/end_markup_liquid.html:1:44
+  |
+1 | {% for item in items %}{{ item }}{%- endfor- %}
+  |                                            -
+  |
+  = note: this file is parsed as Liquid, from `--dialect liquid`
+warning: Liquid ignores `a` after `endif`
+ --> $DIR/end_markup_liquid.html:2:21
+  |
+2 | {% if a %}a{% endif a %}
+  |                     -
+  |
+  = note: this file is parsed as Liquid, from `--dialect liquid`
+warning: Liquid ignores `-` after `endunless`
+ --> $DIR/end_markup_liquid.html:3:29
+  |
+3 | {% unless a %}b{% endunless - %}
+  |                             -
+  |
+  = note: this file is parsed as Liquid, from `--dialect liquid`
+warning: Liquid ignores `a` after `endcase`
+ --> $DIR/end_markup_liquid.html:4:39
+  |
+4 | {% case a %}{% when 1 %}one{% endcase a %}
+  |                                       -
+  |
+  = note: this file is parsed as Liquid, from `--dialect liquid`
+warning: Liquid ignores `x` after `endcapture`
+ --> $DIR/end_markup_liquid.html:5:31
+  |
+5 | {% capture x %}y{% endcapture x %}
+  |                               -
+  |
+  = note: this file is parsed as Liquid, from `--dialect liquid`
+warning: Liquid ignores `item` after `endtablerow`
+ --> $DIR/end_markup_liquid.html:6:54
+  |
+6 | {% tablerow item in items %}{{ item }}{% endtablerow item %}
+  |                                                      ----
+  |
+  = note: this file is parsed as Liquid, from `--dialect liquid`
+warning: Liquid ignores `x` after `endraw`
+ --> $DIR/end_markup_liquid.html:7:27
+  |
+7 | {% raw %}{{ x }}{% endraw x %}
+  |                           -
+  |
+  = note: this file is parsed as Liquid, from `--dialect liquid`
+warning: Liquid ignores `x` after `endcomment`
+ --> $DIR/end_markup_liquid.html:8:32
+  |
+8 | {% comment %}note{% endcomment x %}
+  |                                -
+  |
+  = note: this file is parsed as Liquid, from `--dialect liquid`
+warning: Liquid ignores `-` after `enddoc`
+ --> $DIR/end_markup_liquid.html:9:37
+  |
+9 | {% doc %}@param {string} x{%- enddoc- %}
+  |                                     -
+  |
+  = note: this file is parsed as Liquid, from `--dialect liquid`

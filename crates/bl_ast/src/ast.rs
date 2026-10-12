@@ -822,6 +822,12 @@ define_tree! {
 
         /// The whitespace control of the opening and the closing tag.
         pub trim: TrimTag,
+
+        /// The text after the name of the closing tag, which [Liquid] ignores,
+        /// see [crate::Dialect::else_and_end_tags_ignore_markup].
+        ///
+        /// [Liquid]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/block.rb#L84
+        pub end_markup: Option<ByteRange>,
     }
 
     /// A Liquid [`liquid`] tag, which holds a tag on each of its lines, i.e.
@@ -1031,6 +1037,16 @@ define_tree! {
         /// The whitespace control of the `{% else %}` and `{% endif %}` tags.
         pub else_trim: TrimMarker,
         pub end_trim: TrimMarker,
+
+        /// The text after the names of the `{% else %}` and `{% endif %}` tags,
+        /// which Liquid ignores after an [`else`] and an [end tag], e.g. `if b`
+        /// in `{% else if b %}`, see
+        /// [crate::Dialect::else_and_end_tags_ignore_markup].
+        ///
+        /// [`else`]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/tags/if.rb#L73-L78
+        /// [end tag]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/block.rb#L84
+        pub else_markup: Option<ByteRange>,
+        pub end_markup: Option<ByteRange>,
     }
 
     #[derive(Clone, Copy, Debug, PartialEq)]
@@ -1069,6 +1085,15 @@ define_tree! {
         /// tags.
         pub trim: TrimTag,
         pub empty_trim: TrimMarker,
+
+        /// The text after the names of the `{% else %}` and closing tags,
+        /// which Liquid ignores after an [`else`] and an [end tag], see
+        /// [crate::Dialect::else_and_end_tags_ignore_markup].
+        ///
+        /// [`else`]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/tags/for.rb#L56-L59
+        /// [end tag]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/block.rb#L84
+        pub empty_markup: Option<ByteRange>,
+        pub end_markup: Option<ByteRange>,
     }
 
     /// A Liquid [`case`] block, which renders the first `when` clause with a
@@ -1099,6 +1124,14 @@ define_tree! {
         /// `{% endcase %}` tags.
         pub trim: TrimTag,
         pub else_trim: TrimMarker,
+
+        /// The text after the name of the `{% endcase %}` tag, which [Liquid]
+        /// ignores, see [crate::Dialect::else_and_end_tags_ignore_markup]. A
+        /// `case` takes [none] after its `{% else %}`.
+        ///
+        /// [Liquid]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/block.rb#L84
+        /// [none]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/tags/case.rb#L146-L149
+        pub end_markup: Option<ByteRange>,
     }
 
     /// A `{% when %}` clause of a [`Case`] block, whose values are separated by
