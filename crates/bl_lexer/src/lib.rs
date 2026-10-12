@@ -84,6 +84,11 @@ pub struct Lexer<'lex> {
 
     tree: Cell<Option<TreeInfo>>,
 
+    /// Whether the next token is the file that an `include` names, which can
+    /// be a path, since the token before it is the tag's name, see
+    /// [Lexer::at_include_path].
+    path_next: Cell<bool>,
+
     /// The tokens that the lexer has produced.
     pub tokens: Vec<Token>,
 }
@@ -100,6 +105,7 @@ impl<'lex> Lexer<'lex> {
             tree: Cell::new(None),
             offset: Cell::new(0),
             end: Cell::new(spanned.source.len()),
+            path_next: Cell::new(false),
         }
     }
 
@@ -299,7 +305,7 @@ impl<'lex> Lexer<'lex> {
             ));
         }
 
-        let kind = if self.at_include_path() {
+        let kind = if self.path_next.take() && self.at_include_path() {
             self.include_path()
         } else if let Some(mut info) = self.tree.get() {
             match self.next()? {
@@ -767,7 +773,20 @@ impl<'lex> Lexer<'lex> {
         }
 
         let name = &self.spanned.source[start..self.offset.get()];
-        self.name_kind(name)
+        let kind = self.name_kind(name);
+
+        // The file that an `include` or `include_relative` tag names comes
+        // after the tag's name, and can be a path in Jekyll's [`include`].
+        //
+        // [`include`]: https://jekyllrb.com/docs/includes/
+        if self.dialect.include_takes_paths()
+            && matches!(kind, TokenKind::Keyword(Keyword::Include | Keyword::IncludeRelative))
+            && self.at_tag_name()
+        {
+            self.path_next.set(true);
+        }
+
+        kind
     }
 
     /// What the name `name` is: a keyword that is only one as the name of a
@@ -836,22 +855,15 @@ impl<'lex> Lexer<'lex> {
         })
     }
 
-    /// Whether the file that an `include` or `include_relative` tag names is
-    /// next, after the tag's name, as a path rather than a string. Jekyll's
-    /// [`include`] names it with a path in Liquid, e.g.
-    /// `{% include nav/links.html %}`, and Shopify's with a string, e.g.
-    /// `{% include 'product' %}`, which is lexed as usual.
+    /// Whether the file that an `include` or `include_relative` tag names,
+    /// which is next, is a path rather than a string. Jekyll's [`include`]
+    /// names it with a path in Liquid, e.g. `{% include nav/links.html %}`,
+    /// and Shopify's with a string, e.g. `{% include 'product' %}`, which is
+    /// lexed as usual.
     ///
     /// [`include`]: https://jekyllrb.com/docs/includes/
     fn at_include_path(&self) -> bool {
-        self.dialect.include_takes_paths()
-            && self.tree.get().is_some_and(|info| {
-                matches!(
-                    self.tokens[info.start - 1..],
-                    [tok!(Tree(Delimiter::Percent, _)), kw!(Include) | kw!(IncludeRelative)]
-                )
-            })
-            && !self.is_eof()
+        !self.is_eof()
             && !matches!(self.peek(), '"' | '\'')
             && !self.at_closing_delimiter(0)
             && !(self.is_trim_marker(self.peek()) && self.at_closing_delimiter(1))
