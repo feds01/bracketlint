@@ -823,8 +823,10 @@ define_tree! {
         /// The whitespace control of the opening and the closing tag.
         pub trim: TrimTag,
 
-        /// The text after the name of the closing tag, which Liquid ignores,
+        /// The text after the name of the closing tag, which [Liquid] ignores,
         /// see [crate::Dialect::else_and_end_tags_ignore_markup].
+        ///
+        /// [Liquid]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/block.rb#L84
         pub end_markup: Option<ByteRange>,
     }
 
@@ -1037,8 +1039,12 @@ define_tree! {
         pub end_trim: TrimMarker,
 
         /// The text after the names of the `{% else %}` and `{% endif %}` tags,
-        /// which Liquid ignores, e.g. `if b` in `{% else if b %}`, see
+        /// which Liquid ignores after an [`else`] and an [end tag], e.g. `if b`
+        /// in `{% else if b %}`, see
         /// [crate::Dialect::else_and_end_tags_ignore_markup].
+        ///
+        /// [`else`]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/tags/if.rb#L73-L78
+        /// [end tag]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/block.rb#L84
         pub else_markup: Option<ByteRange>,
         pub end_markup: Option<ByteRange>,
     }
@@ -1081,8 +1087,11 @@ define_tree! {
         pub empty_trim: TrimMarker,
 
         /// The text after the names of the `{% else %}` and closing tags,
-        /// which Liquid ignores, see
+        /// which Liquid ignores after an [`else`] and an [end tag], see
         /// [crate::Dialect::else_and_end_tags_ignore_markup].
+        ///
+        /// [`else`]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/tags/for.rb#L56-L59
+        /// [end tag]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/block.rb#L84
         pub empty_markup: Option<ByteRange>,
         pub end_markup: Option<ByteRange>,
     }
@@ -1116,9 +1125,12 @@ define_tree! {
         pub trim: TrimTag,
         pub else_trim: TrimMarker,
 
-        /// The text after the name of the `{% endcase %}` tag, which Liquid
+        /// The text after the name of the `{% endcase %}` tag, which [Liquid]
         /// ignores, see [crate::Dialect::else_and_end_tags_ignore_markup]. A
-        /// `case` takes none after its `{% else %}`.
+        /// `case` takes [none] after its `{% else %}`.
+        ///
+        /// [Liquid]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/block.rb#L84
+        /// [none]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/tags/case.rb#L146-L149
         pub end_markup: Option<ByteRange>,
     }
 
