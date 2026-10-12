@@ -1,0 +1,12 @@
+// run=pass, stage=check, dialect=liquid
+
+{% if page.description %}{{ page.description }}{% else if site.description %}{{ site.description }}{% endif %}
+{% unless user %}Guest{% else user.name %}{{ user.name }}{% endunless %}
+{% for item in items %}{{ item }}{% else if items == empty %}None{% endfor %}
+{% liquid
+  if a
+    echo a
+  else if b
+    echo b
+  endif
+%}

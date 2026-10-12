@@ -822,6 +822,10 @@ define_tree! {
 
         /// The whitespace control of the opening and the closing tag.
         pub trim: TrimTag,
+
+        /// The text after the name of the closing tag, which Liquid ignores,
+        /// see [crate::Dialect::else_and_end_tags_ignore_markup].
+        pub end_markup: Option<ByteRange>,
     }
 
     /// A Liquid [`liquid`] tag, which holds a tag on each of its lines, i.e.
@@ -1031,6 +1035,12 @@ define_tree! {
         /// The whitespace control of the `{% else %}` and `{% endif %}` tags.
         pub else_trim: TrimMarker,
         pub end_trim: TrimMarker,
+
+        /// The text after the names of the `{% else %}` and `{% endif %}` tags,
+        /// which Liquid ignores, e.g. `if b` in `{% else if b %}`, see
+        /// [crate::Dialect::else_and_end_tags_ignore_markup].
+        pub else_markup: Option<ByteRange>,
+        pub end_markup: Option<ByteRange>,
     }
 
     #[derive(Clone, Copy, Debug, PartialEq)]
@@ -1069,6 +1079,12 @@ define_tree! {
         /// tags.
         pub trim: TrimTag,
         pub empty_trim: TrimMarker,
+
+        /// The text after the names of the `{% else %}` and closing tags,
+        /// which Liquid ignores, see
+        /// [crate::Dialect::else_and_end_tags_ignore_markup].
+        pub empty_markup: Option<ByteRange>,
+        pub end_markup: Option<ByteRange>,
     }
 
     /// A Liquid [`case`] block, which renders the first `when` clause with a
@@ -1099,6 +1115,11 @@ define_tree! {
         /// `{% endcase %}` tags.
         pub trim: TrimTag,
         pub else_trim: TrimMarker,
+
+        /// The text after the name of the `{% endcase %}` tag, which Liquid
+        /// ignores, see [crate::Dialect::else_and_end_tags_ignore_markup]. A
+        /// `case` takes none after its `{% else %}`.
+        pub end_markup: Option<ByteRange>,
     }
 
     /// A `{% when %}` clause of a [`Case`] block, whose values are separated by

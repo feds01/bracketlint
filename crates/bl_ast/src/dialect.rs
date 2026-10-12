@@ -185,6 +185,17 @@ impl Dialect {
         matches!(self, Dialect::Liquid)
     }
 
+    /// Whether a tag's name is only word characters, as [Liquid] reads it as
+    /// [`TagName`], i.e. `\w+`, so that a `-` or `?` ends it, which a name
+    /// can have elsewhere. E.g. `{% endfor- %}` is `endfor` followed by `-`,
+    /// which Liquid ignores, see [Dialect::else_and_end_tags_ignore_markup].
+    ///
+    /// [Liquid]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/block_body.rb#L7-L8
+    /// [`TagName`]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid.rb#L34
+    pub fn tag_names_are_word_characters(self) -> bool {
+        matches!(self, Dialect::Liquid)
+    }
+
     /// The markers that control the whitespace around a tag when they are
     /// written next to its delimiters, e.g. the `-` in `{%- if x -%}`, as in
     /// [Jinja], [Liquid], [Nunjucks] and [Twig]. Django has none.
@@ -685,6 +696,26 @@ impl Dialect {
     /// [Twig]: https://twig.symfony.com/doc/3.x/tags/for.html#the-else-clause
     pub fn empty_loop_tag(self) -> &'static str {
         if self.is_django() { "empty" } else { "else" }
+    }
+
+    /// Whether the text after the name of an `{% else %}` or end tag is
+    /// ignored, as in Liquid, e.g. the `if b` in `{% else if b %}`, which is
+    /// an `else` whatever `b` is. Liquid's [`if`], and so its [`unless`], and
+    /// its [`for`] don't read the text after `else`, though a [`case`] takes
+    /// none there. A block ends at the tag that is named as its end tag, in
+    /// [`Block#parse_body`], and in [`raw`], [`comment`] and [`doc`], which
+    /// find it themselves.
+    ///
+    /// [`if`]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/tags/if.rb#L73-L78
+    /// [`unless`]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/tags/unless.rb#L21
+    /// [`for`]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/tags/for.rb#L56-L59
+    /// [`case`]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/tags/case.rb#L146-L149
+    /// [`Block#parse_body`]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/block.rb#L84
+    /// [`raw`]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/tags/raw.rb#L27
+    /// [`comment`]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/tags/comment.rb#L53-L54
+    /// [`doc`]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/tags/doc.rb#L42-L46
+    pub fn else_and_end_tags_ignore_markup(self) -> bool {
+        matches!(self, Dialect::Liquid)
     }
 
     /// The keyword that the identifier `name` is in the dialect, if any.

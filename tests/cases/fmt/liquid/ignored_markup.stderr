@@ -1,0 +1,43 @@
+warning: Liquid ignores `no items` after `else`
+ --> $DIR/ignored_markup.html:4:9
+  |
+4 | {% else no items %}
+  |         --------
+  |
+  = note: this file is parsed as Liquid, from `--dialect liquid`
+warning: Liquid ignores `-` after `endfor`
+ --> $DIR/ignored_markup.html:6:11
+  |
+6 | {%- endfor- %}
+  |           -
+  |
+  = note: this file is parsed as Liquid, from `--dialect liquid`
+warning: Liquid ignores `if site.description` after `else`
+  --> $DIR/ignored_markup.html:10:11
+   |
+10 | {% else   if site.description %}
+   |           -------------------
+   |
+   = help: `{% elsif site.description %}` starts a branch with a condition
+   = note: this file is parsed as Liquid, from `--dialect liquid`
+warning: Liquid ignores `page` after `endif`
+  --> $DIR/ignored_markup.html:12:10
+   |
+12 | {% endif page %}
+   |          ----
+   |
+   = note: this file is parsed as Liquid, from `--dialect liquid`
+warning: Liquid ignores `-` after `endunless`
+  --> $DIR/ignored_markup.html:15:13
+   |
+15 | {% endunless- -%}
+   |             -
+   |
+   = note: this file is parsed as Liquid, from `--dialect liquid`
+warning: Liquid ignores `a` after `endcase`
+  --> $DIR/ignored_markup.html:19:12
+   |
+19 | {% endcase a %}
+   |            -
+   |
+   = note: this file is parsed as Liquid, from `--dialect liquid`

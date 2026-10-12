@@ -17,7 +17,7 @@ ok            _includes/giscus.liquid
 ok            _includes/head.liquid
 ok            _includes/header.liquid
 ok            _includes/latest_posts.liquid
-parse-error   _includes/metadata.liquid
+ok            _includes/metadata.liquid
 ok            _includes/news.liquid
 ok            _includes/newsletter.liquid
 ok            _includes/pagination.liquid

@@ -1,4 +1,4 @@
-use std::{ops::Range, rc::Rc};
+use std::{borrow::Cow, ops::Range, rc::Rc};
 
 use bl_ast::{
     AstVisitorMutSelf, ByteRange, Dialect, SourceId, SpannedSource,
@@ -265,6 +265,22 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         self.push_hunk(kind.right());
 
         Ok(())
+    }
+
+    /// The contents of an `{% else %}` or end tag named `name`, with the text
+    /// at `markup` after its name, which Liquid ignores, as it is written, if
+    /// there is any, e.g. `else if b`, see
+    /// [Dialect::else_and_end_tags_ignore_markup]. A space separates them
+    /// when the source has one, so `endfor-` stays as it is, and the space
+    /// that the tag ends with keeps its `-` apart from the `%}`, where it
+    /// would be a whitespace control marker.
+    fn with_markup(&self, name: &'static str, markup: Option<ByteRange>) -> Cow<'static, str> {
+        let Some(markup) = markup else {
+            return Cow::Borrowed(name);
+        };
+
+        let space = if self.whitespace_before(markup.start()).is_empty() { "" } else { " " };
+        Cow::Owned(format!("{name}{space}{}", self.ctx.source.hunk(markup)))
     }
 
     /// Push a line with a `{% ... %}` tag that holds `contents`, e.g. the
@@ -682,6 +698,8 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             loop_empty,
             trim,
             empty_trim,
+            empty_markup,
+            end_markup,
         } = node.body();
 
         let (opening, end) = match kind {
@@ -739,11 +757,13 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         // [Twig]: https://twig.symfony.com/doc/3.x/tags/for.html#the-else-clause
         if let Some(loop_empty) = loop_empty {
             self.start_branch(&open);
-            self.push_tag_line(self.ctx.dialect.empty_loop_tag(), *empty_trim)?;
+            let empty = self.with_markup(self.ctx.dialect.empty_loop_tag(), *empty_markup);
+            self.push_tag_line(&empty, *empty_trim)?;
             self.with_block(|formatter| formatter.visit_body(loop_empty.ast_ref()))?;
         }
 
-        self.end_block(end, trim.end, &open, after)
+        let end = self.with_markup(end, *end_markup);
+        self.end_block(&end, trim.end, &open, after)
     }
 
     type IfRet = ();
@@ -752,7 +772,8 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         &mut self,
         node: bl_ast::AstNodeRef<bl_ast::If>,
     ) -> Result<Self::IfRet, Self::Error> {
-        let bl_ast::If { clauses, otherwise, else_trim, end_trim } = node.body();
+        let bl_ast::If { clauses, otherwise, else_trim, end_trim, else_markup, end_markup } =
+            node.body();
         let open = self.ctx.open_elements.clone();
         let mut after = None;
 
@@ -765,7 +786,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
 
         if let Some(otherwise) = otherwise {
             self.start_branch(&open);
-            self.push_tag_line("else", *else_trim)?;
+            self.push_tag_line(&self.with_markup("else", *else_markup), *else_trim)?;
             self.with_block(|formatter| formatter.visit_body(otherwise.ast_ref()))?;
         }
 
@@ -774,8 +795,9 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             Some(bl_ast::ClauseKind::Unless) => "endunless",
             _ => "endif",
         };
+        let end = self.with_markup(end, *end_markup);
         let after = after.unwrap_or_else(|| open.clone());
-        self.end_block(end, *end_trim, &open, after)
+        self.end_block(&end, *end_trim, &open, after)
     }
 
     type IfClauseRet = ();
@@ -824,7 +846,8 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         &mut self,
         node: bl_ast::AstNodeRef<bl_ast::Case>,
     ) -> Result<Self::CaseRet, Self::Error> {
-        let bl_ast::Case { subject, leading, branches, otherwise, trim, else_trim } = node.body();
+        let bl_ast::Case { subject, leading, branches, otherwise, trim, else_trim, end_markup } =
+            node.body();
         let open = self.ctx.open_elements.clone();
         let mut after = None;
 
@@ -852,8 +875,9 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             after.get_or_insert_with(|| self.ctx.open_elements.clone());
         }
 
+        let end = self.with_markup("endcase", *end_markup);
         let after = after.unwrap_or_else(|| open.clone());
-        self.end_block("endcase", trim.end, &open, after)
+        self.end_block(&end, trim.end, &open, after)
     }
 
     type WhenRet = ();

@@ -1,0 +1,4 @@
+// run=fail, stage=check, dialect=jinja
+
+{% if a %}x{% else if b %}y{% endif %}
+{% for item in items %}{{ item }}{% endfor item %}

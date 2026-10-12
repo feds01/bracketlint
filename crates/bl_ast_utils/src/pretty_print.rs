@@ -33,6 +33,15 @@ impl TreeNodeUtils for TreeNode {
     }
 }
 
+impl AstTreePrinter<'_> {
+    /// The leaf `label` for the text at `markup` after the name of an
+    /// `{% else %}` or end tag, which Liquid ignores, if there is any, see
+    /// [ast::Dialect::else_and_end_tags_ignore_markup].
+    fn markup_leaf(&self, label: &str, markup: Option<ast::ByteRange>) -> Option<TreeNode> {
+        markup.map(|range| TreeNode::leaf(labelled(label, self.source.hunk(range), "\"")))
+    }
+}
+
 impl AstVisitor for AstTreePrinter<'_> {
     type Error = Infallible;
 
@@ -548,6 +557,9 @@ impl AstVisitor for AstTreePrinter<'_> {
             children.push(TreeNode::branch("otherwise", vec![otherwise]));
         }
 
+        children.extend(self.markup_leaf("else_markup", node.body().else_markup));
+        children.extend(self.markup_leaf("end_markup", node.body().end_markup));
+
         Ok(TreeNode::branch("if", children))
     }
 
@@ -580,6 +592,9 @@ impl AstVisitor for AstTreePrinter<'_> {
             children.push(TreeNode::branch("guard", vec![guard]));
         }
 
+        children.extend(self.markup_leaf("empty_markup", node.body().empty_markup));
+        children.extend(self.markup_leaf("end_markup", node.body().end_markup));
+
         let label = match node.body().kind {
             ast::LoopKind::For => "for",
             ast::LoopKind::TableRow => "tablerow",
@@ -602,6 +617,8 @@ impl AstVisitor for AstTreePrinter<'_> {
         if let Some(otherwise) = otherwise {
             children.push(TreeNode::branch("otherwise", vec![otherwise]));
         }
+
+        children.extend(self.markup_leaf("end_markup", node.body().end_markup));
 
         Ok(TreeNode::branch("case", children))
     }
@@ -655,7 +672,11 @@ impl AstVisitor for AstTreePrinter<'_> {
         node: ast::AstNodeRef<ast::Capture>,
     ) -> Result<Self::CaptureRet, Self::Error> {
         let walk::Capture { name, block_body } = walk::walk_capture(self, node)?;
-        Ok(TreeNode::branch("capture", vec![name, block_body]))
+
+        let mut children = vec![name, block_body];
+        children.extend(self.markup_leaf("end_markup", node.body().end_markup));
+
+        Ok(TreeNode::branch("capture", children))
     }
 
     type LiquidTagRet = TreeNode;

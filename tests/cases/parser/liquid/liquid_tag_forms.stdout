@@ -19,7 +19,7 @@ body
 │   └─name "liquid"
 ├─text
 └─generic_tag
-  ├─name "liquid-tag"
+  ├─name "liquid_tag"
   └─args
     └─arg
       └─var_expr

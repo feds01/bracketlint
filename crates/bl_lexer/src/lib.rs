@@ -743,8 +743,16 @@ impl<'lex> Lexer<'lex> {
         // The characters of an identifier are all ASCII, so its bytes are
         // scanned directly. It can contain a `-`, but not the whitespace control
         // marker of the delimiter right after it, e.g. the `-` in `x-%}`.
+        //
+        // A tag's name is only word characters in [Liquid], whose [`TagName`]
+        // is `\w+`, so a `-` ends it, e.g. `endfor` in `{% endfor- %}`, and it
+        // doesn't end with a `?`.
+        //
+        // [Liquid]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/block_body.rb#L7-L8
+        // [`TagName`]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid.rb#L34
         let bytes = self.spanned.source.as_bytes();
         let dash_is_marker = self.is_trim_marker('-');
+        let word = self.dialect.tag_names_are_word_characters() && self.at_any_tag_name();
         let mut end = self.offset.get();
 
         while let Some(&byte) = bytes.get(end) {
@@ -755,7 +763,7 @@ impl<'lex> Lexer<'lex> {
                     (Some(b'%' | b'}'), Some(b'}'))
                 );
 
-            if !ID_CONTINUE[usize::from(byte)] || at_marker {
+            if !ID_CONTINUE[usize::from(byte)] || at_marker || (word && byte == b'-') {
                 break;
             }
 
@@ -765,10 +773,10 @@ impl<'lex> Lexer<'lex> {
         self.offset.set(end);
 
         // [Liquid's lexer] lets a name end with one `?`, e.g.
-        // `product.gift_card?`.
+        // `product.gift_card?`, though not a tag's name, see above.
         //
         // [Liquid's lexer]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/lexer.rb#L23
-        if self.dialect.names_can_end_with_question_mark() && self.peek() == '?' {
+        if self.dialect.names_can_end_with_question_mark() && !word && self.peek() == '?' {
             self.skip_ascii();
         }
 
@@ -907,6 +915,13 @@ impl<'lex> Lexer<'lex> {
         TokenKind::Path
     }
 
+    /// Whether the token being lexed is the name of a tag, as in
+    /// [Lexer::at_tag_name], or of a line of a `liquid` tag, which is a tag
+    /// without its delimiters.
+    fn at_any_tag_name(&self) -> bool {
+        self.tree.get().is_some_and(|info| info.start == self.tokens.len() && info.opener.is_tag())
+    }
+
     /// Whether a line of a `liquid` tag starts here, i.e. the tree is a `{% %}`
     /// tree whose first token is `liquid`, and its `%}` isn't next.
     fn at_liquid_line(&self, info: TreeInfo) -> bool {
@@ -986,7 +1001,7 @@ impl<'lex> Lexer<'lex> {
     /// Whether the source ahead has an `end` tag, e.g. `{% enddoc %}`.
     fn has_end_tag(&self, end: &str) -> bool {
         let slice = unsafe { self.as_slice() };
-        find_end_tag(slice, end, self.dialect.trim_markers()).is_some()
+        find_end_tag(slice, end, self.dialect).is_some()
     }
 
     /// Lex the contents of a block as text, up to its `end` tag, e.g. `endraw`,
@@ -994,7 +1009,7 @@ impl<'lex> Lexer<'lex> {
     fn hunk(&mut self, end: &str) {
         let start = self.offset.get();
         let slice = unsafe { self.as_slice() };
-        let len = find_end_tag(slice, end, self.dialect.trim_markers()).unwrap_or(slice.len());
+        let len = find_end_tag(slice, end, self.dialect).unwrap_or(slice.len());
 
         if len > 0 {
             self.offset.update(|x| x + len);
@@ -1032,14 +1047,27 @@ impl<'lex> Lexer<'lex> {
 }
 
 /// The offset of the first `{% end %}` tag in `source`, e.g. `{% endraw %}`, if
-/// there is one. The tag can have any of the whitespace control `markers`,
-/// e.g. `{%- endraw -%}`.
-fn find_end_tag(source: &str, end: &str, markers: &[char]) -> Option<usize> {
+/// there is one. The tag can have any of the whitespace control markers of
+/// `dialect`, e.g. `{%- endraw -%}`.
+fn find_end_tag(source: &str, end: &str, dialect: Dialect) -> Option<usize> {
+    let markers = dialect.trim_markers();
+
     source.match_indices("{%").find_map(|(index, _)| {
         let tag = &source[index + 2..];
         let tag = tag.strip_prefix(markers).unwrap_or(tag).trim_start();
-        let rest = tag.strip_prefix(end)?.trim_start();
+        let rest = tag.strip_prefix(end)?;
 
+        // Liquid's [`raw`] and [`doc`] end at the tag whose name, which is
+        // `\w+`, is `end`, whatever comes after the name, e.g. `{% endraw x %}`.
+        //
+        // [`raw`]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/tags/raw.rb#L27
+        // [`doc`]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/tags/doc.rb#L42-L46
+        if dialect.else_and_end_tags_ignore_markup() {
+            let word = rest.starts_with(|c: char| c.is_ascii_alphanumeric() || c == '_');
+            return (!word).then_some(index);
+        }
+
+        let rest = rest.trim_start();
         rest.strip_prefix(markers).unwrap_or(rest).starts_with("%}").then_some(index)
     })
 }
@@ -1313,6 +1341,79 @@ mod tests {
                 Percent,
                 [kw!(Include), tok!(Ident), tok!(Slash), tok!(Ident), tok!(Dot), tok!(Ident)]
             )
+        ));
+    }
+
+    #[test]
+    fn a_tag_name_ends_at_a_dash_in_liquid() {
+        use crate::{kw, token::Delimiter};
+
+        // The `-` after the name isn't a whitespace control marker, unless it
+        // is next to the `%}`.
+        assert!(matches!(
+            lex("{%- endfor- %}", Dialect::Liquid)[..],
+            tree!(Percent, [kw!(EndFor), tok!(Minus)])
+        ));
+        assert!(matches!(lex("{% endfor-%}", Dialect::Liquid)[..], tree!(Percent, [kw!(EndFor)])));
+        assert!(matches!(
+            lex("{% endif? %}", Dialect::Liquid)[..],
+            tree!(Percent, [kw!(EndIf), tok!(Unexpected('?'))])
+        ));
+
+        // The name of a line of a `liquid` tag too.
+        assert!(matches!(
+            lex("{% liquid\nendfor-\n%}", Dialect::Liquid)[..],
+            [
+                tok!(Tree(Delimiter::Percent, 4)),
+                kw!(Liquid),
+                tok!(Tree(Delimiter::Line, 2)),
+                kw!(EndFor),
+                tok!(Minus),
+            ]
+        ));
+
+        // A name elsewhere can have a `-`, and end with a `?`.
+        assert!(matches!(
+            lex("{% if gift-card? %}", Dialect::Liquid)[..],
+            tree!(Percent, [kw!(If), tok!(Ident)])
+        ));
+
+        // The other dialects read the name with its `-`.
+        assert!(matches!(lex("{% endfor- %}", Dialect::Jinja)[..], tree!(Percent, [tok!(Ident)])));
+    }
+
+    #[test]
+    fn raw_ends_at_its_end_tag_whatever_follows_its_name_in_liquid() {
+        use crate::{kw, token::Delimiter};
+
+        assert!(matches!(
+            lex("{% raw %}{{ x }}{% endraw x %}", Dialect::Liquid)[..],
+            [
+                tok!(Tree(Delimiter::Percent, 1)),
+                kw!(Raw),
+                tok!(Text),
+                tok!(Tree(Delimiter::Percent, 2)),
+                kw!(EndRaw),
+                tok!(Ident),
+            ]
+        ));
+
+        // A tag whose name only starts with `endraw` isn't the end tag.
+        assert!(matches!(
+            lex("{% raw %}{% endraws %}{% endraw %}", Dialect::Liquid)[..],
+            [
+                tok!(Tree(Delimiter::Percent, 1)),
+                kw!(Raw),
+                tok!(Text),
+                tok!(Tree(Delimiter::Percent, 1)),
+                kw!(EndRaw),
+            ]
+        ));
+
+        // Jinja's `raw` only ends at `{% endraw %}`, so the rest is its text.
+        assert!(matches!(
+            lex("{% raw %}{{ x }}{% endraw x %}", Dialect::Jinja)[..],
+            [tok!(Tree(Delimiter::Percent, 1)), kw!(Raw), tok!(Text)]
         ));
     }
 

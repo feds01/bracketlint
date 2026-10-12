@@ -467,6 +467,39 @@ impl<'s, 'a> Parser<'s, 'a> {
         }
     }
 
+    /// Skip the rest of the tag after its name `tag`, which is `else` or an end
+    /// tag, and return the range of the rest, if there is any. Liquid ignores
+    /// it: its [`if`] and [`for`] after `else`, and a [block] or a [`raw`],
+    /// [`comment`] or [`doc`] block after its end tag's name. It is likely a
+    /// mistake, e.g. `{% else if b %}`, which is an `else` whatever `b` is,
+    /// so it is warned about. `in_if` says whether the tag is the `else` of an
+    /// `if` block, which could be an `elsif` clause instead.
+    ///
+    /// [`if`]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/tags/if.rb#L73-L78
+    /// [`for`]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/tags/for.rb#L56-L59
+    /// [block]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/block.rb#L84
+    /// [`raw`]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/tags/raw.rb#L27
+    /// [`comment`]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/tags/comment.rb#L53-L54
+    /// [`doc`]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/tags/doc.rb#L42-L46
+    fn parse_ignored_markup(&mut self, tag: Keyword, in_if: bool) -> Option<ByteRange> {
+        let dialect = self.options.dialect;
+        if !dialect.else_and_end_tags_ignore_markup() || self.exhausted() {
+            return None;
+        }
+
+        let start = self.current_pos();
+        while self.has_token() {
+            self.skip_token(); // `<token>` Skip each token of the rest.
+        }
+        let range = start.join(self.previous_pos());
+
+        let markup = self._source.hunk(range).into();
+        let kind = ParseWarningKind::IgnoredMarkup { dialect, tag, markup, in_if };
+        self.add_warning(ParseWarning::new(kind, self.make_span(range)));
+
+        Some(range)
+    }
+
     /// Create an error at the current location.
     pub(crate) fn err_with_location<T>(
         &self,
@@ -2021,30 +2054,32 @@ impl<'s, 'a> Parser<'s, 'a> {
             })?;
 
         // Next, parse until we reach the end of the loop, or the body for an
-        // empty loop.
-        let (loop_body, ending_token, ending_trim) = self.parse_body_until_block_footer(
+        // empty loop, with the whitespace control of the tag there and the
+        // text after its name.
+        let footer = |g: &mut Self| {
+            // The footer is found by its keyword, `<empty>` or `<end>`.
+            let Some(TokenKind::Keyword(tag)) = g.peek_kind() else { unreachable!() };
+            g.skip_token(); // `<empty>` | `<end>` Skip the empty or end token.
+            Ok((g.trim(), g.parse_ignored_markup(tag, false)))
+        };
+        let (loop_body, ending_token, ending) = self.parse_body_until_block_footer(
             end,
             |kind| matches!(kind, TokenKind::Keyword(kwd) if kwd == end || Some(kwd) == empty),
-            |g| {
-                g.skip_token(); // `<empty>` | `<end>` Skip the empty or end token.
-                Ok(g.trim())
-            },
+            footer,
         )?;
 
-        let (loop_empty, empty_trim, end_trim) = if ending_token != TokenKind::Keyword(end) {
-            let (body, _, end_trim) = self.parse_body_until_block_footer(
-                end,
-                |kind| kind == TokenKind::Keyword(end),
-                |g| {
-                    g.skip_token(); // `<end>` Skip the end token.
-                    Ok(g.trim())
-                },
-            )?;
+        let (loop_empty, (empty_trim, empty_markup), (end_trim, end_markup)) =
+            if ending_token != TokenKind::Keyword(end) {
+                let (body, _, closing) = self.parse_body_until_block_footer(
+                    end,
+                    |kind| kind == TokenKind::Keyword(end),
+                    footer,
+                )?;
 
-            (Some(body), ending_trim, end_trim)
-        } else {
-            (None, ast::TrimMarker::default(), ending_trim)
-        };
+                (Some(body), ending, closing)
+            } else {
+                (None, (ast::TrimMarker::default(), None), ending)
+            };
 
         let for_loop = self.node_with_joined_span(
             ast::For {
@@ -2058,6 +2093,8 @@ impl<'s, 'a> Parser<'s, 'a> {
                 params,
                 trim: ast::TrimTag { start: trim, end: end_trim },
                 empty_trim,
+                empty_markup,
+                end_markup,
             },
             start,
         );
@@ -2211,8 +2248,8 @@ impl<'s, 'a> Parser<'s, 'a> {
     fn parse_if_block(&mut self) -> ParseResult<AstNode<'a, ast::Statement<'a>>> {
         let mut clauses = self.arena.vec();
         let mut otherwise = None;
-        let mut else_trim = ast::TrimMarker::default();
-        let mut end_trim = None;
+        let (mut else_trim, mut else_markup) = (ast::TrimMarker::default(), None);
+        let mut closing = None;
         let start = self.current_pos();
 
         let end = match self.peek_raw(1).map(|token| token.kind) {
@@ -2255,16 +2292,19 @@ impl<'s, 'a> Parser<'s, 'a> {
                     ));
                 }
                 TokenKind::Keyword(Keyword::Else) if otherwise.is_none() => {
-                    ((), else_trim) = self.in_tag(Delimiter::Percent, |g| {
-                        g.parse_token(TokenKind::Keyword(Keyword::Else))
+                    (else_markup, else_trim) = self.in_tag(Delimiter::Percent, |g| {
+                        g.parse_token(TokenKind::Keyword(Keyword::Else))?;
+                        Ok(g.parse_ignored_markup(Keyword::Else, true))
                     })?;
 
                     otherwise = Some(self.parse_body_until(|kwd| kwd == end)?);
                 }
                 TokenKind::Keyword(kwd) if kwd == end => {
-                    let ((), trim) = self
-                        .in_tag(Delimiter::Percent, |g| g.parse_token(TokenKind::Keyword(end)))?;
-                    end_trim = Some(trim);
+                    let (markup, trim) = self.in_tag(Delimiter::Percent, |g| {
+                        g.parse_token(TokenKind::Keyword(end))?;
+                        Ok(g.parse_ignored_markup(end, false))
+                    })?;
+                    closing = Some((trim, markup));
                     break;
                 }
                 _ => self.err_with_location(
@@ -2276,7 +2316,7 @@ impl<'s, 'a> Parser<'s, 'a> {
             }
         }
 
-        let Some(end_trim) = end_trim else {
+        let Some((end_trim, end_markup)) = closing else {
             return self.err_with_location(
                 ParseErrorKind::UnclosedTag(end),
                 ExpectedItem::empty(),
@@ -2286,10 +2326,8 @@ impl<'s, 'a> Parser<'s, 'a> {
         };
 
         let clauses = self.nodes_with_joined_span(clauses, start);
-        Ok(self.node_with_joined_span(
-            ast::Statement::Tag(ast::Tag::If(ast::If { clauses, otherwise, else_trim, end_trim })),
-            start,
-        ))
+        let if_block = ast::If { clauses, otherwise, else_trim, end_trim, else_markup, end_markup };
+        Ok(self.node_with_joined_span(ast::Statement::Tag(ast::Tag::If(if_block)), start))
     }
 
     /// Parse a Liquid `case` block, i.e.
@@ -2314,7 +2352,7 @@ impl<'s, 'a> Parser<'s, 'a> {
         let mut branches = self.arena.vec();
         let mut otherwise = None;
         let mut else_trim = ast::TrimMarker::default();
-        let mut end_trim = None;
+        let mut closing = None;
         let branches_start = self.current_pos();
 
         while let Some(token) = self.peek() {
@@ -2346,6 +2384,11 @@ impl<'s, 'a> Parser<'s, 'a> {
                         clause_start,
                     ));
                 }
+                // Unlike an `if`'s, the `else` of a Liquid [`case`] takes no
+                // text after it, see
+                // [ast::Dialect::else_and_end_tags_ignore_markup].
+                //
+                // [`case`]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/tags/case.rb#L146-L149
                 TokenKind::Keyword(Keyword::Else) if otherwise.is_none() => {
                     ((), else_trim) = self.in_tag(Delimiter::Percent, |g| {
                         g.parse_token(TokenKind::Keyword(Keyword::Else))
@@ -2354,10 +2397,11 @@ impl<'s, 'a> Parser<'s, 'a> {
                     otherwise = Some(self.parse_body_until(|kwd| kwd == Keyword::EndCase)?);
                 }
                 TokenKind::Keyword(Keyword::EndCase) => {
-                    let ((), trim) = self.in_tag(Delimiter::Percent, |g| {
-                        g.parse_token(TokenKind::Keyword(Keyword::EndCase))
+                    let (markup, trim) = self.in_tag(Delimiter::Percent, |g| {
+                        g.parse_token(TokenKind::Keyword(Keyword::EndCase))?;
+                        Ok(g.parse_ignored_markup(Keyword::EndCase, false))
                     })?;
-                    end_trim = Some(trim);
+                    closing = Some((trim, markup));
                     break;
                 }
                 _ => self.err_with_location(
@@ -2369,7 +2413,7 @@ impl<'s, 'a> Parser<'s, 'a> {
             }
         }
 
-        let Some(end_trim) = end_trim else {
+        let Some((end_trim, end_markup)) = closing else {
             return self.err_with_location(
                 ParseErrorKind::UnclosedTag(Keyword::EndCase),
                 ExpectedItem::empty(),
@@ -2387,6 +2431,7 @@ impl<'s, 'a> Parser<'s, 'a> {
                 otherwise,
                 trim: ast::TrimTag { start: trim, end: end_trim },
                 else_trim,
+                end_markup,
             },
             start,
         );
@@ -2719,6 +2764,10 @@ impl<'s, 'a> Parser<'s, 'a> {
             |kind| matches!(kind, TokenKind::Keyword(Keyword::EndRaw)),
             |g| {
                 g.skip_fast(TokenKind::Keyword(Keyword::EndRaw)); // `<endraw>` Skip the endraw token.
+
+                // The block is kept as it is written, so the rest of the tag
+                // needn't be held.
+                g.parse_ignored_markup(Keyword::EndRaw, false);
                 Ok(())
             },
         )?;
@@ -2743,8 +2792,11 @@ impl<'s, 'a> Parser<'s, 'a> {
             if token.kind.is_tag_tree() {
                 let maybe_token = self.peek_raw(1).map(|tok| tok.kind);
                 if maybe_token == Some(TokenKind::Keyword(end)) {
+                    // The comment is kept as it is written, so the rest of the
+                    // tag needn't be held.
                     self.in_tree(Delimiter::Percent, None, |g| {
                         g.parse_token(TokenKind::Keyword(end))?;
+                        g.parse_ignored_markup(end, false);
                         Ok(())
                     })?;
 
@@ -2911,12 +2963,12 @@ impl<'s, 'a> Parser<'s, 'a> {
             g.parse_name_or_string()
         })?;
 
-        let (block_body, _, end_trim) = self.parse_body_until_block_footer(
+        let (block_body, _, (end_trim, end_markup)) = self.parse_body_until_block_footer(
             Keyword::EndCapture,
             |kind| kind == TokenKind::Keyword(Keyword::EndCapture),
             |g| {
                 g.skip_fast(TokenKind::Keyword(Keyword::EndCapture)); // `<endcapture>` Skip the end token.
-                Ok(g.trim())
+                Ok((g.trim(), g.parse_ignored_markup(Keyword::EndCapture, false)))
             },
         )?;
 
@@ -2925,6 +2977,7 @@ impl<'s, 'a> Parser<'s, 'a> {
                 name,
                 block_body,
                 trim: ast::TrimTag { start: trim, end: end_trim },
+                end_markup,
             })),
             token.span,
         ))

@@ -1,0 +1,72 @@
+info: parsed module '$DIR/end_markup_liquid.html' as liquid:
+body
+├─for
+│ ├─target
+│ │ └─name "item"
+│ ├─iterator
+│ │ └─var_expr
+│ │   └─name "items"
+│ ├─loop_body
+│ │ └─body
+│ │   └─inline
+│ │     └─var_expr
+│ │       └─name "item"
+│ └─end_markup "-"
+├─if
+│ ├─clauses
+│ │ └─if_clause
+│ │   ├─condition
+│ │   │ └─var_expr
+│ │   │   └─name "a"
+│ │   └─clause_body
+│ │     └─body
+│ │       └─text
+│ └─end_markup "a"
+├─if
+│ ├─clauses
+│ │ └─unless_clause
+│ │   ├─condition
+│ │   │ └─var_expr
+│ │   │   └─name "a"
+│ │   └─clause_body
+│ │     └─body
+│ │       └─text
+│ └─end_markup "-"
+├─case
+│ ├─subject
+│ │ └─var_expr
+│ │   └─name "a"
+│ ├─leading
+│ │ └─body
+│ ├─branches
+│ │ └─when
+│ │   ├─values
+│ │   │ └─lit_expr
+│ │   │   └─int_lit 1
+│ │   └─clause_body
+│ │     └─body
+│ │       └─text
+│ └─end_markup "a"
+├─capture
+│ ├─name "x"
+│ ├─body
+│ │ └─text
+│ └─end_markup "x"
+├─tablerow
+│ ├─target
+│ │ └─name "item"
+│ ├─iterator
+│ │ └─var_expr
+│ │   └─name "items"
+│ ├─loop_body
+│ │ └─body
+│ │   └─inline
+│ │     └─var_expr
+│ │       └─name "item"
+│ └─end_markup "item"
+├─raw
+│ └─body
+│   └─text
+├─comment
+└─comment
+
