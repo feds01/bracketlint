@@ -1171,10 +1171,12 @@ impl<'s, 'a> Parser<'s, 'a> {
     }
 
     /// Whether `keyword` is a name in an expression, as any keyword is in
-    /// [Jinja] apart from those that its expressions have: `and`, `or`, `not`,
-    /// `in`, `is`, `if` and `else`, and `True` and `False`.
+    /// [Jinja] and [Twig] apart from those that their expressions have: `and`,
+    /// `or`, `not`, `in` and `is`, Jinja's `if` and `else`, and `True` and
+    /// `False`.
     ///
     /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L648-L661
+    /// [Twig]: https://github.com/twigphp/Twig/blob/v3.30.0/src/ExpressionParser/Prefix/LiteralExpressionParser.php#L37-L56
     fn keyword_is_name(&self, keyword: Keyword) -> bool {
         self.options.dialect.keywords_are_names()
             && !matches!(
