@@ -102,7 +102,7 @@ ok            templates/label/empty.html.twig
 ok            templates/label/inaccessible.html.twig
 ok            templates/label/null.html.twig
 ok            templates/label/undefined.html.twig
-unstable      templates/layout.html.twig
+ok            templates/layout.html.twig
 parse-error   templates/menu.html.twig
 ok            templates/page/content.html.twig
 ok            templates/page/login.html.twig
@@ -110,4 +110,4 @@ ok            templates/page/login_minimal.html.twig
 parse-error   templates/symfony-form-themes/bootstrap_5_layout.html.twig
 ok            templates/symfony-form-themes/bootstrap_base_layout.html.twig
 ok            templates/symfony-form-themes/form_div_layout.html.twig
-unstable      templates/welcome.html.twig
+ok            templates/welcome.html.twig
