@@ -651,8 +651,11 @@ define_tree! {
     }
 
     /// A path that names a file without quotes, e.g. `nav/links.html` in
-    /// Jekyll's `{% include nav/links.html %}`. It can have variables in it,
-    /// e.g. `icons/{{ icon }}.svg`, and is kept as it is written.
+    /// [Jekyll]'s `{% include nav/links.html %}`. It can have [variables] in
+    /// it, e.g. `icons/{{ icon }}.svg`, and is kept as it is written.
+    ///
+    /// [Jekyll]: https://jekyllrb.com/docs/includes/#passing-parameters-to-includes
+    /// [variables]: https://jekyllrb.com/docs/includes/#using-variables-names-for-the-include-file
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub struct PathExpr {
@@ -758,9 +761,11 @@ define_tree! {
         /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#import-context-behavior
         pub with_context: Option<bool>,
 
-        /// Whether the tag is Jekyll's `include_relative`, which names a file
+        /// Whether the tag is Jekyll's [`include_relative`], which names a file
         /// relative to this template, rather than in the site's `_includes`
         /// directory.
+        ///
+        /// [`include_relative`]: https://jekyllrb.com/docs/includes/#including-files-relative-to-another-file
         pub relative: bool,
     }
 
