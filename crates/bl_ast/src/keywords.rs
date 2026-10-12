@@ -263,6 +263,21 @@ pub enum Keyword {
     /// %}
     /// ```
     Liquid,
+    /// `guard` - Begins a Twig block that renders its body if the function,
+    /// filter or test that it names exists, and can have an `else` clause.
+    /// The lexer only makes this keyword at the start of a tag, so that
+    /// `guard` is still a name elsewhere
+    /// ```twig
+    /// {% guard function importmap %}
+    ///     {{ importmap('app') }}
+    /// {% else %}
+    ///     <script src="app.js"></script>
+    /// {% endguard %}
+    /// ```
+    Guard,
+    /// `endguard` - Ends a `guard` block. The lexer only makes this keyword at
+    /// the start of a tag too
+    EndGuard,
 }
 impl Keyword {
     pub fn identifier_like(&self) -> bool {

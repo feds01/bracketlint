@@ -1,0 +1,19 @@
+{% guard function importmap %}
+    {{ importmap('app') }}
+{% endguard %}
+<head>
+    {% guard function csp_nonce %}
+        <script nonce="{{ csp_nonce('script') }}" src="app.js"></script>
+    {%- else -%}
+        <script src="app.js"></script>
+    {% endguard %}
+</head>
+{%~ guard test same as ~%}
+    <p>{{ a is same as(b) }}</p>
+{%~ endguard %}
+<link
+{% guard function csp_nonce %}
+    nonce="{{ csp_nonce('style') }}"
+{% endguard %}
+rel="stylesheet">
+

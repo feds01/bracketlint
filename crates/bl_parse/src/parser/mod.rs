@@ -59,6 +59,9 @@ pub(crate) enum TagContext {
 
     /// When the parser has encountered a Liquid `capture` block.
     Capture,
+
+    /// When the parser has encountered a Twig `guard` block.
+    Guard,
 }
 impl TagContext {
     fn applies_to(&self, kwd: Keyword) -> bool {
@@ -73,6 +76,7 @@ impl TagContext {
             }
             TagContext::Case => matches!(kwd, Keyword::When | Keyword::Else),
             TagContext::Capture => matches!(kwd, Keyword::EndCapture),
+            TagContext::Guard => matches!(kwd, Keyword::EndGuard),
         }
     }
 }
@@ -797,6 +801,9 @@ impl<'s, 'a> Parser<'s, 'a> {
                     self.with_tag_context(TagContext::If, |g| g.parse_if_block())
                 }
                 Keyword::Case => self.with_tag_context(TagContext::Case, |g| g.parse_case_block()),
+                Keyword::Guard => {
+                    self.with_tag_context(TagContext::Guard, |g| g.parse_guard_block())
+                }
                 Keyword::Capture => {
                     self.with_tag_context(TagContext::Capture, |g| g.parse_capture_block())
                 }
@@ -2348,6 +2355,121 @@ impl<'s, 'a> Parser<'s, 'a> {
         }
 
         Ok(self.nodes_with_joined_span(values, start))
+    }
+
+    /// Parse a Twig [`guard`] block, which renders its body if the function,
+    /// filter or test that it names exists, and else the body after its
+    /// `{% else %}`, i.e.
+    ///
+    /// ```twig
+    /// {% guard function importmap %}
+    ///     {{ importmap('app') }}
+    /// {% else %}
+    ///     <script src="app.js"></script>
+    /// {% endguard %}
+    /// ```
+    ///
+    /// [`guard`]: https://twig.symfony.com/doc/3.x/tags/guard.html
+    fn parse_guard_block(&mut self) -> ParseResult<AstNode<'a, ast::Statement<'a>>> {
+        let start = self.current_pos();
+
+        let ((kind, name), trim) = self.in_tag(Delimiter::Percent, |g| {
+            g.parse_token(TokenKind::Keyword(Keyword::Guard))?;
+            let kind = g.parse_guard_kind()?;
+            Ok((kind, g.parse_guard_name(kind)?))
+        })?;
+
+        // The body ends at `{% else %}` or `{% endguard %}`, and the body after
+        // `{% else %}` at `{% endguard %}`.
+        let is_else = |kind: TokenKind| kind == TokenKind::Keyword(Keyword::Else);
+        let is_end = |kind: TokenKind| kind == TokenKind::Keyword(Keyword::EndGuard);
+        let footer = |g: &mut Self| {
+            g.skip_token(); // `else` | `endguard` Skip the else or end token.
+            Ok(g.trim())
+        };
+
+        let (guard_body, ending_token, ending_trim) = self.parse_body_until_block_footer(
+            Keyword::EndGuard,
+            |kind| is_else(kind) || is_end(kind),
+            footer,
+        )?;
+
+        let (otherwise, else_trim, end_trim) = if is_else(ending_token) {
+            let (body, _, end_trim) =
+                self.parse_body_until_block_footer(Keyword::EndGuard, is_end, footer)?;
+            (Some(body), ending_trim, end_trim)
+        } else {
+            (None, ast::TrimMarker::default(), ending_trim)
+        };
+
+        let guard = self.node_with_joined_span(
+            ast::Guard {
+                kind,
+                name,
+                guard_body,
+                otherwise,
+                trim: ast::TrimTag { start: trim, end: end_trim },
+                else_trim,
+            },
+            start,
+        );
+        Ok(self.node_with_joined_span(ast::Statement::Tag(ast::Tag::Guard(guard)), start))
+    }
+
+    /// Parse the kind of callable that a `guard` checks for, which is
+    /// `function`, `filter` or `test` in [Twig].
+    ///
+    /// [Twig]: https://twig.symfony.com/doc/3.x/tags/guard.html
+    fn parse_guard_kind(&mut self) -> ParseResult<ast::GuardKind> {
+        let token = self.peek().copied();
+        let kind = match token.map(|token| (token.kind, self._source.hunk(token.span))) {
+            Some((TokenKind::Ident, "function")) => ast::GuardKind::Function,
+            Some((TokenKind::Ident, "filter")) => ast::GuardKind::Filter,
+            Some((TokenKind::Ident, "test")) => ast::GuardKind::Test,
+            _ => {
+                return self.err_with_location(
+                    ParseErrorKind::GuardKind,
+                    ExpectedItem::empty(),
+                    token.map(|token| token.kind),
+                    token.map_or_else(|| self.eof_pos(), |token| token.span),
+                );
+            }
+        };
+
+        self.skip_fast(TokenKind::Ident); // `function` | `filter` | `test` Skip the kind.
+        Ok(kind)
+    }
+
+    /// Parse the name of the callable that a `guard` checks for, which can be
+    /// any name, e.g. `raw`. [Twig] reads a second name after a test's as
+    /// part of it, e.g. `same as`, so the name spans both.
+    ///
+    /// [Twig]: https://github.com/twigphp/Twig/blob/v3.30.0/src/TokenParser/GuardTokenParser.php#L34-L40
+    fn parse_guard_name(&mut self, kind: ast::GuardKind) -> ParseResult<AstNode<'a, ast::Name>> {
+        let start = self.current_pos();
+        let at_name = |g: &Self| match g.peek_kind() {
+            Some(TokenKind::Ident) => true,
+            Some(TokenKind::Keyword(keyword)) => {
+                keyword.identifier_like() || g.keyword_is_name(keyword)
+            }
+            _ => false,
+        };
+
+        if !at_name(self) {
+            return self.err_with_location(
+                ParseErrorKind::UnExpected,
+                ExpectedItem::Ident,
+                self.peek_kind(),
+                self.expected_pos(),
+            );
+        }
+        self.skip_token(); // `<name>` Skip the name.
+
+        if kind == ast::GuardKind::Test && at_name(self) {
+            self.skip_token(); // `<name>` Skip the second word of the test's name.
+        }
+
+        Ok(self.node_with_joined_span(ast::Name::new(ast::Identifier::from(0u32)), start))
     }
 
     fn parse_break_statement(&mut self) -> ParseResult<AstNode<'a, ast::Statement<'a>>> {

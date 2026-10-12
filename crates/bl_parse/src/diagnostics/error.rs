@@ -57,6 +57,13 @@ pub enum ParseErrorKind {
     ///
     /// It holds the keyword of the tag that closes it, e.g. `endif`.
     UnclosedTag(Keyword),
+
+    /// The kind of callable that a Twig `guard` checks for is missing, or
+    /// isn't one of `function`, `filter` and `test`, e.g.
+    /// ```twig
+    /// {% guard macro forms %}
+    /// ```
+    GuardKind,
 }
 
 impl From<ParseError> for Reports {
@@ -77,6 +84,9 @@ impl From<ParseError> for Reports {
             ParseErrorKind::Statement => "expected a statement".to_string(),
             ParseErrorKind::Tag => "expected a tag".to_string(),
             ParseErrorKind::UnclosedTag(end) => format!("expected a closing `{{% {end} %}}` tag"),
+            ParseErrorKind::GuardKind => {
+                "expected `function`, `filter` or `test` after `guard`".to_string()
+            }
         };
 
         // `ParseErrorKind::Expected` format the error message in their own way,

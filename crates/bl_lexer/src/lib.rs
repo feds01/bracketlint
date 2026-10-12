@@ -754,19 +754,29 @@ impl<'lex> Lexer<'lex> {
         }
 
         let name = &self.spanned.source[start..self.offset.get()];
+        self.name_kind(name)
+    }
 
-        // `liquid` is only a keyword as the name of a [`liquid` tag], so that it
-        // is still a name elsewhere, e.g. in `{{ liquid }}`.
+    /// What the name `name` is: a keyword that is only one as the name of a
+    /// tag, one of the dialect's other keywords, or a name.
+    fn name_kind(&self, name: &str) -> TokenKind {
+        // Some keywords are only keywords as the name of a tag, so that they are
+        // still names elsewhere, e.g. in `{{ liquid }}`: Liquid's [`liquid`]
+        // tag, and the tags of Twig's [`guard`] blocks.
         //
-        // [`liquid` tag]: https://shopify.github.io/liquid/tags/template/#liquid
-        if name == "liquid" && self.dialect.has_liquid_tag() && self.at_tag_name() {
-            return TokenKind::Keyword(Keyword::Liquid);
-        }
+        // [`liquid`]: https://shopify.github.io/liquid/tags/template/#liquid
+        // [`guard`]: https://twig.symfony.com/doc/3.x/tags/guard.html
+        let tag_keyword = match name {
+            "liquid" if self.dialect.has_liquid_tag() => Some(Keyword::Liquid),
+            "guard" if self.dialect.has_guard_blocks() => Some(Keyword::Guard),
+            "endguard" if self.dialect.has_guard_blocks() => Some(Keyword::EndGuard),
+            _ => None,
+        };
 
-        if let Some(keyword) = self.dialect.keyword(name) {
-            TokenKind::Keyword(keyword)
-        } else {
-            TokenKind::Ident
+        match (tag_keyword, self.dialect.keyword(name)) {
+            (Some(keyword), _) if self.at_tag_name() => TokenKind::Keyword(keyword),
+            (_, Some(keyword)) => TokenKind::Keyword(keyword),
+            (_, None) => TokenKind::Ident,
         }
     }
 
@@ -1133,6 +1143,27 @@ mod tests {
                 "{dialect}"
             );
         }
+    }
+
+    #[test]
+    fn guard_is_only_a_keyword_as_a_tag_name_in_twig() {
+        use crate::kw;
+
+        assert!(matches!(
+            lex("{%- guard function guard %}{% endguard -%}", Dialect::Twig)[..],
+            [
+                tok!(Tree(crate::token::Delimiter::Percent, 3)),
+                kw!(Guard),
+                tok!(Ident),
+                tok!(Ident),
+                tok!(Tree(crate::token::Delimiter::Percent, 1)),
+                kw!(EndGuard),
+            ]
+        ));
+        assert!(matches!(lex("{{ guard }}", Dialect::Twig)[..], tree!(Brace, [tok!(Ident)])));
+
+        // The other dialects have no `guard` blocks.
+        assert!(matches!(lex("{% guard %}", Dialect::Jinja)[..], tree!(Percent, [tok!(Ident)])));
     }
 
     #[test]

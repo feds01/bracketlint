@@ -44,7 +44,7 @@ ok            templates/crud/detail/tab_group_close.html.twig
 ok            templates/crud/detail/tab_group_open.html.twig
 ok            templates/crud/detail/tab_list.html.twig
 ok            templates/crud/detail/tab_open.html.twig
-parse-error   templates/crud/edit.html.twig
+ok            templates/crud/edit.html.twig
 ok            templates/crud/field/array.html.twig
 ok            templates/crud/field/association.html.twig
 ok            templates/crud/field/avatar.html.twig
@@ -83,7 +83,7 @@ ok            templates/crud/includes/_batch_action_modal.html.twig
 ok            templates/crud/includes/_filters_modal.html.twig
 ok            templates/crud/includes/_sort_modal.html.twig
 ok            templates/crud/index.html.twig
-parse-error   templates/crud/new.html.twig
+ok            templates/crud/new.html.twig
 ok            templates/crud/paginator.html.twig
 ok            templates/exception.html.twig
 ok            templates/exception_standalone.html.twig
@@ -91,8 +91,8 @@ ok            templates/flash_messages.html.twig
 ok            templates/includes/_css_assets.html.twig
 ok            templates/includes/_encore_link_tags.html.twig
 ok            templates/includes/_encore_script_tags.html.twig
-parse-error   templates/includes/_importmap.html.twig
-parse-error   templates/includes/_js_assets.html.twig
+ok            templates/includes/_importmap.html.twig
+ok            templates/includes/_js_assets.html.twig
 ok            templates/includes/_reprise_link_tags.html.twig
 ok            templates/includes/_reprise_script_tags.html.twig
 ok            templates/inspector/data_collector.html.twig
@@ -102,12 +102,12 @@ ok            templates/label/empty.html.twig
 ok            templates/label/inaccessible.html.twig
 ok            templates/label/null.html.twig
 ok            templates/label/undefined.html.twig
-parse-error   templates/layout.html.twig
+unstable      templates/layout.html.twig
 parse-error   templates/menu.html.twig
 ok            templates/page/content.html.twig
-parse-error   templates/page/login.html.twig
-parse-error   templates/page/login_minimal.html.twig
+ok            templates/page/login.html.twig
+ok            templates/page/login_minimal.html.twig
 parse-error   templates/symfony-form-themes/bootstrap_5_layout.html.twig
 ok            templates/symfony-form-themes/bootstrap_base_layout.html.twig
 ok            templates/symfony-form-themes/form_div_layout.html.twig
-parse-error   templates/welcome.html.twig
+unstable      templates/welcome.html.twig

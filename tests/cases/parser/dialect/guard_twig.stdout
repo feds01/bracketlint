@@ -1,0 +1,100 @@
+info: parsed module '$DIR/guard_twig.html' as twig:
+body
+├─guard
+│ ├─function
+│ ├─name "importmap"
+│ └─guard_body
+│   └─body
+│     └─inline
+│       └─call_expr
+│         ├─subject
+│         │ └─var_expr
+│         │   └─name "importmap"
+│         └─args
+│           └─arg
+│             └─lit_expr
+│               └─str_lit 'app'
+├─guard
+│ ├─filter
+│ ├─name "raw"
+│ ├─guard_body
+│ │ └─body
+│ │   └─inline
+│ │     └─filtered_expr
+│ │       ├─subject
+│ │       │ └─var_expr
+│ │       │   └─name "html"
+│ │       └─filter
+│ │         ├─name "raw"
+│ │         └─args
+│ └─otherwise
+│   └─body
+│     └─inline
+│       └─filtered_expr
+│         ├─subject
+│         │ └─var_expr
+│         │   └─name "html"
+│         └─filter
+│           ├─name "e"
+│           └─args
+├─guard
+│ ├─test
+│ ├─name "same as"
+│ ├─guard_body
+│ │ └─body
+│ │   └─inline
+│ │     └─bin_expr
+│ │       ├─lhs
+│ │       │ └─var_expr
+│ │       │   └─name "a"
+│ │       ├─operator `is`
+│ │       └─rhs
+│ │         └─call_expr
+│ │           ├─subject
+│ │           │ └─var_expr
+│ │           │   └─name "same as"
+│ │           └─args
+│ │             └─arg
+│ │               └─var_expr
+│ │                 └─name "b"
+│ └─otherwise
+│   └─body
+│     └─inline
+│       └─bin_expr
+│         ├─lhs
+│         │ └─var_expr
+│         │   └─name "a"
+│         ├─operator `==`
+│         └─rhs
+│           └─var_expr
+│             └─name "b"
+├─guard
+│ ├─test
+│ ├─name "empty"
+│ └─guard_body
+│   └─body
+│     └─guard
+│       ├─function
+│       ├─name "csp_nonce"
+│       └─guard_body
+│         └─body
+│           └─inline
+│             └─call_expr
+│               ├─subject
+│               │ └─var_expr
+│               │   └─name "csp_nonce"
+│               └─args
+│                 └─arg
+│                   └─lit_expr
+│                     └─str_lit 'script'
+├─generic_tag
+│ ├─name "set"
+│ └─args
+│   └─arg
+│     ├─name "guard"
+│     └─lit_expr
+│       └─int_lit 1
+└─inline
+  └─var_expr
+    └─name "guard"
+
