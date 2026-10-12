@@ -1,0 +1,7 @@
+warning: the `<script>` doesn't parse as JavaScript
+ --> $DIR/script_unparsed_after_tag.html:4:16
+  |
+4 | let greeting = ;
+  |                - Expected an expression, or an assignment but instead found ';'.
+  |
+  = help: its code is kept as it is written

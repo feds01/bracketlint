@@ -1,17 +1,20 @@
 use std::{borrow::Cow, ops::Range, rc::Rc};
 
 use bl_ast::{
-    AstVisitorMutSelf, ByteRange, Dialect, SourceId, SpannedSource,
+    AstVisitorMutSelf, ByteRange, Dialect, SourceId, Span, SpannedSource,
     ast_visitor_mut_self_default_impl, walk_mut_self,
 };
-use bl_reporting::inline::{InlineSnippet, note_on_span};
+use bl_reporting::{
+    DiagnosticsMut,
+    inline::{InlineSnippet, note_on_span},
+};
 
 use crate::{
     adapters::{
         ExternalLanguagesEngineAdaptor, Formatted, FormatterContext, HasHTMLParsing, HtmlPart,
-        LanguageType, TerminalState,
+        LanguageType, TerminalState, Unparsed,
     },
-    diagnostics::FmtError,
+    diagnostics::{FmtDiagnostics, FmtError, FmtWarning, FmtWarningKind},
     options::FormatterOptions,
 };
 
@@ -32,6 +35,9 @@ pub(crate) struct Formatter<'fmt, EngineAdaptor: ExternalLanguagesEngineAdaptor>
     /// the buffer then. In a `<pre>`, `<textarea>`, `<script>` or `<style>`,
     /// the source after it is pushed exactly as it is written too, from there.
     exact: Option<(usize, usize)>,
+
+    /// What the formatter reports while it formats all of the template.
+    diagnostics: FmtDiagnostics,
 }
 
 impl<EngineAdaptor: ExternalLanguagesEngineAdaptor> Formatter<'_, EngineAdaptor> {
@@ -91,12 +97,13 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
                 open_elements: vec![],
             },
             exact: None,
+            diagnostics: FmtDiagnostics::new(),
         }
     }
 
-    /// Convert the formatter into the buffer.
-    pub fn into_buffer(self) -> String {
-        self.buffer
+    /// Convert the formatter into the buffer, and what it reported.
+    pub fn finish(self) -> (String, FmtDiagnostics) {
+        (self.buffer, self.diagnostics)
     }
 
     /// Apply an indent to the buffer.
@@ -309,9 +316,9 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         match self.ctx.state.language {
             LanguageType::Html => return self.push_html(start, text),
             // The text is only CSS or JavaScript when a tag splits a `<style>`
-            // or `<script>`, whose content is kept exactly as it is written, as
-            // a whole one's is. A piece of a script can't be formatted on its
-            // own without changing it: Biome drops the `;` of `{{ data }};`,
+            // or `<script>`, whose content is kept exactly as it is written,
+            // unlike a whole one's. A piece of a script can't be formatted on
+            // its own without changing it: Biome drops the `;` of `{{ data }};`,
             // and makes `{{ f }}\n(x)`, a call, into `{{ f }}\nx;`.
             LanguageType::Css | LanguageType::Js => self.push_exact(start, text),
             LanguageType::Text => {
@@ -348,8 +355,11 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
 
                     self.ctx.open_elements(opens);
                 }
-                HtmlPart::Verbatim { range } => {
+                HtmlPart::Verbatim { range, unparsed } => {
                     self.push_exact(start + range.start(), &text[Range::from(range)]);
+                    if let Some(unparsed) = unparsed {
+                        self.report_unparsed(start, unparsed);
+                    }
                 }
                 HtmlPart::Close { range, name } => {
                     // The closing tag of a `<pre>` or `<textarea>` stays where it
@@ -369,6 +379,17 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         }
 
         Ok(())
+    }
+
+    /// Report the code of a `<script>` or `<style>` that doesn't parse, in the
+    /// piece of HTML that starts at `start` in the source.
+    fn report_unparsed(&mut self, start: usize, unparsed: Unparsed) {
+        let Unparsed { language, range, message } = unparsed;
+        let range = ByteRange::new(start + range.start(), start + range.end());
+        let span = Span::new(range, self.ctx.id());
+
+        let kind = FmtWarningKind::UnparsedCode { language, message };
+        self.diagnostics.add_warning(FmtWarning::new(kind, span));
     }
 
     /// Push `text`, which starts at `start` in the source, exactly as it is

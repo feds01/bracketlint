@@ -1,0 +1,7 @@
+warning: the `<script>` doesn't parse as JavaScript
+ --> $DIR/script_unparsed.html:3:15
+  |
+3 | const total = ;
+  |               - Expected an expression, or an assignment but instead found ';'.
+  |
+  = help: its code is kept as it is written

@@ -1,7 +1,10 @@
 <html>
     <head>
         <style>
-body { color: red; margin:0 }
+        body {
+            color: red;
+            margin: 0;
+        }
         </style>
     </head>
     <body>
@@ -13,7 +16,10 @@ body { color: red; margin:0 }
             <p>some text</p>
         </div>
         <script>
-const x = {a:1,b:2}; function f(){return x}
+        const x = { a: 1, b: 2 };
+        function f() {
+            return x;
+        }
         </script>
     </body>
 </html>

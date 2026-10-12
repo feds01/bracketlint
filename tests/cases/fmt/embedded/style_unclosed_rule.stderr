@@ -1,0 +1,7 @@
+warning: the `<style>` doesn't parse as CSS
+ --> $DIR/style_unclosed_rule.html:4:1
+  |
+4 | </style>
+  | - expected `;` but instead the file ends
+  |
+  = help: its code is kept as it is written

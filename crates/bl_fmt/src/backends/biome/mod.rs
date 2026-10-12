@@ -1,18 +1,21 @@
 //! The Biome backend, which utilises the `biome` crate to parse and format
 //! code.
 
-use std::{cell::RefCell, ops::Range, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, ops::Range, rc::Rc};
 
 use biome_css_formatter::{self as css_formatter, context::CssFormatOptions};
-use biome_css_parser::{self as css_parser, CssParserOptions};
-use biome_formatter::{FormatError, IndentStyle, SourceMapGeneration, SourceMarker};
+use biome_css_parser::{self as css_parser, CssOffsetParse, CssParserOptions};
+use biome_formatter::{
+    FormatError, IndentStyle, SourceMapGeneration, SourceMarker, prelude::Document,
+};
 use biome_html_formatter::{HtmlFormatOptions, format_node};
 use biome_html_parser::{HtmlParse, HtmlParserOptions, parse_html_with_cache};
 use biome_html_syntax::{
-    AnyHtmlElement, HtmlElement, HtmlElementList, HtmlSyntaxKind, HtmlSyntaxNode, T, VOID_ELEMENTS,
+    AnyHtmlContent, AnyHtmlElement, HtmlElement, HtmlElementList, HtmlSyntaxKind, HtmlSyntaxNode,
+    ScriptType, T, TextRange, TextSize, VOID_ELEMENTS,
 };
 use biome_js_formatter::{self as js_formatter, context::JsFormatOptions};
-use biome_js_parser::{self as js_parser, JsParserOptions};
+use biome_js_parser::{self as js_parser, JsOffsetParse, JsParserOptions};
 use biome_languages::{CssFileSource, HtmlFileSource, JsFileSource};
 use biome_rowan::{AstNode, AstNodeList, Direction, NodeCache, SyntaxKind, WalkEvent};
 use bl_ast::ByteRange;
@@ -20,7 +23,7 @@ use bl_ast::ByteRange;
 use crate::{
     adapters::{
         ExternalLanguagesEngineAdaptor, Formatted, FormatterContext, HasCSSParsing, HasHTMLParsing,
-        HasJSParsing, HtmlPart, LanguageType, TerminalState,
+        HasJSParsing, HtmlPart, LanguageType, TerminalState, Unparsed,
     },
     diagnostics::{FmtError, FmtErrorKind, FmtResult},
     dialects::html::is_verbatim,
@@ -79,6 +82,11 @@ struct HTMLBiomeFormatter {
 
     /// The cache of the nodes and tokens that the HTML parser makes.
     cache: Rc<RefCell<NodeCache>>,
+
+    /// The code of each [Body] in the piece that has been parsed, by where it
+    /// starts in the piece. The piece is parsed again in its parts, each of
+    /// which finds its bodies again, but the code of each is parsed once.
+    codes: RefCell<HashMap<usize, Rc<ParsedCode>>>,
 }
 
 impl HTMLBiomeFormatter {
@@ -87,49 +95,98 @@ impl HTMLBiomeFormatter {
         parse_html_with_cache(contents, &mut self.cache.borrow_mut(), options)
     }
 
+    /// The code of `body` in `contents`, which starts at `at` in the piece,
+    /// parsed the first time that it is asked for.
+    fn code(&self, contents: &str, at: usize, body: &Body) -> Rc<ParsedCode> {
+        let start = at + body.content.start;
+        if let Some(code) = self.codes.borrow().get(&start) {
+            return code.clone();
+        }
+
+        let code = &contents[body.content.clone()];
+        let offset = TextSize::from(start as u32);
+        let parsed = Rc::new(match body.language {
+            Code::Js(source) => {
+                let options = JsParserOptions::default();
+                ParsedCode::Js(
+                    js_parser::parse_js_with_offset(code, offset, source, options),
+                    source,
+                )
+            }
+            Code::Css => ParsedCode::Css(css_parser::parse_css_with_offset(
+                code,
+                CssFileSource::css(),
+                offset,
+                css_parser_options(),
+            )),
+        });
+
+        self.codes.borrow_mut().insert(start, parsed.clone());
+        parsed
+    }
+
     /// The part of the HTML at `range` in `contents`, which leaves the
     /// elements `opens` open, if it isn't empty. It is formatted, unless
     /// `broken` holds a tag in it, see [Scan::bogus], or it is only whitespace,
     /// which is laid out with what comes next. It is parsed on its own, unless
-    /// it is the whole of `contents`, whose parse is `parsed`.
+    /// it is the whole of `contents`, whose parse and scan are `scanned`.
+    /// `contents` start at `at` in the piece.
     fn html_part(
         &self,
-        contents: &str,
+        (contents, at): (&str, usize),
         range: Range<usize>,
         broken: bool,
         opens: Vec<String>,
-        parsed: Option<&HtmlParse>,
+        scanned: Option<(&HtmlParse, &Scan)>,
     ) -> FmtResult<Option<HtmlPart>> {
         let Some(byte_range) = byte_range(&range) else {
             return Ok(None);
         };
 
-        let html = &contents[range];
+        let (html, at) = (&contents[range.clone()], at + range.start);
         let formatted = if html.trim().is_empty() {
             Some(Formatted::default())
         } else if broken {
             None
-        } else if let Some(parsed) = parsed {
-            self.format_parsed(parsed)?
+        } else if let Some((parsed, scan)) = scanned {
+            self.format_parsed((html, at), parsed, &scan.bodies)?
         } else {
             let parsed = self.parse(html);
-            match Scan::new(&parsed.syntax(), html.len()).has_broken_tag() {
+            let scan = Scan::new(&parsed.syntax(), html.len());
+            match scan.has_broken_tag() {
                 true => None,
-                false => self.format_parsed(&parsed)?,
+                false => self.format_parsed((html, at), &parsed, &scan.bodies)?,
             }
         };
 
         Ok(Some(HtmlPart::Html { range: byte_range, formatted, opens }))
     }
 
-    /// Format `parsed`, which has no tag that Biome can't parse, or return
-    /// `None` if Biome still can't format it.
-    fn format_parsed(&self, parsed: &HtmlParse) -> FmtResult<Option<Formatted>> {
+    /// Format `parsed`, the HTML `contents`, which start at `at` in the piece
+    /// and have no tag that Biome can't parse, or return `None` if Biome still
+    /// can't format it. The code of each of its `bodies`, which parses, is
+    /// formatted as JavaScript or CSS, as Biome formats it in an HTML file.
+    fn format_parsed(
+        &self,
+        (contents, at): (&str, usize),
+        parsed: &HtmlParse,
+        bodies: &[Body],
+    ) -> FmtResult<Option<Formatted>> {
         let language = LanguageType::Html;
-        match format_node(self.options.html.clone(), &parsed.syntax(), vec![]) {
+        let nodes = bodies.iter().map(|body| body.node).collect();
+        match format_node(self.options.html.clone(), &parsed.syntax(), nodes) {
             // The source map only marks where each text starts and ends in the
             // code, which tells the lines that Biome keeps as they are written.
-            Ok(formatted) => {
+            Ok(mut formatted) => {
+                formatted.format_embedded(|node| {
+                    let body = bodies.iter().find(|body| body.node == node)?;
+                    // The code is formatted once, so its parse is let go of then.
+                    let code = self.code(contents, at, body);
+                    self.codes.borrow_mut().remove(&(at + body.content.start));
+                    code.format(&self.options)
+                });
+                formatted.propagate_expand();
+
                 let printed = formatted.print_with_indent(0, SourceMapGeneration::Enabled).unwrap();
                 let kept_lines = kept_lines(printed.as_code(), printed.sourcemap());
                 Ok(Some(Formatted { code: printed.into_code(), kept_lines }))
@@ -153,13 +210,22 @@ impl<'ctx> HasHTMLParsing<'ctx> for HTMLBiomeFormatter {
     /// elements that open before the piece are its own parts, so that each is
     /// indented by the elements that are still open. A part where a template
     /// tag cuts an HTML tag, e.g. `<li class="`, is kept as it is written, see
-    /// [Scan::bogus].
+    /// [Scan::bogus]. The code of a `<script>` or `<style>` that no template
+    /// tag splits is formatted with the HTML around it, see [Body].
     fn format(&mut self, contents: &str) -> FmtResult<Vec<HtmlPart>> {
+        self.parts(contents, 0)
+    }
+}
+
+impl HTMLBiomeFormatter {
+    /// The parts of `contents`, which start at `at` in the piece, see
+    /// [HasHTMLParsing::format].
+    fn parts(&self, contents: &str, at: usize) -> FmtResult<Vec<HtmlPart>> {
         // A piece of only whitespace, e.g. between two tags, is laid out with
         // what comes next, so there's nothing to parse.
         if contents.trim().is_empty() {
             return Ok(self
-                .html_part(contents, 0..contents.len(), false, vec![], None)?
+                .html_part((contents, at), 0..contents.len(), false, vec![], None)?
                 .into_iter()
                 .collect());
         }
@@ -168,23 +234,55 @@ impl<'ctx> HasHTMLParsing<'ctx> for HTMLBiomeFormatter {
         let html = parsed.tree().html();
         let mut scan = Scan::new(&parsed.syntax(), contents.len());
 
-        // The content of a `<pre>`, `<textarea>`, `<script>` or `<style>` is
-        // its own part, which is kept exactly as it is written. Biome would
-        // print it as it is written too, but among the HTML that it indents,
-        // which the formatter would then indent again.
-        if let Some(content) = scan.verbatim {
-            let mut parts = self.format(&contents[..content.start])?;
-            parts.extend(byte_range(&content).map(|range| HtmlPart::Verbatim { range }));
+        // The code of a `<script>` or `<style>` that no tag splits is formatted
+        // with the HTML around it, see [Body], unless it doesn't parse. Then
+        // it is kept as it is written, as that of one that a tag splits is,
+        // and reported. The scan finds the bodies before the first of the
+        // other verbatim elements, so one that doesn't parse comes first.
+        let mut unparsed = None;
+        if let Some((content, error)) = scan.bodies.iter().find_map(|body| {
+            Some((body.content.clone(), self.code(contents, at, body).unparsed(body)?))
+        }) {
+            scan.verbatim = Some(content);
+            unparsed = Some(error);
+        }
 
-            let rest = self.format(&contents[content.end..])?;
+        // The content of a `<pre>`, `<textarea>`, or a `<script>` or `<style>`
+        // that Biome doesn't format, is its own part, which is kept exactly as
+        // it is written. Biome would print it as it is written too, but among
+        // the HTML that it indents, which the formatter would then indent
+        // again.
+        if let Some(content) = scan.verbatim {
+            let mut parts = self.parts(&contents[..content.start], at)?;
+            parts.extend(byte_range(&content).map(|range| HtmlPart::Verbatim { range, unparsed }));
+
+            let rest = self.parts(&contents[content.end..], at + content.end)?;
             parts.extend(rest.into_iter().map(|part| part.shift(content.end)));
+            return Ok(parts);
+        }
+
+        // A part that holds a tag that a template tag cuts is kept as it is
+        // written, see [Scan::bogus], so the element of a body that is outside
+        // of such a tag is its own part, which is formatted.
+        if let Some(body) = scan.bodies.first()
+            && scan.broken_outside(&body.element)
+        {
+            let element = body.element.clone();
+            let mut parts = self.parts(&contents[..element.start], at)?;
+
+            let whole = self.parts(&contents[element.clone()], at + element.start)?;
+            parts.extend(whole.into_iter().map(|part| part.shift(element.start)));
+
+            let rest = self.parts(&contents[element.end..], at + element.end)?;
+            parts.extend(rest.into_iter().map(|part| part.shift(element.end)));
             return Ok(parts);
         }
 
         let closes = std::mem::take(&mut scan.closes);
         if closes.is_empty() {
             let (all, broken) = (0..contents.len(), scan.has_broken_tag());
-            let part = self.html_part(contents, all, broken, open_elements(html), Some(&parsed))?;
+            let scanned = Some((&parsed, &scan));
+            let part = self.html_part((contents, at), all, broken, open_elements(html), scanned)?;
             return Ok(part.into_iter().collect());
         }
 
@@ -196,11 +294,12 @@ impl<'ctx> HasHTMLParsing<'ctx> for HTMLBiomeFormatter {
             // as other HTML, since it doesn't see its opening tag.
             let before = start..range.start;
             if is_verbatim(&name) {
-                parts.extend(byte_range(&before).map(|range| HtmlPart::Verbatim { range }));
+                let verbatim = |range| HtmlPart::Verbatim { range, unparsed: None };
+                parts.extend(byte_range(&before).map(verbatim));
             } else {
                 // A part before a closing tag closes the elements it opens.
                 let broken = scan.broken_in(&before);
-                parts.extend(self.html_part(contents, before, broken, vec![], None)?);
+                parts.extend(self.html_part((contents, at), before, broken, vec![], None)?);
             }
 
             start = range.end;
@@ -211,7 +310,7 @@ impl<'ctx> HasHTMLParsing<'ctx> for HTMLBiomeFormatter {
         // so it leaves open the elements that the piece does.
         let rest = start..contents.len();
         let broken = scan.broken_in(&rest);
-        parts.extend(self.html_part(contents, rest, broken, open_elements(html), None)?);
+        parts.extend(self.html_part((contents, at), rest, broken, open_elements(html), None)?);
         Ok(parts)
     }
 }
@@ -250,8 +349,12 @@ fn byte_range(range: &Range<usize>) -> Option<ByteRange> {
 /// over it, as the walk allocates each node.
 struct Scan {
     /// The content of the first of the verbatim elements in the piece, see
-    /// [verbatim_content].
+    /// [verbatim_content], other than the bodies.
     verbatim: Option<Range<usize>>,
+
+    /// The code of each `<script>` and `<style>` that Biome formats, see
+    /// [Body], before the first of the other verbatim elements.
+    bodies: Vec<Body>,
 
     /// The closing tags at the top of the piece, of elements that open before
     /// it, by their range and name.
@@ -263,7 +366,7 @@ struct Scan {
 
 impl Scan {
     fn new(root: &HtmlSyntaxNode, len: usize) -> Self {
-        let mut scan = Scan { verbatim: None, closes: vec![], broken: vec![] };
+        let mut scan = Scan { verbatim: None, bodies: vec![], closes: vec![], broken: vec![] };
         let mut walk = root.preorder();
 
         while let Some(event) = walk.next() {
@@ -277,7 +380,10 @@ impl Scan {
             } else if scan.verbatim.is_none()
                 && let Some(element) = HtmlElement::cast(node)
             {
-                scan.verbatim = verbatim_content(&element, len);
+                match Body::of(&element, len) {
+                    Some(body) => scan.bodies.push(body),
+                    None => scan.verbatim = verbatim_content(&element, len),
+                }
             }
         }
 
@@ -328,6 +434,12 @@ impl Scan {
     /// Whether a tag that Biome couldn't parse starts in `range` of the piece.
     fn broken_in(&self, range: &Range<usize>) -> bool {
         self.broken.iter().any(|start| range.contains(start))
+    }
+
+    /// Whether a tag that Biome couldn't parse starts outside of `range` of
+    /// the piece.
+    fn broken_outside(&self, range: &Range<usize>) -> bool {
+        self.broken.iter().any(|start| !range.contains(start))
     }
 }
 
@@ -383,6 +495,131 @@ fn verbatim_content(element: &HtmlElement, len: usize) -> Option<Range<usize>> {
     (start < end).then_some(start..end)
 }
 
+/// The code of a `<script>` of JavaScript or a `<style>` of CSS that no
+/// template tag splits, i.e. whose opening and closing tags are both in the
+/// piece. Biome formats it with the HTML around it, as it does in an HTML
+/// file, when it is given the range of its node. The code of a `<script>` of
+/// another type, e.g. JSON or a template that a library renders, is kept as
+/// it is written.
+struct Body {
+    /// The element, from the start of its opening tag to the end of its
+    /// closing tag.
+    element: Range<usize>,
+
+    /// The content of the element, see [verbatim_content].
+    content: Range<usize>,
+
+    /// The range of the node of the code, by which Biome asks for it to be
+    /// formatted.
+    node: TextRange,
+
+    /// The language of the code.
+    language: Code,
+}
+
+/// The language of the code of a [Body].
+#[derive(Clone, Copy)]
+enum Code {
+    /// JavaScript, as a classic script or as a module.
+    Js(JsFileSource),
+
+    /// CSS.
+    Css,
+}
+
+impl Body {
+    /// The code of `element`, in a piece of length `len`, if it is a
+    /// `<script>` of JavaScript or a `<style>` of CSS, as Biome tells them,
+    /// with its closing tag.
+    fn of(element: &HtmlElement, len: usize) -> Option<Self> {
+        element.closing_element()?;
+        let language = match element.get_script_type() {
+            Some(ScriptType::Classic) => Code::Js(JsFileSource::js_script()),
+            Some(ScriptType::Module) => Code::Js(JsFileSource::js_module()),
+            Some(_) => return None,
+            // A `<style>` of another type, e.g. `text/less`, isn't CSS.
+            None if element.is_supported_style_tag()
+                && (element.find_attribute_by_name("type").is_none()
+                    || element.has_attribute_with_value("type", "text/css")) =>
+            {
+                Code::Css
+            }
+            None => return None,
+        };
+
+        let code = element.children().iter().find_map(|child| match child {
+            AnyHtmlElement::AnyHtmlContent(AnyHtmlContent::HtmlEmbeddedContent(code)) => Some(code),
+            _ => None,
+        })?;
+
+        // Old pages wrap the code in an HTML comment, `<!-- ... -->`, to hide
+        // it from browsers that don't know the element. It is still JavaScript
+        // or CSS, but Biome can't parse it.
+        if code.value_token().ok()?.text_trimmed().trim_start().starts_with("<!--") {
+            return None;
+        }
+
+        Some(Body {
+            element: element.syntax().text_trimmed_range().into(),
+            content: verbatim_content(element, len)?,
+            node: code.range(),
+            language,
+        })
+    }
+}
+
+/// The code of a [Body], as Biome parsed it.
+enum ParsedCode {
+    Js(JsOffsetParse, JsFileSource),
+    Css(CssOffsetParse),
+}
+
+impl ParsedCode {
+    /// Where and why Biome first fails to parse the code of `body`, in its
+    /// piece, if it does.
+    fn unparsed(&self, body: &Body) -> Option<Unparsed> {
+        let (language, diagnostics) = match self {
+            ParsedCode::Js(parsed, _) => (LanguageType::Js, parsed.diagnostics()),
+            ParsedCode::Css(parsed) => (LanguageType::Css, parsed.diagnostics()),
+        };
+
+        let diagnostic = diagnostics.first()?;
+        let span =
+            diagnostic.span().unwrap_or_default() + TextSize::from(body.content.start as u32);
+
+        // An empty span, e.g. where the code ends without its last `}`, marks
+        // the character there, which is the `<` of the closing tag at the end.
+        let (start, end) = (usize::from(span.start()), usize::from(span.end()));
+        let range = ByteRange::new(start, end.saturating_sub(1).max(start));
+        Some(Unparsed { language, range, message: diagnostic.message.to_string() })
+    }
+
+    /// The code, formatted, or `None` if it doesn't parse, or if Biome can't
+    /// format it, in which case Biome prints it as it is written.
+    fn format(&self, options: &BiomeFormatterOptions) -> Option<Document> {
+        match self {
+            // The options are those of the code's source type, e.g. a module.
+            ParsedCode::Js(parsed, source) if !parsed.has_errors() => {
+                let options = JsFormatOptions::new(*source);
+                let formatted = js_formatter::format_node_with_offset(options, &parsed.syntax());
+                formatted.ok().map(|formatted| formatted.into_document())
+            }
+            ParsedCode::Css(parsed) if !parsed.has_errors() => {
+                let options = options.css.clone();
+                let formatted = css_formatter::format_node_with_offset(options, &parsed.syntax());
+                formatted.ok().map(|formatted| formatted.into_document())
+            }
+            _ => None,
+        }
+    }
+}
+
+/// The options that CSS is parsed with: `//` comments and Grit's metavariables
+/// are allowed.
+fn css_parser_options() -> CssParserOptions {
+    CssParserOptions::default().allow_wrong_line_comments().allow_metavariables()
+}
+
 /// The elements that `list` leaves open, outermost first. An element without
 /// its closing tag holds the rest of the list, so it is the last element of
 /// the list, and the elements open inside it are the last of its children.
@@ -435,11 +672,7 @@ impl<'ctx> HasCSSParsing<'ctx> for CSSBiomeFormatter<'ctx> {
     fn format(&self, contents: &str) -> FmtResult<Option<String>> {
         // @@Todo: consider using `parse_css_with_cache` here, and store the cache
         // within our caching system.
-        let parsed = css_parser::parse_css(
-            contents,
-            CssFileSource::css(),
-            CssParserOptions::default().allow_wrong_line_comments().allow_metavariables(),
-        );
+        let parsed = css_parser::parse_css(contents, CssFileSource::css(), css_parser_options());
         if parsed.has_errors() {
             return Ok(None);
         }
@@ -513,7 +746,11 @@ impl ExternalLanguagesEngineAdaptor for BiomeFormatter {
     type JSEngine<'ctx> = impl HasJSParsing<'ctx>;
 
     fn html_engine<'ctx>(&self, _: &'ctx FormatterContext<'ctx>) -> Self::HTMLEngine<'ctx> {
-        HTMLBiomeFormatter { options: self.options.clone(), cache: self.html_cache.clone() }
+        HTMLBiomeFormatter {
+            options: self.options.clone(),
+            cache: self.html_cache.clone(),
+            codes: RefCell::default(),
+        }
     }
 
     fn css_engine<'ctx>(&self, context: &'ctx FormatterContext<'ctx>) -> Self::CSSEngine<'ctx> {

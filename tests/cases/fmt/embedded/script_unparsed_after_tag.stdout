@@ -1,0 +1,7 @@
+{% if user %}
+    <p>{{ user.name }}</p>
+    <script>
+let greeting = ;
+    </script>
+{% endif %}
+

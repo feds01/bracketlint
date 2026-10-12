@@ -1,0 +1,7 @@
+<style type="text/less">@accent: red; .a { color: @accent }</style>
+<style type="text/css">
+p {
+    margin: 0;
+}
+</style>
+

@@ -1,0 +1,14 @@
+warning: the `<script>` doesn't parse as JavaScript
+ --> $DIR/unparsed_around_pre.html:3:9
+  |
+3 | let a = ;
+  |         - Expected an expression, or an assignment but instead found ';'.
+  |
+  = help: its code is kept as it is written
+warning: the `<style>` doesn't parse as CSS
+ --> $DIR/unparsed_around_pre.html:8:1
+  |
+8 | </style>
+  | - expected `;` but instead the file ends
+  |
+  = help: its code is kept as it is written
