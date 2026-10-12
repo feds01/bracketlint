@@ -1,7 +1,9 @@
 //! Any warning that the parser can emit and report.
 
 use bl_ast::{ForeignSyntax, Span};
-use bl_reporting::{ReportBuilder, Reports};
+use bl_reporting::{ReportBuilder, ReportKind, Reports};
+
+use super::error::ParseError;
 
 #[derive(Debug, Clone, Copy)]
 pub struct ParseWarning {
@@ -25,6 +27,13 @@ pub enum ParseWarningKind {
     /// A `{# #}` in a dialect without such comments, where it is text, see
     /// [Syntax::HashComments](bl_ast::Syntax::HashComments).
     HashComment(ForeignSyntax),
+
+    /// The markup of a tag or a `{{ }}` that doesn't parse, which is kept as it
+    /// is written, see
+    /// [Dialect::markup_can_be_lax](bl_ast::Dialect::markup_can_be_lax). It
+    /// holds the error that parsing the markup reported, whose title, span
+    /// and help the warning has.
+    LaxMarkup(ParseError),
 }
 
 impl ParseWarning {
@@ -58,6 +67,19 @@ impl From<ParseWarning> for Reports {
                     .title(format!("`{{# #}}` isn't a comment in {}", foreign.dialect.title()))
                     .add_span(span)
                     .add_help(foreign.help());
+            }
+            // The warning reads as the error would, with a note on why it
+            // isn't one.
+            ParseWarningKind::LaxMarkup(error) => {
+                let mut reports = Reports::from(error);
+                for report in &mut reports {
+                    report.kind(ReportKind::Warning).add_note(
+                        "Liquid's strict parser rejects this, and Jekyll reads it with the lax \
+                         parser instead, so it is kept as it is written",
+                    );
+                }
+
+                return reports;
             }
         }
 

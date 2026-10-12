@@ -1,0 +1,10 @@
+// run=pass, stage=check, dialect=liquid
+
+{% for content in data %}
+  {% if (content[1] == "") or (skip contains content[0]) %}{% continue %}{% endif %}
+  <a href="{{ content.url | default: # }}">{{ content.name }}</a>
+{% endfor %}
+{{ site.data.locales[lang].tabs.[tab_name] | default: tab.title | upcase }}
+{% if a + b %}x{% elsif c %}y{% endif %}{{ after }}
+{% unless (a) %}z{% endunless %}
+{% case (kind) %}{% when 'a' 'b' %}A{% when 'c' %}C{% endcase %}

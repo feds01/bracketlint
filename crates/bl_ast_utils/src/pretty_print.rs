@@ -766,6 +766,15 @@ impl AstVisitor for AstTreePrinter<'_> {
         ))
     }
 
+    type UnparsedExprRet = TreeNode;
+
+    fn visit_unparsed_expr(
+        &self,
+        node: ast::AstNodeRef<ast::UnparsedExpr>,
+    ) -> Result<Self::UnparsedExprRet, Self::Error> {
+        Ok(TreeNode::leaf(labelled("unparsed_expr", self.source.hunk(node.range()), "`")))
+    }
+
     type NilLitRet = TreeNode;
 
     fn visit_nil_lit(

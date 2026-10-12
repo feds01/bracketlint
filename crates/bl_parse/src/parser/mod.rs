@@ -637,6 +637,53 @@ impl<'s, 'a> Parser<'s, 'a> {
         self.in_tree(delimiter, None, |this| Ok((g(this)?, this.trim())))
     }
 
+    /// Parse the rest of the tag that the current frame is in as its markup,
+    /// with `g`, e.g. the expression in a `{{ }}`, or the condition of an
+    /// `if`. If the markup doesn't parse in a dialect whose markup can be lax,
+    /// it is kept as it is written instead, as an [ast::Expr::Unparsed] that
+    /// `lax` makes into what `g` would return, and the error that parsing it
+    /// reported is a warning.
+    fn parse_markup<T>(
+        &mut self,
+        g: impl FnOnce(&mut Self) -> ParseResult<T>,
+        lax: impl FnOnce(&Self, AstNode<'a, ast::Expr<'a>>) -> T,
+    ) -> ParseResult<T> {
+        // [Liquid] parses markup strictly, and if that fails, records a warning
+        // and parses it again with its lax parser, which takes nearly any
+        // markup that isn't empty.
+        //
+        // [Liquid]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/parser_switching.rb#L38-L44
+        if !self.options.dialect.markup_can_be_lax() || self.exhausted() {
+            return g(self);
+        }
+
+        let (position, start) = (self.position(), self.current_pos());
+        let (errors, frame_error) = (self.diagnostics.errors.len(), self.frame.error.get());
+        let result = g(self)
+            .and_then(|value| if self.exhausted() { Ok(value) } else { self.expected_eof() });
+
+        // A tree in the markup reports an error at what is left in it, e.g. the
+        // `c` in `a[b c]`, without stopping the parse, so that error is first.
+        let error = match (self.diagnostics.errors.get(errors).copied(), result) {
+            (None, Ok(value)) => return Ok(value),
+            (Some(error), _) | (None, Err(error)) => error,
+        };
+        self.diagnostics.errors.truncate(errors);
+        self.frame.error.set(frame_error);
+        self.add_warning(ParseWarning::new(ParseWarningKind::LaxMarkup(error), error.span()));
+
+        // Skip to the end of the tag from where the markup starts, a token or a
+        // whole tree at a time, so that the markup's span ends with the last.
+        self.set_pos(position);
+        while self.has_token() {
+            self.skip_token();
+        }
+
+        let unparsed = ast::Expr::Unparsed(ast::UnparsedExpr {});
+        let expr = self.node_with_joined_span(unparsed, start);
+        Ok(lax(self, expr))
+    }
+
     /// Get the current [TagContext] that the parser is in, if any.
     pub(crate) fn tag_context(&self) -> Option<TagContext> {
         self.frame.tag_context
@@ -879,58 +926,61 @@ impl<'s, 'a> Parser<'s, 'a> {
     fn parse_variable_block(&mut self) -> ParseResult<AstNode<'a, ast::Statement<'a>>> {
         let token = self.peek().copied().ok_or_else(|| self.make_unexpected_eof())?;
         let (expr, trim) = self.in_tag(Delimiter::Brace, |g| {
-            // Jinja's [`Parser.subparse`], Nunjucks' [`Parser.parseNodes`] and
-            // Twig's [`Parser::subparse`] parse `{{ }}` as any expression,
-            // rather than a single value.
-            //
-            // [`Parser.subparse`]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L1019-L1022
-            // [`Parser.parseNodes`]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/parser.js#L1317-L1318
-            // [`Parser::subparse`]: https://github.com/twigphp/Twig/blob/v3.30.0/src/Parser.php#L187-L190
-            let (mut subject, subject_span) = g.track_span(|g| {
-                if g.options.dialect.variable_supports_operators() {
-                    g.parse_compound_expr(0)
-                } else {
-                    g.parse_expr()
-                }
-            })?;
-
-            // Items separated by commas are a tuple without its parentheses in
-            // [Jinja], e.g. `{{ a, b }}`.
-            //
-            // [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L1019-L1022
-            if g.options.dialect.variables_take_bare_tuples()
-                && g.peek_kind() == Some(TokenKind::Comma)
-            {
-                let mut items = g.arena.vec();
-                items.push(subject);
-                while g.parse_token_fast(TokenKind::Comma).is_some() && !g.exhausted() {
-                    items.push(g.parse_compound_expr(0)?);
-                }
-
-                let children = g.nodes_with_joined_span(items, subject_span);
-                subject = g.node_with_joined_span(
-                    ast::Expr::Tuple(ast::TupleExpr { children }),
-                    subject_span,
-                );
-            }
-
-            // A name that is followed by anything other than an operator, e.g.
-            // `{{ x "a" b=c }}`, is called with the rest as its arguments.
-            if !g.exhausted() && subject.body.is_var() {
-                // This might be a call expression, try and parse the arguments
-                let args = g.parse_args()?;
-
-                return Ok(g.node_with_joined_span(
-                    ast::Expr::Call(ast::CallExpr { subject, args }),
-                    subject_span,
-                ));
-            }
-
-            Ok(subject)
+            g.parse_markup(Self::parse_variable_expr, |_, expr| expr)
         })?;
 
         Ok(self
             .node_with_joined_span(ast::Statement::Inline(ast::Inline { expr, trim }), token.span))
+    }
+
+    /// Parse the expression in a `{{ }}`.
+    fn parse_variable_expr(&mut self) -> ParseResult<AstNode<'a, ast::Expr<'a>>> {
+        // Jinja's [`Parser.subparse`], Nunjucks' [`Parser.parseNodes`] and
+        // Twig's [`Parser::subparse`] parse `{{ }}` as any expression, rather
+        // than a single value.
+        //
+        // [`Parser.subparse`]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L1019-L1022
+        // [`Parser.parseNodes`]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/parser.js#L1317-L1318
+        // [`Parser::subparse`]: https://github.com/twigphp/Twig/blob/v3.30.0/src/Parser.php#L187-L190
+        let (mut subject, subject_span) = self.track_span(|g| {
+            if g.options.dialect.variable_supports_operators() {
+                g.parse_compound_expr(0)
+            } else {
+                g.parse_expr()
+            }
+        })?;
+
+        // Items separated by commas are a tuple without its parentheses in
+        // [Jinja], e.g. `{{ a, b }}`.
+        //
+        // [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L1019-L1022
+        if self.options.dialect.variables_take_bare_tuples()
+            && self.peek_kind() == Some(TokenKind::Comma)
+        {
+            let mut items = self.arena.vec();
+            items.push(subject);
+            while self.parse_token_fast(TokenKind::Comma).is_some() && !self.exhausted() {
+                items.push(self.parse_compound_expr(0)?);
+            }
+
+            let children = self.nodes_with_joined_span(items, subject_span);
+            subject = self
+                .node_with_joined_span(ast::Expr::Tuple(ast::TupleExpr { children }), subject_span);
+        }
+
+        // A name that is followed by anything other than an operator, e.g.
+        // `{{ x "a" b=c }}`, is called with the rest as its arguments.
+        if !self.exhausted() && subject.body.is_var() {
+            // This might be a call expression, try and parse the arguments
+            let args = self.parse_args()?;
+
+            return Ok(self.node_with_joined_span(
+                ast::Expr::Call(ast::CallExpr { subject, args }),
+                subject_span,
+            ));
+        }
+
+        Ok(subject)
     }
 
     /// Parse an expression with the binary operators that bind at least as
@@ -2187,7 +2237,7 @@ impl<'s, 'a> Parser<'s, 'a> {
                 {
                     let (condition, trim) = self.in_tag(Delimiter::Percent, |g| {
                         g.skip_token();
-                        g.parse_compound_expr(0)
+                        g.parse_markup(|g| g.parse_compound_expr(0), |_, expr| expr)
                     })?;
 
                     let clause_kind = match kwd {
@@ -2256,7 +2306,7 @@ impl<'s, 'a> Parser<'s, 'a> {
 
         let (subject, trim) = self.in_tag(Delimiter::Percent, |g| {
             g.parse_token(TokenKind::Keyword(Keyword::Case))?;
-            g.parse_expr()
+            g.parse_markup(Self::parse_expr, |_, expr| expr)
         })?;
 
         let leading = self.parse_body_until(is_clause)?;
@@ -2283,7 +2333,11 @@ impl<'s, 'a> Parser<'s, 'a> {
                     let clause_start = self.current_pos();
                     let (values, trim) = self.in_tag(Delimiter::Percent, |g| {
                         g.skip_token(); // `when` Skip the keyword.
-                        g.parse_when_values()
+                        g.parse_markup(Self::parse_when_values, |g, expr| {
+                            let mut values = g.arena.vec();
+                            values.push(expr);
+                            g.nodes_with_span(values, expr.range())
+                        })
                     })?;
 
                     let clause_body = self.parse_body_until(is_clause)?;

@@ -1,0 +1,44 @@
+warning: unexpectedly encountered a `==`
+ --> $DIR/lax_markup.html:4:18
+  |
+4 |   if (content[1] == "") or (skip contains
+  |                  --
+  |
+  = help: expected a `..`
+  = note: Liquid's strict parser rejects this, and Jekyll reads it with the lax parser instead, so it is kept as it is written
+  = note: this file is parsed as Liquid, from `--dialect liquid`
+warning: unexpectedly encountered an unknown character `#`
+ --> $DIR/lax_markup.html:9:44
+  |
+9 | <tr><td><a href="{{ content.url | default: # }}">{{ content.name }}</a></td></tr>
+  |                                            -
+  |
+  = help: expected either `identifier`, `literal`, `(`, `{`, or `[`
+  = note: Liquid's strict parser rejects this, and Jekyll reads it with the lax parser instead, so it is kept as it is written
+  = note: this file is parsed as Liquid, from `--dialect liquid`
+warning: unexpectedly encountered a `[...]`
+  --> $DIR/lax_markup.html:12:39
+   |
+12 | <span>{{ site.data.locales[lang].tabs.[tab_name]   | default: tab.title }}</span>
+   |                                       ----------
+   |
+   = help: expected a `identifier`
+   = note: Liquid's strict parser rejects this, and Jekyll reads it with the lax parser instead, so it is kept as it is written
+   = note: this file is parsed as Liquid, from `--dialect liquid`
+warning: unexpectedly reached the end of input
+  --> $DIR/lax_markup.html:13:14
+   |
+13 | {% case (kind) %}
+   |              -
+   |
+   = help: expected a `..`
+   = note: Liquid's strict parser rejects this, and Jekyll reads it with the lax parser instead, so it is kept as it is written
+   = note: this file is parsed as Liquid, from `--dialect liquid`
+warning: unexpectedly encountered a string literal
+  --> $DIR/lax_markup.html:14:13
+   |
+14 | {% when 'a' 'b' %}
+   |             ---
+   |
+   = note: Liquid's strict parser rejects this, and Jekyll reads it with the lax parser instead, so it is kept as it is written
+   = note: this file is parsed as Liquid, from `--dialect liquid`

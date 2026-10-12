@@ -1,21 +1,9 @@
 info: parsed module '$DIR/variable_operators_liquid.html' as liquid:
 body
 ├─inline
-│ └─call_expr
-│   ├─subject
-│   │ └─var_expr
-│   │   └─name "x"
-│   └─args
+│ └─unparsed_expr `x is not defined`
 ├─inline
-│ └─call_expr
-│   ├─subject
-│   │ └─var_expr
-│   │   └─name "a"
-│   └─args
+│ └─unparsed_expr `a == b`
 └─inline
-  └─call_expr
-    ├─subject
-    │ └─var_expr
-    │   └─name "a"
-    └─args
+  └─unparsed_expr `a and b`
 

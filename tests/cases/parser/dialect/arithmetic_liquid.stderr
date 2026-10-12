@@ -1,63 +1,72 @@
-error: unexpectedly encountered a `+`
+warning: unexpectedly encountered a `+`
  --> $DIR/arithmetic_liquid.html:1:9
   |
 1 | {% if a + b %}{% endif %}
   |         -
   |
+  = note: Liquid's strict parser rejects this, and Jekyll reads it with the lax parser instead, so it is kept as it is written
   = note: this file is parsed as Liquid, from `--dialect liquid`
-error: unexpectedly encountered a `-`
+warning: unexpectedly encountered a `-`
  --> $DIR/arithmetic_liquid.html:2:9
   |
 2 | {% if a - b %}{% endif %}
   |         -
   |
+  = note: Liquid's strict parser rejects this, and Jekyll reads it with the lax parser instead, so it is kept as it is written
   = note: this file is parsed as Liquid, from `--dialect liquid`
-error: unexpectedly encountered a `*`
+warning: unexpectedly encountered a `*`
  --> $DIR/arithmetic_liquid.html:3:9
   |
 3 | {% if a * b %}{% endif %}
   |         -
   |
+  = note: Liquid's strict parser rejects this, and Jekyll reads it with the lax parser instead, so it is kept as it is written
   = note: this file is parsed as Liquid, from `--dialect liquid`
-error: unexpectedly encountered a `/`
+warning: unexpectedly encountered a `/`
  --> $DIR/arithmetic_liquid.html:4:9
   |
 4 | {% if a / b %}{% endif %}
   |         -
   |
+  = note: Liquid's strict parser rejects this, and Jekyll reads it with the lax parser instead, so it is kept as it is written
   = note: this file is parsed as Liquid, from `--dialect liquid`
-error: unexpectedly encountered a `//`
+warning: unexpectedly encountered a `//`
  --> $DIR/arithmetic_liquid.html:5:9
   |
 5 | {% if a // b %}{% endif %}
   |         --
   |
+  = note: Liquid's strict parser rejects this, and Jekyll reads it with the lax parser instead, so it is kept as it is written
   = note: this file is parsed as Liquid, from `--dialect liquid`
-error: unexpectedly encountered a `%`
+warning: unexpectedly encountered a `%`
  --> $DIR/arithmetic_liquid.html:6:9
   |
 6 | {% if a % b %}{% endif %}
   |         -
   |
+  = note: Liquid's strict parser rejects this, and Jekyll reads it with the lax parser instead, so it is kept as it is written
   = note: this file is parsed as Liquid, from `--dialect liquid`
-error: unexpectedly encountered a `**`
+warning: unexpectedly encountered a `**`
  --> $DIR/arithmetic_liquid.html:7:9
   |
 7 | {% if a ** b %}{% endif %}
   |         --
   |
+  = note: Liquid's strict parser rejects this, and Jekyll reads it with the lax parser instead, so it is kept as it is written
   = note: this file is parsed as Liquid, from `--dialect liquid`
-error: unexpectedly encountered a `~`
+warning: unexpectedly encountered a `~`
  --> $DIR/arithmetic_liquid.html:8:9
   |
 8 | {% if a ~ b %}{% endif %}
   |         -
   |
+  = note: Liquid's strict parser rejects this, and Jekyll reads it with the lax parser instead, so it is kept as it is written
   = note: this file is parsed as Liquid, from `--dialect liquid`
-error: unexpectedly encountered a `-`
+warning: unexpectedly encountered a `-`
  --> $DIR/arithmetic_liquid.html:9:10
   |
 9 | {%- if a - b -%}{%- endif -%}
   |          -
   |
+  = note: Liquid's strict parser rejects this, and Jekyll reads it with the lax parser instead, so it is kept as it is written
   = note: this file is parsed as Liquid, from `--dialect liquid`

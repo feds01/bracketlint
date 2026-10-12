@@ -1,0 +1,6 @@
+// run=fail, stage=check, dialect=jinja
+
+{% for content in data %}
+  {% if (content[1] == "") or (skip contains content[0]) %}{% continue %}{% endif %}
+{% endfor %}
+{{ site.data.locales[lang].tabs.[tab_name] }}

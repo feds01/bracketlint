@@ -28,8 +28,8 @@ ok            _includes/repository/repo.liquid
 ok            _includes/repository/repo_trophies.liquid
 ok            _includes/repository/repo_user.liquid
 ok            _includes/resume/awards.liquid
-parse-error   _includes/resume/basics.liquid
-parse-error   _includes/resume/certificates.liquid
+ok            _includes/resume/basics.liquid
+ok            _includes/resume/certificates.liquid
 ok            _includes/resume/education.liquid
 ok            _includes/resume/interests.liquid
 ok            _includes/resume/languages.liquid

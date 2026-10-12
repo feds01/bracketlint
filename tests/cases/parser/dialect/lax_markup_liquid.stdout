@@ -1,0 +1,78 @@
+info: parsed module '$DIR/lax_markup_liquid.html' as liquid:
+body
+├─for
+│ ├─target
+│ │ └─name "content"
+│ ├─iterator
+│ │ └─var_expr
+│ │   └─name "data"
+│ └─loop_body
+│   └─body
+│     ├─if
+│     │ └─clauses
+│     │   └─if_clause
+│     │     ├─condition
+│     │     │ └─unparsed_expr `(content[1] == "") or (skip contains content[0])`
+│     │     └─clause_body
+│     │       └─body
+│     │         └─continue
+│     ├─text
+│     ├─inline
+│     │ └─unparsed_expr `content.url | default: #`
+│     ├─text
+│     ├─inline
+│     │ └─access_expr
+│     │   ├─subject
+│     │   │ └─var_expr
+│     │   │   └─name "content"
+│     │   └─field
+│     │     └─name "name"
+│     └─text
+├─inline
+│ └─unparsed_expr `site.data.locales[lang].tabs.[tab_name] | default: tab.title | upcase`
+├─if
+│ └─clauses
+│   ├─if_clause
+│   │ ├─condition
+│   │ │ └─unparsed_expr `a + b`
+│   │ └─clause_body
+│   │   └─body
+│   │     └─text
+│   └─elif_clause
+│     ├─condition
+│     │ └─var_expr
+│     │   └─name "c"
+│     └─clause_body
+│       └─body
+│         └─text
+├─inline
+│ └─var_expr
+│   └─name "after"
+├─if
+│ └─clauses
+│   └─unless_clause
+│     ├─condition
+│     │ └─unparsed_expr `(a)`
+│     └─clause_body
+│       └─body
+│         └─text
+└─case
+  ├─subject
+  │ └─unparsed_expr `(kind)`
+  ├─leading
+  │ └─body
+  └─branches
+    ├─when
+    │ ├─values
+    │ │ └─unparsed_expr `'a' 'b'`
+    │ └─clause_body
+    │   └─body
+    │     └─text
+    └─when
+      ├─values
+      │ └─lit_expr
+      │   └─str_lit 'c'
+      └─clause_body
+        └─body
+          └─text
+

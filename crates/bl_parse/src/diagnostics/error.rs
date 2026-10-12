@@ -28,6 +28,13 @@ pub struct ParseError {
     foreign: Option<ForeignSyntax>,
 }
 
+impl ParseError {
+    /// The [Span] that the error is at.
+    pub fn span(&self) -> Span {
+        self.span
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub enum ParseErrorKind {
     /// Generic error specifying an expected token atom.
