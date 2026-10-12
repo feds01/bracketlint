@@ -449,6 +449,15 @@ impl Dialect {
         matches!(self, Dialect::Twig)
     }
 
+    /// Whether a test's argument can be written after it without parentheses,
+    /// e.g. `loop.index is divisibleby 3`, as in [Jinja], which takes a single
+    /// value there.
+    ///
+    /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L971-L986
+    pub fn test_arg_needs_no_parentheses(self) -> bool {
+        matches!(self, Dialect::Jinja)
+    }
+
     /// Whether the name of a test can be two words, as Twig's [`same as`] and
     /// [`divisible by`] are, e.g. `x is same as(false)`.
     ///
