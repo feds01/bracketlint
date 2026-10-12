@@ -1,0 +1,7 @@
+// run=pass, stage=check, dialect=liquid
+
+{% include note.html content="A \"quoted\" note" %}
+{% include note.html content='It\'s a note' %}
+{% include nav.html all=include.all lang = page.lang max-width=200 %}
+{% include image.html url="https://jekyllrb.com"
+max-width="200px" alt=site.title %}

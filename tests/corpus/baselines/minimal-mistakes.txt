@@ -4,7 +4,7 @@ ok            _includes/analytics-providers/google-gtag.html
 ok            _includes/analytics-providers/google-universal.html
 ok            _includes/analytics-providers/google.html
 ok            _includes/analytics-providers/swetrix.html
-parse-error   _includes/analytics.html
+ok            _includes/analytics.html
 ok            _includes/archive-single.html
 ok            _includes/author-profile-custom-links.html
 ok            _includes/author-profile.html
@@ -18,11 +18,11 @@ ok            _includes/comments-providers/discourse.html
 ok            _includes/comments-providers/disqus.html
 ok            _includes/comments-providers/facebook.html
 ok            _includes/comments-providers/giscus.html
-parse-error   _includes/comments-providers/scripts.html
+ok            _includes/comments-providers/scripts.html
 ok            _includes/comments-providers/staticman.html
 ok            _includes/comments-providers/staticman_v2.html
 ok            _includes/comments-providers/utterances.html
-parse-error   _includes/comments.html
+ok            _includes/comments.html
 ok            _includes/copyright.html
 ok            _includes/documents-collection.html
 ok            _includes/footer.html
@@ -44,7 +44,7 @@ ok            _includes/posts-category.html
 ok            _includes/posts-tag.html
 ok            _includes/posts-taxonomy.html
 ok            _includes/schema.html
-parse-error   _includes/scripts.html
+ok            _includes/scripts.html
 ok            _includes/search/algolia-search-scripts.html
 ok            _includes/search/google-search-scripts.html
 ok            _includes/search/lunr-search-scripts.html
@@ -62,7 +62,7 @@ ok            _layouts/categories.html
 ok            _layouts/category.html
 ok            _layouts/collection.html
 ok            _layouts/compress.html
-parse-error   _layouts/default.html
+ok            _layouts/default.html
 ok            _layouts/home.html
 ok            _layouts/posts.html
 ok            _layouts/search.html

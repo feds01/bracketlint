@@ -1,0 +1,5 @@
+// run=pass, stage=check, dialect=liquid
+
+{% include_relative somedir/footer.html %}
+{% capture content %}{% include_relative {{ profile.content }} %}{% endcapture %}
+<p>{{ include_relative }}</p>

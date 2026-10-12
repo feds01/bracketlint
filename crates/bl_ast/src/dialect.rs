@@ -479,6 +479,25 @@ impl Dialect {
         matches!(self, Dialect::Jinja)
     }
 
+    /// Whether `include` can name its file with a path rather than a string,
+    /// as Jekyll's [`include`] does in Liquid, and take parameters written
+    /// `name=value`, e.g. `{% include nav.html title="Docs" all=true %}`. The
+    /// path can have [variables] in it, e.g. `{{ page.lang }}/head.html`.
+    /// Jekyll's [`include_relative`] takes the same, for a file relative to
+    /// the template. [Jekyll's source] reads the file as the first word of the
+    /// tag, or the part with its `{{ }}`, as [LiquidJS] does with its
+    /// `jekyllInclude` option. A file named with a string is read as Shopify's
+    /// `include` names it.
+    ///
+    /// [`include`]: https://jekyllrb.com/docs/includes/#passing-parameters-to-includes
+    /// [variables]: https://jekyllrb.com/docs/includes/#using-variables-names-for-the-include-file
+    /// [`include_relative`]: https://jekyllrb.com/docs/includes/#including-files-relative-to-another-file
+    /// [Jekyll's source]: https://github.com/jekyll/jekyll/blob/v4.4.1/lib/jekyll/tags/include.rb#L6-L30
+    /// [LiquidJS]: https://liquidjs.com/tutorials/options.html#Jekyll-include
+    pub fn include_takes_paths(self) -> bool {
+        matches!(self, Dialect::Liquid)
+    }
+
     /// Whether a block's name is any word, up to a space, e.g.
     /// `{% block table.caption %}`, as in [Django], which splits its tag on
     /// spaces. The other dialects take a name.

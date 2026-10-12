@@ -200,6 +200,11 @@ pub enum TokenKind {
     /// the context of the template.
     Text,
 
+    /// A path that names a file without quotes, e.g. `nav/links.html` in
+    /// Jekyll's `{% include nav/links.html %}`, which can have `{{ }}`
+    /// variables in it.
+    Path,
+
     /// A comment token, a hunk of text that should be structurally
     /// ignored, but preserved when rendering the template.
     Comment,
@@ -261,6 +266,7 @@ impl TokenKind {
             TokenKind::Str => "a string literal".to_string(),
             TokenKind::Number(_) => "a number".to_string(),
             TokenKind::Text => "text".to_string(),
+            TokenKind::Path => "a path".to_string(),
             TokenKind::Keyword(kwd) => format!("the keyword `{kwd}`"),
             TokenKind::Ident => "an identifier".to_string(),
             kind => format!("a `{kind}`"),
@@ -330,6 +336,7 @@ impl fmt::Display for TokenKind {
             TokenKind::Ident => write!(f, "<identifier>"),
             TokenKind::Number(_) => write!(f, "<number>"),
             TokenKind::Text => write!(f, "<text>"),
+            TokenKind::Path => write!(f, "<path>"),
             TokenKind::Comment => write!(f, "<comment>"),
 
             TokenKind::Unexpected(atom) => write!(f, "{atom}"),

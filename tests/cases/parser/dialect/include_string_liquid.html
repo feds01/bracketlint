@@ -1,0 +1,7 @@
+// run=pass, stage=check, dialect=liquid
+
+{% include 'product' %}
+{% include 'product' with featured %}
+{% include "product-card", product: product, show_vendor: true %}
+{% include 'icon-' | append: name %}
+{% include product-card, product: product %}

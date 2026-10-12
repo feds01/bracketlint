@@ -1,0 +1,45 @@
+info: parsed module '$DIR/include_string_liquid.html' as liquid:
+body
+├─include
+│ ├─lit_expr
+│ │ └─str_lit 'product'
+│ └─context
+├─include
+│ ├─lit_expr
+│ │ └─str_lit 'product'
+│ └─context
+│   └─arg
+│     └─var_expr
+│       └─name "featured"
+├─include
+│ ├─lit_expr
+│ │ └─str_lit "product-card"
+│ └─context
+│   ├─arg
+│   │ ├─name "product"
+│   │ └─var_expr
+│   │   └─name "product"
+│   └─arg
+│     ├─name "show_vendor"
+│     └─lit_expr
+│       └─bool_lit true
+├─include
+│ ├─filtered_expr
+│ │ ├─subject
+│ │ │ └─lit_expr
+│ │ │   └─str_lit 'icon-'
+│ │ └─filter
+│ │   ├─name "append"
+│ │   └─args
+│ │     └─arg
+│ │       └─var_expr
+│ │         └─name "name"
+│ └─context
+└─include
+  ├─path product-card
+  └─context
+    └─arg
+      ├─name "product"
+      └─var_expr
+        └─name "product"
+

@@ -1,0 +1,8 @@
+error: unexpectedly encountered a `/`
+ --> $DIR/include_path_django.html:1:12
+  |
+1 | {% include /footer.html %}
+  |            -
+  |
+  = help: expected either `identifier`, `literal`, `(`, `{`, or `[`
+  = note: this file is parsed as Django, from `--dialect django`

@@ -1,0 +1,6 @@
+// run=pass, stage=check, dialect=liquid
+
+{% include {{ page.my_variable }} %}
+{% include analytics/{{ platform }}.html %}
+{% include {{ _include_path }} lang=lang %}
+{% include {{ file | append: ".html" }} %}

@@ -140,6 +140,14 @@ pub enum Keyword {
     /// {% include "navbar.html" %}
     /// ```
     Include,
+    /// `include_relative` - Includes another template in Jekyll's Liquid, which
+    /// it names relative to this one. The lexer only makes this keyword at the
+    /// start of a tag, so that `include_relative` is still a name elsewhere
+    /// ```liquid
+    /// {% include_relative sections/intro.md %}
+    /// ```
+    #[strum(serialize = "include_relative")]
+    IncludeRelative,
     /// `load` - Loads a custom template tag library
     /// ```django
     /// {% load static %}
