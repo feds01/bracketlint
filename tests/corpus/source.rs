@@ -5,6 +5,7 @@ use std::{
     fs,
     path::{Path, PathBuf},
     process::Command,
+    sync::Mutex,
 };
 
 use bl_ast::Dialect;
@@ -68,6 +69,11 @@ impl Source {
     /// Download the paths of the source at its tag into `target/corpus`,
     /// unless they already are, returning where they are.
     fn download(&self) -> PathBuf {
+        // The tests that check the corpus run at the same time, and each
+        // downloads the sources that aren't yet, so one downloads at a time.
+        static DOWNLOAD: Mutex<()> = Mutex::new(());
+        let _downloading = DOWNLOAD.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+
         let checkout = target_dir().join(format!("{}@{}", self.name, self.tag));
 
         // A checkout is only whole if git's files are there. CI's cache of
