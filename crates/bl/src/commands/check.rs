@@ -10,7 +10,7 @@ use bl_utils::timed;
 use bl_workspace::{Workspace, resolver::find_files_in_paths};
 use log::{Level, debug, warn};
 
-use super::{file_error, sort_files, walk_error};
+use super::{FileError, sort_files};
 
 pub fn check(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
     // Firstly, we need to discover all of the files in the provided paths.
@@ -53,7 +53,7 @@ pub fn check(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
                         ));
                         arena.reset();
                     }
-                    Err(err) => pipeline_diagnostics.push(walk_error(&err)),
+                    Err(err) => pipeline_diagnostics.extend(Reports::from(FileError::from(err))),
                 }
             }
         },
@@ -72,7 +72,7 @@ fn check_file(workspace: &mut Workspace, path: PathBuf, arena: &Arena) -> Report
     // We first need to convert this to a workspace member.
     let contents = match fs::read_to_string(&path) {
         Ok(contents) => contents,
-        Err(err) => return vec![file_error("read", &path, &err)],
+        Err(err) => return Reports::from(FileError::Read { path, err }),
     };
 
     let id = workspace.reserve_member(path, contents);

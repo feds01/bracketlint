@@ -7,12 +7,12 @@ use bl_arena::Arena;
 use bl_fmt::{FormatQuery, FormatQueryResult, FormatterOptions, fmt_module};
 use bl_lints::{diff::Diff, settings::FixMode};
 use bl_parse::{ParseQuery, ParseQueryResult, parse_source};
-use bl_reporting::{Report, Reports, pluralise};
-use bl_utils::{stream_write, stream_writeln, timed};
+use bl_reporting::{Reports, pluralise};
+use bl_utils::{path::relative_path, stream_write, stream_writeln, timed};
 use bl_workspace::{Member, Workspace, resolver::find_files_in_paths};
 use log::{Level, debug, warn};
 
-use super::{file_error, relative_path, sort_files, walk_error};
+use super::{FileError, sort_files};
 
 /// What came of formatting the templates.
 #[derive(Debug, Default)]
@@ -107,7 +107,7 @@ pub fn fmt(files: &[PathBuf], workspace: &mut Workspace) -> Result<FormatResults
 
                         arena.reset();
                     }
-                    Err(err) => parse_diagnostics.push(walk_error(&err)),
+                    Err(err) => parse_diagnostics.extend(Reports::from(FileError::from(err))),
                 }
             }
         },
@@ -149,7 +149,7 @@ fn format_file(
     let contents = match fs::read_to_string(&path) {
         Ok(contents) => contents,
         Err(err) => {
-            let parse_diagnostics = vec![file_error("read", &path, &err)];
+            let parse_diagnostics = Reports::from(FileError::Read { path, err });
             return FormattedFile { parse_diagnostics, ..Default::default() };
         }
     };
@@ -173,8 +173,8 @@ fn format_file(
 
     let changed = match emit_formatted(workspace, member, &buffer, changed) {
         Ok(()) => Some(changed),
-        Err(report) => {
-            format_diagnostics.push(report);
+        Err(err) => {
+            format_diagnostics.extend(Reports::from(err));
             None
         }
     };
@@ -194,7 +194,7 @@ fn emit_formatted(
     member: &Member,
     buffer: &str,
     changed: bool,
-) -> Result<(), Report> {
+) -> Result<(), FileError> {
     let mut stdout = workspace.output_stream();
 
     match workspace.settings.linter_settings.fix_mode {
@@ -205,7 +205,7 @@ fn emit_formatted(
 
         FixMode::Apply => {
             fs::write(&member.path, buffer)
-                .map_err(|err| file_error("write", &member.path, &err))?;
+                .map_err(|err| FileError::Write { path: member.path.clone(), err })?;
         }
         FixMode::Check => {
             stream_writeln!(stdout, "Would reformat: {}", relative_path(&member.path).display());

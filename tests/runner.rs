@@ -247,9 +247,7 @@ fn handle_test(test: TestingInput) {
     };
     let error_stream = CompilerOutputStream::stderr;
 
-    // Setup the logger for the test case. It writes to the case's output
-    // rather than to `stderr`, so that the tree that `--dump-ast` logs is in
-    // the `.stdout` snapshot.
+    // Setup the logger for the test case.
     LOGGER.error_stream.set(output_stream()).unwrap();
     LOGGER.set_messaging_format(MessagingFormat::Normal);
     log::set_logger(&LOGGER).unwrap_or_else(|_| panic!("couldn't initiate logger"));

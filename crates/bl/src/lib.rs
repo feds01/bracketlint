@@ -15,9 +15,7 @@ use std::{
 use anyhow::{Ok, Result};
 use bl_lints::settings::FixMode;
 use bl_reporting::{Reporter, Reports, pluralise};
-use bl_utils::{
-    highlight::set_colours, logging::ToolLogger, stream::CompilerOutputStream, stream_writeln,
-};
+use bl_utils::{logging::ToolLogger, stream::CompilerOutputStream, stream_writeln};
 use bl_workspace::{Workspace, WorkspaceBuilder, settings::Settings};
 use cli::{CheckCommand, FormatCommand};
 use commands::fmt::FormatResults;
@@ -81,11 +79,7 @@ pub fn run(cli::Cli { command, verbose }: cli::Cli) -> Result<ExitStatus> {
     // that `--dump-ast` asks for, and the count of errors and warnings, so
     // only debug logs, such as timings, wait for `--verbose`.
     LOGGER.error_stream.set(CompilerOutputStream::stderr()).unwrap();
-
-    // Diagnostics and logs are coloured on a terminal, unless `NO_COLOR` asks
-    // for none, but not in a file or a pipe, e.g. a CI log.
-    let no_colour = std::env::var_os("NO_COLOR").is_some_and(|value| !value.is_empty());
-    set_colours(io::stderr().is_terminal() && !no_colour);
+    LOGGER.set_colours(stderr_colours());
     log::set_max_level(if verbose { log::LevelFilter::Debug } else { log::LevelFilter::Info });
 
     // We also need to create a global-config
@@ -157,6 +151,14 @@ fn fmt(args: FormatCommand) -> Result<ExitStatus> {
     Ok(if would_reformat { status.would_reformat() } else { status })
 }
 
+/// Whether what goes to `stderr`, i.e. diagnostics and logs, is coloured: on a
+/// terminal, unless `NO_COLOR` asks for none, but not in a file or a pipe, e.g.
+/// a CI log.
+fn stderr_colours() -> bool {
+    let no_colour = std::env::var_os("NO_COLOR").is_some_and(|value| !value.is_empty());
+    io::stderr().is_terminal() && !no_colour
+}
+
 /// A workspace with the given `settings`, which writes to `stdout` and
 /// `stderr`.
 fn build_workspace(settings: Settings) -> Workspace {
@@ -189,7 +191,8 @@ fn consume_diagnostics(workspace: &Workspace, diagnostics: Reports) -> Result<Ex
     }
 
     if !diagnostics.is_empty() {
-        stream_writeln!(stderr, "{}", Reporter::new(workspace, diagnostics));
+        let mut reporter = Reporter::new(workspace, diagnostics);
+        stream_writeln!(stderr, "{}", reporter.with_colours(stderr_colours()));
     }
 
     // ##Hack: to prevent the compiler from printing this message when the pipeline

@@ -48,12 +48,26 @@ pub struct ToolLogger {
 
     /// The format to use when logging information.
     messaging_format: OnceCell<MessagingFormat>,
+
+    /// Whether the level of each message is coloured, which it is unless
+    /// [Self::set_colours] says otherwise.
+    colours: OnceCell<bool>,
 }
 
 impl ToolLogger {
     /// Create a new compiler logger.
     pub const fn new() -> Self {
-        Self { error_stream: OnceCell::new(), messaging_format: OnceCell::new() }
+        Self {
+            error_stream: OnceCell::new(),
+            messaging_format: OnceCell::new(),
+            colours: OnceCell::new(),
+        }
+    }
+
+    /// Colour the level of each message, or don't, e.g. when the messages go
+    /// to a file or a pipe rather than a terminal.
+    pub fn set_colours(&self, colours: bool) {
+        self.colours.set(colours).unwrap();
     }
 
     /// Set the [CompilerLogger] messaging format.
@@ -83,13 +97,14 @@ impl Log for ToolLogger {
             return;
         }
 
-        // Custom colour formatting for the log level
+        // Custom colour formatting for the log level, unless it isn't coloured.
+        let colour = |decoration| self.colours.get().is_none_or(|&on| on).then_some(decoration);
         let level_prefix = match record.level() {
-            Level::Error => highlight(Colour::Red | Modifier::Bold, "error"),
-            Level::Warn => highlight(Colour::Yellow | Modifier::Bold, "warn"),
-            Level::Info => highlight(Colour::Blue | Modifier::Bold, "info"),
-            Level::Debug => highlight(Colour::Blue | Modifier::Bold, "debug"),
-            Level::Trace => highlight(Colour::Magenta | Modifier::Bold, "trace"),
+            Level::Error => highlight(colour(Colour::Red | Modifier::Bold), "error"),
+            Level::Warn => highlight(colour(Colour::Yellow | Modifier::Bold), "warn"),
+            Level::Info => highlight(colour(Colour::Blue | Modifier::Bold), "info"),
+            Level::Debug => highlight(colour(Colour::Blue | Modifier::Bold), "debug"),
+            Level::Trace => highlight(colour(Colour::Magenta | Modifier::Bold), "trace"),
         };
 
         let mut out = self.error_stream.get().unwrap().clone();

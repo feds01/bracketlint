@@ -17,24 +17,7 @@
 //! reporter.error().title(message);
 //! ```
 
-use std::{
-    ops::BitOr,
-    sync::atomic::{AtomicBool, Ordering},
-};
-
-/// Whether messages are coloured, which they are unless [set_colours] turns
-/// it off, e.g. when they go to a file or a pipe rather than a terminal.
-static COLOURS: AtomicBool = AtomicBool::new(true);
-
-/// Colour messages, or don't, see [colours].
-pub fn set_colours(enabled: bool) {
-    COLOURS.store(enabled, Ordering::Relaxed);
-}
-
-/// Whether messages are coloured, e.g. by [highlight].
-pub fn colours() -> bool {
-    COLOURS.load(Ordering::Relaxed)
-}
+use std::ops::BitOr;
 
 /// Variants of highlighter colour that can be used.
 pub enum Colour {
@@ -128,21 +111,25 @@ impl Highlighter for Decoration {
     }
 }
 
+/// A highlighter that may be none, which leaves a message as it is, e.g. when
+/// it goes to a file or a pipe rather than a terminal.
+impl<H: Highlighter> Highlighter for Option<H> {
+    fn escape_code(&self) -> String {
+        self.as_ref().map(Highlighter::escape_code).unwrap_or_default()
+    }
+}
+
 /// General function to apply a highlighter on a string. This will call the
 /// provided [Highlighter] implementation and then apply it to the passed
-/// message, resetting the effect at the end of the message. The message is
-/// left as it is when messages aren't coloured, see [colours].
+/// message, resetting the effect at the end of the message. A highlighter
+/// without an effect, e.g. `None`, leaves the message as it is.
 pub fn highlight(highlighter: impl Highlighter, message: impl ToString) -> String {
     const RESET: &str = "\u{001b}[0m";
 
-    if !colours() {
+    let escape_code = highlighter.escape_code();
+    if escape_code.is_empty() {
         return message.to_string();
     }
 
-    highlighter
-        .escape_code()
-        .chars()
-        .chain(message.to_string().chars())
-        .chain(RESET.chars())
-        .collect()
+    escape_code.chars().chain(message.to_string().chars()).chain(RESET.chars()).collect()
 }

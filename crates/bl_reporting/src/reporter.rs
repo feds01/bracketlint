@@ -7,7 +7,6 @@ use std::{fmt, ops::Range};
 
 use annotate_snippets::{Annotation, AnnotationKind, Element, Level, Renderer, Snippet};
 use bl_ast::HasSource;
-use bl_utils::highlight::colours;
 
 use crate::{Report, ReportCodeBlock, ReportElement, Reports};
 
@@ -24,9 +23,10 @@ pub struct Reporter<'a, S: HasSource> {
     sources: &'a S,
 }
 
-/// The renderer for the reporter, which colours the reports unless messages
-/// aren't coloured, see [colours].
-const STYLED_RENDERER: Renderer = Renderer::styled();
+/// The default renderer for the reporter.
+const DEFAULT_RENDERER: Renderer = Renderer::styled();
+
+/// The renderer for reports that aren't coloured, see [Reporter::with_colours].
 const PLAIN_RENDERER: Renderer = Renderer::plain();
 
 impl<'a, S: HasSource> Reporter<'a, S> {
@@ -38,12 +38,18 @@ impl<'a, S: HasSource> Reporter<'a, S> {
         self.renderer = Some(renderer);
         self
     }
+
+    /// Colour the reports, or don't, e.g. when they go to a file or a pipe
+    /// rather than a terminal.
+    pub fn with_colours(&mut self, colours: bool) -> &mut Self {
+        self.renderer = Some(if colours { &DEFAULT_RENDERER } else { &PLAIN_RENDERER });
+        self
+    }
 }
 
 impl<S: HasSource> fmt::Display for Reporter<'_, S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let renderer =
-            self.renderer.unwrap_or(if colours() { &STYLED_RENDERER } else { &PLAIN_RENDERER });
+        let renderer = self.renderer.unwrap_or(&DEFAULT_RENDERER);
 
         for report in self.reports.iter() {
             let level = Level::from(report.kind);
