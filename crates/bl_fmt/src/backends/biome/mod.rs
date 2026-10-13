@@ -6,7 +6,7 @@ use std::{cell::RefCell, collections::HashMap, ops::Range, rc::Rc};
 use biome_css_formatter::{self as css_formatter, context::CssFormatOptions};
 use biome_css_parser::{self as css_parser, CssOffsetParse, CssParserOptions};
 use biome_formatter::{
-    FormatError, IndentStyle, SourceMapGeneration, SourceMarker, prelude::Document,
+    FormatError, IndentStyle, LineWidth, SourceMapGeneration, SourceMarker, prelude::Document,
 };
 use biome_html_formatter::{HtmlFormatOptions, format_node};
 use biome_html_parser::{HtmlParse, HtmlParserOptions, parse_html_with_cache};
@@ -215,6 +215,66 @@ impl<'ctx> HasHTMLParsing<'ctx> for HTMLBiomeFormatter {
     fn format(&mut self, contents: &str) -> FmtResult<Vec<HtmlPart>> {
         self.parts(contents, 0)
     }
+
+    fn format_run(
+        &mut self,
+        contents: &str,
+        words: &[Range<usize>],
+        width: usize,
+    ) -> FmtResult<Option<Vec<HtmlPart>>> {
+        let parsed = self.parse(contents);
+        let root = parsed.syntax();
+
+        let scan = Scan::new(&root, contents.len());
+        if scan.verbatim.is_some() || !scan.bodies.is_empty() || scan.has_broken_tag() {
+            return Ok(None);
+        }
+
+        // A placeholder is a word of the text of an element when it is in the
+        // value of a piece of the element's content, as a whole.
+        let in_text = |word: &Range<usize>| {
+            let start = TextSize::from(word.start as u32);
+            root.token_at_offset(start).right_biased().is_some_and(|token| {
+                token.kind() == HtmlSyntaxKind::HTML_LITERAL
+                    && token
+                        .parent()
+                        .is_some_and(|node| node.kind() == HtmlSyntaxKind::HTML_CONTENT)
+                    && token.text_trimmed_range().end() >= TextSize::from(word.end as u32)
+            })
+        };
+
+        if !words.iter().all(in_text) {
+            return Ok(None);
+        }
+
+        // Biome reads the run as HTML, so text with a `<` or `>` in it isn't
+        // text, but the rest of a tag that it can't see: the attributes after
+        // `<{{ name }}`, whose name a template tag writes, or those of a tag
+        // that a template tag cuts. Wrapping them as words of text could break
+        // a line in an attribute value, so the run is laid out as before.
+        let is_tag_text = |token: &biome_rowan::SyntaxToken<_>| {
+            token.kind() == HtmlSyntaxKind::HTML_LITERAL
+                && token.parent().is_some_and(|node| node.kind() == HtmlSyntaxKind::HTML_CONTENT)
+                && token.text_trimmed().contains(['<', '>'])
+        };
+
+        if root.descendants_tokens(Direction::Next).any(|token| is_tag_text(&token)) {
+            return Ok(None);
+        }
+
+        let width = LineWidth::try_from(width as u16).unwrap_or_default();
+        self.options.html = self.options.html.clone().with_line_width(width);
+
+        // The run may close a `<pre>`, `<textarea>`, `<script>` or `<style>`
+        // that opens before it, whose content is kept as it is written. The
+        // run has text, so it is parsed as a whole, as `parts` would parse it.
+        let parts = self.parts_of((contents, 0), parsed, scan)?;
+        if parts.iter().any(|part| matches!(part, HtmlPart::Verbatim { .. })) {
+            return Ok(None);
+        }
+
+        Ok(Some(parts))
+    }
 }
 
 impl HTMLBiomeFormatter {
@@ -231,8 +291,19 @@ impl HTMLBiomeFormatter {
         }
 
         let parsed = self.parse(contents);
+        let scan = Scan::new(&parsed.syntax(), contents.len());
+        self.parts_of((contents, at), parsed, scan)
+    }
+
+    /// The parts of `contents`, which start at `at` in the piece, as
+    /// [Self::parts] finds them, from their parse and its scan.
+    fn parts_of(
+        &self,
+        (contents, at): (&str, usize),
+        parsed: HtmlParse,
+        mut scan: Scan,
+    ) -> FmtResult<Vec<HtmlPart>> {
         let html = parsed.tree().html();
-        let mut scan = Scan::new(&parsed.syntax(), contents.len());
 
         // The code of a `<script>` or `<style>` that no tag splits is formatted
         // with the HTML around it, see [Body], unless it doesn't parse. Then

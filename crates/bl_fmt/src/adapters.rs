@@ -314,6 +314,20 @@ pub trait HasHTMLParsing<'ctx> {
     /// no template tag splits is formatted with the HTML around it, or is a
     /// verbatim part when it doesn't parse.
     fn format(&mut self, contents: &str) -> FmtResult<Vec<HtmlPart>>;
+
+    /// Format `contents`, a run of HTML and `{{ }}` tags in which each tag is
+    /// a word of placeholder characters at one of `words`, as [Self::format]
+    /// does, with lines `width` wide. Returns `None` if a placeholder isn't in
+    /// the text of an element, e.g. it is in an attribute value, whose quotes
+    /// the engine can change, or the run has a tag that a template tag cuts,
+    /// or holds the content of a `<pre>`, `<textarea>`, `<script>` or
+    /// `<style>`, which is kept as it is written.
+    fn format_run(
+        &mut self,
+        contents: &str,
+        words: &[std::ops::Range<usize>],
+        width: usize,
+    ) -> FmtResult<Option<Vec<HtmlPart>>>;
 }
 
 /// A trait that represents a type that has the capability to parse CSS.

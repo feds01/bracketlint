@@ -1,0 +1,5 @@
+// run=pass, stage=fmt, dialect=twig
+
+<a href="{{ url }}" class="toggle {{ header.ascending ? 'ascending' : 'descending' }}" title="{{ title }}">{{ label }}</a>
+{{ options.inline ? '<span' : '<div' }} class="views-summary views-summary-unformatted"> {{ row.link }} </div>
+<a {% if active %}aria-current="page" class="nav-link nav-link--active {{ extra_classes }}"{% endif %}>{{ name }}</a>

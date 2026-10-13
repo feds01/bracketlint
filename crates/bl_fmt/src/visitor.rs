@@ -19,7 +19,8 @@ use crate::{
         ExternalLanguagesEngineAdaptor, Formatted, FormatterContext, HasHTMLParsing, HtmlPart,
         LanguageType, TerminalState, Unparsed,
     },
-    diagnostics::{FmtDiagnostics, FmtError, FmtWarning, FmtWarningKind},
+    diagnostics::{FmtDiagnostics, FmtError, FmtResult, FmtWarning, FmtWarningKind},
+    dialects::html::is_verbatim,
     options::FormatterOptions,
 };
 
@@ -100,6 +101,93 @@ impl Splice {
     }
 }
 
+/// The width that Biome wraps the lines of HTML to.
+const LINE_WIDTH: usize = 80;
+
+/// Whether the HTML that starts at `start` in `source` starts in a tag, e.g.
+/// in the attributes of `<a {% if x %}href="{{ url }}"{% endif %}>`, as the
+/// last `<` or `>` before it tells, outside of the template's tags.
+fn starts_in_tag(source: &str, start: usize) -> bool {
+    let mut before = &source[..start];
+
+    while let Some(last) = before.rfind(['<', '>', '}']) {
+        let (rest, c) = (&before[..last], &before[last..=last]);
+
+        // Skip a template tag, from its closing delimiter back to its opening
+        // one, e.g. the `>` in `{% if a > b %}`.
+        before = match rest.chars().next_back() {
+            Some(close @ ('}' | '%' | '#')) if c == "}" => {
+                let open = if close == '}' { "{{" } else { &format!("{{{close}") };
+                &rest[..rest.rfind(open).unwrap_or(0)]
+            }
+            _ if c == "}" => rest,
+            _ => return c == "<",
+        };
+    }
+
+    false
+}
+
+/// A run of HTML and `{{ }}` tags, which is formatted as one piece of HTML so
+/// that its lines are wrapped with the tags in them, see
+/// [Formatter::push_run]. Each tag is a word of placeholder characters as wide
+/// as the tag is formatted: a character that names the tag, then
+/// [Run::PADDING].
+struct Run {
+    /// The run, with each tag as its placeholder.
+    text: String,
+
+    /// Each tag, formatted, by its index.
+    tags: Vec<String>,
+
+    /// Where each piece of the run starts, in [Self::text] and in the source,
+    /// in order. Each tag and the text between two tags is a piece.
+    pieces: Vec<(usize, usize)>,
+}
+
+impl Run {
+    /// The character that the placeholder of the first tag starts with. Those
+    /// of the tags after it follow it, up to [Self::LAST].
+    const FIRST: char = '\u{E000}';
+
+    /// The character that the placeholder of the last tag that a run can hold
+    /// starts with.
+    const LAST: char = '\u{F7FF}';
+
+    /// The character that the rest of each placeholder is made of.
+    const PADDING: char = '\u{F8FF}';
+
+    /// Whether `c` is a character of a placeholder, which are all in Unicode's
+    /// Private Use Area, so that none is in a template.
+    fn is_placeholder(c: char) -> bool {
+        (Self::FIRST..=Self::PADDING).contains(&c)
+    }
+
+    /// Where `at` in [Self::text] is in the source, e.g. the start of a tag at
+    /// the start of its placeholder.
+    fn source_offset(&self, at: usize) -> usize {
+        let index = self.pieces.partition_point(|&(start, _)| start <= at).saturating_sub(1);
+        let (start, source) = self.pieces[index];
+        source + (at - start)
+    }
+
+    /// `text`, a part of [Self::text] or its formatted code, with the tag of
+    /// each placeholder in it in its place.
+    fn with_tags(&self, text: &str) -> String {
+        let mut with_tags = String::with_capacity(text.len());
+        for c in text.chars().filter(|&c| c != Self::PADDING) {
+            match c {
+                Self::FIRST..=Self::LAST => {
+                    with_tags.push_str(&self.tags[c as usize - Self::FIRST as usize]);
+                }
+                c => with_tags.push(c),
+            }
+        }
+
+        with_tags
+    }
+}
+
 impl<EngineAdaptor: ExternalLanguagesEngineAdaptor> Formatter<'_, EngineAdaptor> {
     /// Report an error to the parser diagnostics.
     ///
@@ -109,6 +197,9 @@ impl<EngineAdaptor: ExternalLanguagesEngineAdaptor> Formatter<'_, EngineAdaptor>
         note_on_span(InlineSnippet::new(&self.ctx.source, span), note.into());
     }
 }
+
+/// A statement of a body, as the formatter walks it.
+type Statement<'t> = &'t bl_ast::AstNode<'t, bl_ast::Statement<'t>>;
 
 /// Whether a run of whitespace separates two items on the same line.
 fn is_inline_space(whitespace: &str) -> bool {
@@ -434,6 +525,17 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
     /// part by part, and open and close the elements that it does.
     fn push_html(&mut self, start: usize, text: &str) -> Result<(), FmtError> {
         let parts = self.adaptor.html_engine(&self.ctx).format(text)?;
+        self.push_parts(parts, start, text, None);
+        Ok(())
+    }
+
+    /// Push the `parts` of the piece of HTML `text`, which starts at `start`
+    /// in the source, and open and close the elements that they do. The text
+    /// of a `run` is its own, whose parts hold placeholders for its tags, see
+    /// [Run].
+    fn push_parts(&mut self, parts: Vec<HtmlPart>, start: usize, text: &str, run: Option<&Run>) {
+        let at = |offset: usize| run.map_or(start + offset, |run| run.source_offset(offset));
+        let with_tags = |html: &str| run.map(|run| run.with_tags(html));
 
         for part in parts {
             match part {
@@ -447,17 +549,27 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
 
                     // The content of a `<pre>` or `<textarea>` that a tag splits
                     // is kept exactly as it is written, as a whole one's is.
-                    let (at, html) = (start + range.start(), &text[Range::from(range)]);
+                    let html = &text[Range::from(range)];
                     if self.ctx.in_verbatim() {
-                        self.push_exact(at, html);
+                        self.push_exact(at(range.start()), html);
                     } else {
-                        self.push_piece(at, html, formatted);
+                        let formatted =
+                            formatted.map(|formatted| match with_tags(&formatted.code) {
+                                Some(code) => Formatted { code, ..formatted },
+                                None => formatted,
+                            });
+                        let kept = with_tags(html);
+                        self.push_piece(
+                            at(range.start()),
+                            kept.as_deref().unwrap_or(html),
+                            formatted,
+                        );
                     }
 
                     self.ctx.open_elements(opens);
                 }
                 HtmlPart::Verbatim { range, unparsed } => {
-                    self.push_exact(start + range.start(), &text[Range::from(range)]);
+                    self.push_exact(at(range.start()), &text[Range::from(range)]);
                     if let Some(unparsed) = unparsed {
                         self.report_unparsed(start, unparsed);
                     }
@@ -466,20 +578,111 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
                     // The closing tag of a `<pre>` or `<textarea>` stays where it
                     // is, as the whitespace before it is its content. Any other
                     // is at the indent of the elements that are still open.
-                    let (at, tag) = (start + range.start(), &text[Range::from(range)]);
+                    let tag = &text[Range::from(range)];
                     if self.ctx.keeps_whitespace() {
-                        self.push_exact(at, tag);
+                        self.push_exact(at(range.start()), tag);
                         self.ctx.close_element(&name);
                     } else {
                         self.ctx.close_element(&name);
-                        self.start_item(at);
+                        self.start_item(at(range.start()));
                         self.push_hunk(tag);
                     }
                 }
             }
         }
+    }
+
+    /// Push the run of text and `{{ }}` tags at `run` in `statements`, see
+    /// [Self::run_at], as one piece of HTML, in which each tag is a word as
+    /// wide as it is formatted, see [Run]. Biome then wraps the lines of
+    /// the text with the tags in them, as it would wrap the words of the
+    /// text. If each piece of text between two tags were formatted on its
+    /// own, from the start of a line, a tag would lengthen the line that it
+    /// continues.
+    ///
+    /// A run that can't be formatted as one piece, see [Self::push_run_whole],
+    /// is pushed a statement at a time.
+    fn push_run(&mut self, statements: &[Statement], run: Range<usize>) -> FmtResult<()> {
+        if self.push_run_whole(statements, run.clone())? {
+            return Ok(());
+        }
+
+        for index in run {
+            self.push_statement(statements, index)?;
+        }
 
         Ok(())
+    }
+
+    /// Push the run at `run` in `statements` as one piece of HTML, see [Run],
+    /// at the width that the indent leaves. Returns `false`, having pushed
+    /// nothing, if the run can't be, e.g. when it starts in a tag, or a tag is
+    /// in an attribute value, see [HasHTMLParsing::format_run].
+    fn push_run_whole(&mut self, statements: &[Statement], run: Range<usize>) -> FmtResult<bool> {
+        let source = self.ctx.source.source;
+        let (start, end) =
+            (statements[run.start].range().start(), statements[run.end - 1].range().end() + 1);
+        if source[start..end].contains(Run::is_placeholder) || starts_in_tag(source, start) {
+            return Ok(false);
+        }
+
+        let mut text = String::with_capacity(end - start);
+        let (mut tags, mut words, mut pieces) = (vec![], vec![], vec![(0, start)]);
+        let mut from = start;
+
+        for statement in &statements[run.clone()] {
+            let bl_ast::Statement::Inline(inline) = statement.body() else {
+                continue;
+            };
+
+            let Some(first) = char::from_u32(Run::FIRST as u32 + tags.len() as u32)
+                .filter(|&first| first <= Run::LAST)
+            else {
+                return Ok(false);
+            };
+
+            // A tag in a tag, e.g. in an attribute value, isn't a word of text,
+            // which the last `<` or `>` before it tells, as the run doesn't
+            // start in a tag. Finding it here saves parsing the run.
+            let range = statement.range();
+            text.push_str(&source[from..range.start()]);
+            if text.rfind(['<', '>']).is_some_and(|last| text[last..].starts_with('<')) {
+                return Ok(false);
+            }
+
+            pieces.push((text.len(), range.start()));
+
+            // Format the tag on its own, to know how wide it is.
+            let bl_ast::Inline { expr, trim } = inline;
+            let len = self.buffer.len();
+            self.within_tag(TagKind::Inline, *trim, |this| this.visit_expr(expr.ast_ref()))?;
+            let tag = self.buffer.split_off(len);
+
+            let word = text.len();
+            text.push(first);
+            text.extend(std::iter::repeat_n(Run::PADDING, tag.chars().count() - 1));
+            words.push(word..text.len());
+            tags.push(tag);
+
+            from = range.end() + 1;
+            pieces.push((text.len(), from));
+        }
+
+        text.push_str(&source[from..end]);
+
+        let width = LINE_WIDTH.saturating_sub(self.ctx.indent_level() as usize).max(LINE_WIDTH / 2);
+        let parts = self.adaptor.html_engine(&self.ctx).format_run(&text, &words, width)?;
+        let Some(parts) = parts else {
+            return Ok(false);
+        };
+
+        let whole = Run { text, tags, pieces };
+        self.push_parts(parts, start, &whole.text, Some(&whole));
+
+        let last = statements[run.end - 1].ast_ref();
+        let next = statements.get(run.end).map(|next| next.ast_ref());
+        self.check_inline_statement_newline(last, next)?;
+        Ok(true)
     }
 
     /// Report the code of a `<script>` or `<style>` that doesn't parse, in the
@@ -621,6 +824,66 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
             Some(newline) if source.contains('\n') => self.push_hunk(&whitespace[newline + 1..]),
             _ => self.add_indent(),
         }
+    }
+
+    /// Push the statement at `index` in `statements`, and end its line if it
+    /// ends one, as the statement after it decides.
+    fn push_statement(&mut self, statements: &[Statement], index: usize) -> FmtResult<()> {
+        // The tags in a `<pre>`, `<textarea>`, `<script>` or `<style>` are
+        // kept exactly as they are written, with the whitespace around
+        // them, as is the rest of its content. A block in one is kept
+        // whole, so a closing tag in it doesn't close the element.
+        let statement = statements[index].ast_ref();
+        if self.ctx.in_verbatim() && !matches!(statement.body(), bl_ast::Statement::Text(_)) {
+            let range = statement.range();
+            self.push_exact(range.start(), self.ctx.source.hunk(range));
+            return Ok(());
+        }
+
+        walk_mut_self::walk_statement(self, statement)?;
+
+        // The whitespace after a statement in a `<pre>`, `<textarea>`,
+        // `<script>` or `<style>` is kept as it is written, before what
+        // comes next.
+        if self.ctx.in_verbatim() {
+            return Ok(());
+        }
+
+        let next = statements.get(index + 1).map(|next| next.ast_ref());
+        self.check_inline_statement_newline(statement, next)
+    }
+
+    /// The length of the run of text and `{{ }}` tags that `statements` start
+    /// with, which [Self::push_run] lays out together: in HTML, outside of a
+    /// `<pre>`, `<textarea>`, `<script>` or `<style>`, with tags that each fit
+    /// on a line, and with a tag and some text. Otherwise, it is zero.
+    fn run_at(&self, statements: &[Statement]) -> usize {
+        // A `<code>` in a `<pre>` is in the content of the `<pre>` too.
+        if self.text.is_some()
+            || self.ctx.open_elements.iter().any(|name| is_verbatim(name))
+            || !matches!(self.ctx.language(), LanguageType::Html)
+        {
+            return 0;
+        }
+
+        let source = self.ctx.source;
+        let len = statements
+            .iter()
+            .take_while(|statement| match statement.body() {
+                bl_ast::Statement::Text(_) => true,
+                bl_ast::Statement::Inline(_) => !source.hunk(statement.range()).contains('\n'),
+                _ => false,
+            })
+            .count();
+
+        let run = &statements[..len];
+        let has_tag = run.iter().any(|item| matches!(item.body(), bl_ast::Statement::Inline(_)));
+        let has_text = run.iter().any(|item| {
+            matches!(item.body(), bl_ast::Statement::Text(_))
+                && !source.hunk(item.range()).trim().is_empty()
+        });
+
+        if has_tag && has_text { len } else { 0 }
     }
 
     // Extract the inline check into a separate function
@@ -1070,34 +1333,21 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         let bl_ast::Body { contents } = node.body();
         let statements: Vec<_> = contents.iter().collect();
 
-        // Visit the body of the document
-        for (i, item) in statements.iter().enumerate() {
-            // The tags in a `<pre>`, `<textarea>`, `<script>` or `<style>` are
-            // kept exactly as they are written, with the whitespace around
-            // them, as is the rest of its content. A block in one is kept
-            // whole, so a closing tag in it doesn't close the element.
-            let statement = item.ast_ref();
-            if self.ctx.in_verbatim() && !matches!(statement.body(), bl_ast::Statement::Text(_)) {
-                let range = statement.range();
-                self.push_exact(range.start(), self.ctx.source.hunk(range));
-                continue;
+        // Visit the body of the document. A run of text and `{{ }}` tags in
+        // HTML is laid out together, so that its lines are wrapped with the
+        // tags in them.
+        let mut i = 0;
+        while i < statements.len() {
+            let run = self.run_at(&statements[i..]);
+            if run > 1 {
+                self.push_run(&statements, i..i + run)?;
+                i += run;
+            } else {
+                self.push_statement(&statements, i)?;
+                i += 1;
             }
-
-            walk_mut_self::walk_statement(self, item.ast_ref())?;
-
-            // The whitespace after a statement in a `<pre>`, `<textarea>`,
-            // `<script>` or `<style>` is kept as it is written, before what
-            // comes next.
-            if self.ctx.in_verbatim() {
-                continue;
-            }
-
-            // Get optional next statement if it exists
-            let next_statement =
-                if i + 1 < statements.len() { Some(statements[i + 1].ast_ref()) } else { None };
-
-            self.check_inline_statement_newline(item.ast_ref(), next_statement)?;
         }
+
         Ok(())
     }
 
@@ -1196,5 +1446,22 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
     ) -> Result<Self::ExprRet, Self::Error> {
         self.push_source(node.range());
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::starts_in_tag;
+
+    #[test]
+    fn html_starts_in_a_tag_after_its_name() {
+        let starts_at = |source: &str| starts_in_tag(source, source.find('|').unwrap());
+
+        assert!(starts_at("<a {% if x %}|href=\"{{ url }}\""));
+        assert!(starts_at("<a {% if a > b %}|"));
+        assert!(starts_at("<{{ name }} {{ attrs }}|"));
+        assert!(!starts_at("<p>{% if a > b %}|"));
+        assert!(!starts_at("<p>{{ a }} {# > #}|"));
+        assert!(!starts_at("|"));
     }
 }
