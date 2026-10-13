@@ -1,0 +1,9 @@
+// run=pass, stage=fmt, dialect=twig
+
+<div>
+<p>{% trans %}Submitted by {{ author_name }} on {{ date }}, which is a long message that would otherwise wrap.{% endtrans %}</p>
+</div>
+<button>{% trans 'Remove' %}</button>
+<div>
+<p>{% trans %}A block after a tag that   isn't one keeps its text.{% endtrans %}</p>
+</div>

@@ -853,6 +853,43 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         self.check_inline_statement_newline(statement, next)
     }
 
+    /// The length of the block of text to translate that `statements` start
+    /// with, from its opening tag to its closing one, see
+    /// [Dialect::translation_tags], or zero if they don't start with one.
+    fn translation_block_at(&self, statements: &[Statement]) -> usize {
+        // A tag is named by the word after its `{%` and its whitespace control,
+        // whichever way it is parsed, e.g. `{% blocktrans count n as num %}` as
+        // an assignment.
+        let name = |statement: &Statement| {
+            let bl_ast::Statement::Tag(_) = statement.body() else {
+                return None;
+            };
+
+            let tag = self.ctx.source.hunk(statement.range()).strip_prefix("{%")?;
+            let tag = tag.trim_start_matches(['-', '+', '~']).trim_start();
+            Some(&tag[..tag.find(|c: char| !c.is_alphanumeric() && c != '_')?])
+        };
+
+        let Some(open) = statements.first().and_then(name) else {
+            return 0;
+        };
+
+        let tags = self.ctx.dialect.translation_tags();
+        let Some(&(_, end)) = tags.iter().find(|&&(start, _)| start == open) else {
+            return 0;
+        };
+
+        // The block ends at the next tag of the same name, which is its end tag
+        // unless the tag doesn't open one, e.g. `{% trans 'Remove' %}` in Twig.
+        let next = statements[1..]
+            .iter()
+            .position(|statement| name(statement).is_some_and(|name| name == open || name == end));
+        match next {
+            Some(at) if name(&statements[at + 1]) == Some(end) => at + 2,
+            _ => 0,
+        }
+    }
+
     /// The length of the run of text and `{{ }}` tags that `statements` start
     /// with, which [Self::push_run] lays out together: in HTML, outside of a
     /// `<pre>`, `<textarea>`, `<script>` or `<style>`, with tags that each fit
@@ -1338,6 +1375,24 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         // tags in them.
         let mut i = 0;
         while i < statements.len() {
+            // A block of text to translate, as in [Django] and [Jinja], and in
+            // Twig as [Symfony] defines it, is kept as it is written, since its
+            // whitespace is part of the message that it is translated by.
+            //
+            // [Django]: https://docs.djangoproject.com/en/stable/topics/i18n/translation/#blocktranslate-template-tag
+            // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#i18n
+            // [Symfony]: https://github.com/symfony/symfony/blob/v7.3.0/src/Symfony/Bridge/Twig/Node/TransNode.php#L109-L129
+            let block = self.translation_block_at(&statements[i..]);
+            if block > 0 && !self.ctx.in_verbatim() {
+                let (open, end) = (statements[i].range(), statements[i + block - 1].range());
+                self.push_kept_source(ByteRange::new(open.start(), end.end()));
+
+                i += block;
+                let next = statements.get(i).map(|next| next.ast_ref());
+                self.check_inline_statement_newline(statements[i - 1].ast_ref(), next)?;
+                continue;
+            }
+
             let run = self.run_at(&statements[i..]);
             if run > 1 {
                 self.push_run(&statements, i..i + run)?;

@@ -133,6 +133,26 @@ impl Dialect {
         if self.has_raw_blocks() { ("raw", "endraw") } else { ("verbatim", "endverbatim") }
     }
 
+    /// The tags that open and close a block of text to translate, whose
+    /// contents are the message as they are written, with the whitespace in
+    /// them, unless the block is `trimmed`: `blocktranslate` in [Django], or
+    /// `blocktrans`, which it still [registers], and `trans` in [Jinja], and in
+    /// Twig as [Symfony] defines it.
+    ///
+    /// [Django]: https://docs.djangoproject.com/en/stable/topics/i18n/translation/#blocktranslate-template-tag
+    /// [registers]: https://github.com/django/django/blob/6.1.2/django/templatetags/i18n.py#L456-L457
+    /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#i18n
+    /// [Symfony]: https://github.com/symfony/symfony/blob/v7.3.0/src/Symfony/Bridge/Twig/Node/TransNode.php#L109-L129
+    pub fn translation_tags(self) -> &'static [(&'static str, &'static str)] {
+        match self {
+            Dialect::Django => {
+                &[("blocktranslate", "endblocktranslate"), ("blocktrans", "endblocktrans")]
+            }
+            Dialect::Jinja | Dialect::Twig => &[("trans", "endtrans")],
+            Dialect::Liquid | Dialect::Nunjucks => &[],
+        }
+    }
+
     /// Whether `{% doc %}` blocks exist, as in [Liquid], whose contents are
     /// documentation that is neither rendered nor run. Liquid reads them as
     /// text up to `{% enddoc %}`, so they needn't be valid Liquid.
