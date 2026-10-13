@@ -641,15 +641,22 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
                 return Ok(false);
             };
 
+            // A tag in a tag, e.g. in an attribute value, isn't a word of text,
+            // which the last `<` or `>` before it tells, as the run doesn't
+            // start in a tag. Finding it here saves parsing the run.
+            let range = statement.range();
+            text.push_str(&source[from..range.start()]);
+            if text.rfind(['<', '>']).is_some_and(|last| text[last..].starts_with('<')) {
+                return Ok(false);
+            }
+
+            pieces.push((text.len(), range.start()));
+
             // Format the tag on its own, to know how wide it is.
             let bl_ast::Inline { expr, trim } = inline;
             let len = self.buffer.len();
             self.within_tag(TagKind::Inline, *trim, |this| this.visit_expr(expr.ast_ref()))?;
             let tag = self.buffer.split_off(len);
-
-            let range = statement.range();
-            text.push_str(&source[from..range.start()]);
-            pieces.push((text.len(), range.start()));
 
             let word = text.len();
             text.push(first);

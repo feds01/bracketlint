@@ -247,9 +247,11 @@ impl<'ctx> HasHTMLParsing<'ctx> for HTMLBiomeFormatter {
             return Ok(None);
         }
 
-        // Text with a `<` or `>` in it is the rest of a tag, e.g. the
-        // attributes after `<{{ name }}`, which a template tag writes, or
-        // after a tag that a template tag cuts. Its lines aren't text's.
+        // Biome reads the run as HTML, so text with a `<` or `>` in it isn't
+        // text, but the rest of a tag that it can't see: the attributes after
+        // `<{{ name }}`, whose name a template tag writes, or those of a tag
+        // that a template tag cuts. Wrapping them as words of text could break
+        // a line in an attribute value, so the run is laid out as before.
         let is_tag_text = |token: &biome_rowan::SyntaxToken<_>| {
             token.kind() == HtmlSyntaxKind::HTML_LITERAL
                 && token.parent().is_some_and(|node| node.kind() == HtmlSyntaxKind::HTML_CONTENT)
@@ -264,8 +266,9 @@ impl<'ctx> HasHTMLParsing<'ctx> for HTMLBiomeFormatter {
         self.options.html = self.options.html.clone().with_line_width(width);
 
         // The run may close a `<pre>`, `<textarea>`, `<script>` or `<style>`
-        // that opens before it, whose content is kept as it is written.
-        let parts = self.parts(contents, 0)?;
+        // that opens before it, whose content is kept as it is written. The
+        // run has text, so it is parsed as a whole, as `parts` would parse it.
+        let parts = self.parts_of((contents, 0), parsed, scan)?;
         if parts.iter().any(|part| matches!(part, HtmlPart::Verbatim { .. })) {
             return Ok(None);
         }
@@ -288,8 +291,19 @@ impl HTMLBiomeFormatter {
         }
 
         let parsed = self.parse(contents);
+        let scan = Scan::new(&parsed.syntax(), contents.len());
+        self.parts_of((contents, at), parsed, scan)
+    }
+
+    /// The parts of `contents`, which start at `at` in the piece, as
+    /// [Self::parts] finds them, from their parse and its scan.
+    fn parts_of(
+        &self,
+        (contents, at): (&str, usize),
+        parsed: HtmlParse,
+        mut scan: Scan,
+    ) -> FmtResult<Vec<HtmlPart>> {
         let html = parsed.tree().html();
-        let mut scan = Scan::new(&parsed.syntax(), contents.len());
 
         // The code of a `<script>` or `<style>` that no tag splits is formatted
         // with the HTML around it, see [Body], unless it doesn't parse. Then
