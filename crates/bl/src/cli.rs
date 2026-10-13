@@ -19,6 +19,10 @@ use clap::{
 pub struct Cli {
     #[command(subcommand)]
     pub(crate) command: Command,
+
+    /// Also print debug logs, such as how long each step of the run takes.
+    #[arg(short, long, global = true)]
+    pub(crate) verbose: bool,
 }
 
 #[derive(Debug, clap::Subcommand)]

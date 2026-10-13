@@ -41,10 +41,9 @@ impl fmt::Display for MessagingFormat {
 /// This is also used to emit structured messages to the user.
 #[derive(Default, Debug)]
 pub struct ToolLogger {
-    /// The output stream that the logger will write to.
-    pub output_stream: OnceCell<CompilerOutputStream>,
-
-    /// The error stream that the logger will write to.
+    /// The error stream that the logger writes every message to, so that the
+    /// output stream only has what a command outputs, such as a formatted
+    /// template or a diff of it.
     pub error_stream: OnceCell<CompilerOutputStream>,
 
     /// The format to use when logging information.
@@ -54,11 +53,7 @@ pub struct ToolLogger {
 impl ToolLogger {
     /// Create a new compiler logger.
     pub const fn new() -> Self {
-        Self {
-            output_stream: OnceCell::new(),
-            error_stream: OnceCell::new(),
-            messaging_format: OnceCell::new(),
-        }
+        Self { error_stream: OnceCell::new(), messaging_format: OnceCell::new() }
     }
 
     /// Set the [CompilerLogger] messaging format.
@@ -78,7 +73,9 @@ impl ToolLogger {
 
 impl Log for ToolLogger {
     fn enabled(&self, metadata: &Metadata) -> bool {
-        metadata.level() <= Level::Debug
+        // Other crates, such as `ignore` and `globset`, log what they do at the
+        // debug level too, which would bury bracketlint's own debug logs.
+        metadata.level() <= Level::Warn || is_bracketlint_target(metadata.target())
     }
 
     fn log(&self, record: &Record) {
@@ -95,16 +92,19 @@ impl Log for ToolLogger {
             Level::Trace => highlight(Colour::Magenta | Modifier::Bold, "trace"),
         };
 
-        let mut out = if record.level() == Level::Error {
-            self.error_stream.get().unwrap().clone()
-        } else {
-            self.output_stream.get().unwrap().clone()
-        };
-
+        let mut out = self.error_stream.get().unwrap().clone();
         self.log_default(&mut out, record, level_prefix);
     }
 
     fn flush(&self) {}
+}
+
+/// Whether a log's `target`, which is the path of the module that logs it
+/// unless it names another, is in one of bracketlint's own crates:
+/// `bracketlint` and the `bl_*` crates.
+fn is_bracketlint_target(target: &str) -> bool {
+    let krate = target.split("::").next().unwrap_or(target);
+    krate == "bracketlint" || krate.starts_with("bl_")
 }
 
 // #[derive(Default)]
@@ -116,3 +116,17 @@ impl Log for ToolLogger {
 //         Ok(())
 //     }
 // }
+
+#[cfg(test)]
+mod test_super {
+    use super::*;
+
+    #[test]
+    fn test_is_bracketlint_target() {
+        assert!(is_bracketlint_target("bracketlint"));
+        assert!(is_bracketlint_target("bracketlint::commands::fmt"));
+        assert!(is_bracketlint_target("bl_workspace::resolver"));
+        assert!(!is_bracketlint_target("globset"));
+        assert!(!is_bracketlint_target("ignore::walk"));
+    }
+}

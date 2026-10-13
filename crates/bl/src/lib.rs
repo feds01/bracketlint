@@ -57,18 +57,18 @@ pub static LOGGER: ToolLogger = ToolLogger::new();
 
 /// Handler function which will delegate functionality to the appropriate
 /// command.
-pub fn run(cli::Cli { command }: cli::Cli) -> Result<ExitStatus> {
+pub fn run(cli::Cli { command, verbose }: cli::Cli) -> Result<ExitStatus> {
     // Initial grunt work, panic handler and logger setup...
     panic::set_hook(Box::new(crash_handler));
 
-    let output_stream = CompilerOutputStream::stdout;
-    let error_stream = CompilerOutputStream::stderr;
-
     log::set_logger(&LOGGER).unwrap_or_else(|_| panic!("couldn't initiate logger"));
 
-    LOGGER.error_stream.set(error_stream()).unwrap();
-    LOGGER.output_stream.set(output_stream()).unwrap();
-    log::set_max_level(log::LevelFilter::Debug);
+    // Logs go to `stderr`, so that `stdout` only has what the command outputs,
+    // e.g. `bracketlint fmt --diff > changes.diff`. The info logs are the tree
+    // that `--dump-ast` asks for, and the count of errors and warnings, so
+    // only debug logs, such as timings, wait for `--verbose`.
+    LOGGER.error_stream.set(CompilerOutputStream::stderr()).unwrap();
+    log::set_max_level(if verbose { log::LevelFilter::Debug } else { log::LevelFilter::Info });
 
     // We also need to create a global-config
 
