@@ -15,8 +15,16 @@ pub fn main() -> ExitCode {
     #[cfg(windows)]
     assert!(colored::control::set_virtual_terminal(true).is_ok());
 
+    // An argument that starts with `@` names a file of arguments, which may not
+    // exist.
     let args = wild::args_os();
-    let args = argfile::expand_args_from(args, argfile::parse_fromfile, argfile::PREFIX).unwrap();
+    let args = match argfile::expand_args_from(args, argfile::parse_fromfile, argfile::PREFIX) {
+        Ok(args) => args,
+        Err(e) => {
+            eprintln!("error: couldn't read the arguments in a file: {e}");
+            return ExitStatus::Error.into();
+        }
+    };
 
     let args = Cli::parse_from(args);
 

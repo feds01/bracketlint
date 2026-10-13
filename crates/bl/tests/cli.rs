@@ -171,3 +171,12 @@ fn reports_in_a_pipe_are_not_coloured() {
     assert!(stderr(&output).contains("error"), "{}", stderr(&output));
     assert!(!stderr(&output).contains('\u{1b}'), "{}", stderr(&output));
 }
+
+#[test]
+fn a_missing_file_of_arguments_fails_the_run() {
+    let dir = project("missing_argfile", &[]);
+
+    let output = bracketlint(&dir, &["check", "@missing-arguments"]);
+    assert_eq!(output.status.code(), Some(2), "{}", stderr(&output));
+    assert!(stderr(&output).contains("couldn't read the arguments"), "{}", stderr(&output));
+}
