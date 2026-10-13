@@ -1,4 +1,4 @@
-//! Definitions of the command line interface for the `bl` binary.
+//! Definitions of the command line interface for the `bracketlint` binary.
 
 use std::path::PathBuf;
 
@@ -11,9 +11,9 @@ use clap::{
 #[derive(Debug, Parser)]
 #[command(
     author,
-    name = "ruff",
-    about = "Bracketlint: An fast Jinja template linter and code formatter.",
-    after_help = "For help with a specific command, see: `bl help <command>`."
+    name = "bracketlint",
+    about,
+    after_help = "For help with a specific command, see: `bracketlint help <command>`."
 )]
 #[command(version)]
 pub struct Cli {
@@ -34,7 +34,7 @@ pub enum Command {
     /// Format the given files or directories.
     Fmt(LintCommand),
 
-    /// Command to print the version of the `bl` binary.
+    /// Print the version of bracketlint.
     Version,
 }
 

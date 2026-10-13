@@ -1,4 +1,4 @@
-//! Library definition of `bl` crate.
+//! Library definition of the `bracketlint` crate.
 
 pub mod cli;
 pub mod commands;
