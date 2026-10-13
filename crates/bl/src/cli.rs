@@ -1,4 +1,4 @@
-//! Definitions of the command line interface for the `bl` binary.
+//! Definitions of the command line interface for the `bracketlint` binary.
 
 use std::path::PathBuf;
 
@@ -11,74 +11,74 @@ use clap::{
 #[derive(Debug, Parser)]
 #[command(
     author,
-    name = "ruff",
-    about = "Bracketlint: An fast Jinja template linter and code formatter.",
-    after_help = "For help with a specific command, see: `bl help <command>`."
+    name = "bracketlint",
+    about,
+    after_help = "For help with a specific command, see: `bracketlint help <command>`."
 )]
 #[command(version)]
 pub struct Cli {
     #[command(subcommand)]
     pub(crate) command: Command,
+
+    /// Also print debug logs, such as how long each step of the run takes.
+    #[arg(short, long, global = true, help_heading = "Log levels")]
+    pub(crate) verbose: bool,
 }
 
 #[derive(Debug, clap::Subcommand)]
 pub enum Command {
-    /// The check command checks the given files or directories for linting
-    /// errors.
-    Check(LintCommand),
+    /// Report problems in the templates in the given files or directories.
+    Check(CheckCommand),
 
-    /// Format the given files or directories.
-    Fmt(LintCommand),
+    /// Format the templates in the given files or directories, in place.
+    Fmt(FormatCommand),
 
-    /// Command to print the version of the `bl` binary.
+    /// Print the version of bracketlint.
     Version,
 }
 
-#[derive(Clone, Debug, clap::Parser)]
-pub struct LintCommand {
-    /// List of files or directories to check.
-    #[clap(help = "List of files or directories to check [default: .]")]
+#[derive(Clone, Debug, clap::Args)]
+pub struct CheckCommand {
+    /// The files or directories to check [default: .]
     pub files: Vec<PathBuf>,
-
-    /// Apply fixes to resolve lint violations.
-    /// Use `--no-fix` to disable or `--unsafe-fixes` to include unsafe fixes.
-    #[arg(long, overrides_with("no_fix"))]
-    pub fix: bool,
-
-    #[clap(long, overrides_with("fix"), hide = true)]
-    no_fix: bool,
-
-    /// Enable preview mode; checks will include unstable rules and fixes.
-    /// Use `--no-preview` to disable.
-    #[arg(long, overrides_with("no_preview"))]
-    pub preview: bool,
-    #[clap(long, overrides_with("preview"), hide = true)]
-    no_preview: bool,
-
-    /// Respect file exclusions via `.gitignore` and other standard ignore
-    /// files. Use `--no-respect-gitignore` to disable.
-    #[arg(long, overrides_with("no_respect_gitignore"), help_heading = "File selection")]
-    pub respect_gitignore: bool,
-
-    #[clap(long, overrides_with("respect_gitignore"), hide = true)]
-    no_respect_gitignore: bool,
-
-    /// Avoid writing any fixed files back; instead, output a diff for each
-    /// changed file to stdout, and exit 0 if there are no diffs.
-    /// Implies `--fix-only`.
-    #[arg(long, conflicts_with = "show_fixes")]
-    pub diff: bool,
-
-    /// Show an enumeration of all fixed lint violations.
-    /// Use `--no-show-fixes` to disable.
-    #[arg(long, overrides_with("no_show_fixes"))]
-    show_fixes: bool,
-    #[clap(long, overrides_with("show_fixes"), hide = true)]
-    no_show_fixes: bool,
 
     /// Dump the generated AST for the given files.
     #[arg(long)]
     pub dump_ast: bool,
+
+    #[command(flatten)]
+    pub shared: SharedArgs,
+}
+
+#[derive(Clone, Debug, clap::Args)]
+pub struct FormatCommand {
+    /// The files or directories to format [default: .]
+    pub files: Vec<PathBuf>,
+
+    /// Don't write the formatted templates back. Instead, name each file that
+    /// formatting would change, and exit with 1 if there are any.
+    #[arg(long)]
+    pub check: bool,
+
+    /// Don't write the formatted templates back. Instead, print a diff of how
+    /// formatting would change each file, and exit with 1 if there are any.
+    #[arg(long, conflicts_with = "check")]
+    pub diff: bool,
+
+    #[command(flatten)]
+    pub shared: SharedArgs,
+}
+
+/// The arguments that `check` and `fmt` share.
+#[derive(Clone, Debug, clap::Args)]
+pub struct SharedArgs {
+    /// Respect file exclusions via `.gitignore` and other standard ignore
+    /// files. Use `--no-respect-gitignore` to disable.
+    #[arg(long, overrides_with("no_respect_gitignore"), help_heading = "File selection")]
+    respect_gitignore: bool,
+
+    #[clap(long, overrides_with("respect_gitignore"), hide = true)]
+    no_respect_gitignore: bool,
 
     /// Exit with 1 when there are warnings, as when there are errors. By
     /// default, only errors fail the run.
@@ -94,4 +94,13 @@ pub struct LintCommand {
             .map(|name| name.parse::<Dialect>().unwrap())
     )]
     pub dialect: Option<Dialect>,
+}
+
+impl SharedArgs {
+    /// Whether to skip the files that `.gitignore` and other ignore files
+    /// exclude, which is the default, unless `--no-respect-gitignore` is the
+    /// last of the two flags that is passed.
+    pub fn respect_gitignore(&self) -> bool {
+        !self.no_respect_gitignore
+    }
 }

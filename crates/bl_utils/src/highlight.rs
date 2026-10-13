@@ -111,16 +111,25 @@ impl Highlighter for Decoration {
     }
 }
 
+/// A highlighter that may be none, which leaves a message as it is, e.g. when
+/// it goes to a file or a pipe rather than a terminal.
+impl<H: Highlighter> Highlighter for Option<H> {
+    fn escape_code(&self) -> String {
+        self.as_ref().map(Highlighter::escape_code).unwrap_or_default()
+    }
+}
+
 /// General function to apply a highlighter on a string. This will call the
 /// provided [Highlighter] implementation and then apply it to the passed
-/// message, resetting the effect at the end of the message.
+/// message, resetting the effect at the end of the message. A highlighter
+/// without an effect, e.g. `None`, leaves the message as it is.
 pub fn highlight(highlighter: impl Highlighter, message: impl ToString) -> String {
     const RESET: &str = "\u{001b}[0m";
 
-    highlighter
-        .escape_code()
-        .chars()
-        .chain(message.to_string().chars())
-        .chain(RESET.chars())
-        .collect()
+    let escape_code = highlighter.escape_code();
+    if escape_code.is_empty() {
+        return message.to_string();
+    }
+
+    escape_code.chars().chain(message.to_string().chars()).chain(RESET.chars()).collect()
 }

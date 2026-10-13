@@ -1,4 +1,4 @@
-//! Library definition of `bl` crate.
+//! Library definition of the `bracketlint` crate.
 
 pub mod cli;
 pub mod commands;
@@ -6,7 +6,7 @@ mod crash;
 pub(crate) mod version;
 
 use std::{
-    io::Write,
+    io::{self, IsTerminal, Write},
     panic,
     path::{Path, PathBuf},
     process::ExitCode,
@@ -17,7 +17,8 @@ use bl_lints::settings::FixMode;
 use bl_reporting::{Reporter, Reports, pluralise};
 use bl_utils::{logging::ToolLogger, stream::CompilerOutputStream, stream_writeln};
 use bl_workspace::{Workspace, WorkspaceBuilder, settings::Settings};
-use cli::LintCommand;
+use cli::{CheckCommand, FormatCommand};
+use commands::fmt::FormatResults;
 use crash::crash_handler;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -27,9 +28,10 @@ pub enum ExitStatus {
     /// Linting was successful and there were linting warnings, but no errors.
     /// A warning doesn't fail the run, unless `--deny-warnings` is passed.
     Warnings,
-    /// Linting was successful but there were linting errors.
+    /// Linting was successful but there were linting errors, or `fmt --check`
+    /// or `fmt --diff` found templates that formatting would change.
     Failure,
-    /// Linting failed.
+    /// Linting failed, as bracketlint crashed or couldn't run.
     Error,
 }
 
@@ -39,6 +41,15 @@ impl ExitStatus {
         match self {
             ExitStatus::Warnings => ExitStatus::Failure,
             status => status,
+        }
+    }
+
+    /// The status when `fmt --check` or `fmt --diff` finds templates that
+    /// formatting would change, which fail the run as errors do.
+    fn would_reformat(self) -> Self {
+        match self {
+            ExitStatus::Error => ExitStatus::Error,
+            _ => ExitStatus::Failure,
         }
     }
 }
@@ -57,18 +68,19 @@ pub static LOGGER: ToolLogger = ToolLogger::new();
 
 /// Handler function which will delegate functionality to the appropriate
 /// command.
-pub fn run(cli::Cli { command }: cli::Cli) -> Result<ExitStatus> {
+pub fn run(cli::Cli { command, verbose }: cli::Cli) -> Result<ExitStatus> {
     // Initial grunt work, panic handler and logger setup...
     panic::set_hook(Box::new(crash_handler));
 
-    let output_stream = CompilerOutputStream::stdout;
-    let error_stream = CompilerOutputStream::stderr;
-
     log::set_logger(&LOGGER).unwrap_or_else(|_| panic!("couldn't initiate logger"));
 
-    LOGGER.error_stream.set(error_stream()).unwrap();
-    LOGGER.output_stream.set(output_stream()).unwrap();
-    log::set_max_level(log::LevelFilter::Debug);
+    // Logs go to `stderr`, so that `stdout` only has what the command outputs,
+    // e.g. `bracketlint fmt --diff > changes.diff`. The info logs are the tree
+    // that `--dump-ast` asks for, and the count of errors and warnings, so
+    // only debug logs, such as timings, wait for `--verbose`.
+    LOGGER.error_stream.set(CompilerOutputStream::stderr()).unwrap();
+    LOGGER.set_colours(stderr_colours());
+    log::set_max_level(if verbose { log::LevelFilter::Debug } else { log::LevelFilter::Info });
 
     // We also need to create a global-config
 
@@ -93,64 +105,68 @@ fn resolve_default_files(files: Vec<PathBuf>, is_stdin: bool) -> Vec<PathBuf> {
     }
 }
 
-pub fn check(args: LintCommand) -> Result<ExitStatus> {
-    let files = resolve_default_files(args.files, false); // @@Todo: add stdin support.
+pub fn check(args: CheckCommand) -> Result<ExitStatus> {
+    let CheckCommand { files, dump_ast, shared } = args;
+    let files = resolve_default_files(files, false); // @@Todo: add stdin support.
 
-    // Fix rules are as follows:
-    // - By default, generate all fixes, but don't apply them to the filesystem.
-    // - If `--fix` or `--fix-only` is set, apply applicable fixes to the filesystem
-    //   (or print them to stdout, if we're reading from stdin).
-    // - If `--diff` or `--fix-only` are set, don't print any violations (only
-    //   applicable fixes)
-
-    let fix_mode = if args.diff {
-        FixMode::Diff
-    } else if args.fix {
-        FixMode::Apply
-    } else {
-        FixMode::Generate
-    };
-
-    let settings = Settings::new(args.respect_gitignore, fix_mode, args.dump_ast, args.dialect);
-    let builder = WorkspaceBuilder::new()
-        .with_settings(settings)
-        .with_stdout(CompilerOutputStream::stdout())
-        .with_stderr(CompilerOutputStream::stderr());
-    let mut workspace = builder.build();
+    // There are no lint rules yet, so there are no fixes to apply.
+    let settings =
+        Settings::new(shared.respect_gitignore(), FixMode::default(), dump_ast, shared.dialect);
+    let mut workspace = build_workspace(settings);
 
     let messages = commands::check::check(&files, &mut workspace)?;
     let status = consume_diagnostics(&workspace, messages)?;
-    Ok(if args.deny_warnings { status.deny_warnings() } else { status })
+    Ok(if shared.deny_warnings { status.deny_warnings() } else { status })
 }
 
-fn fmt(args: LintCommand) -> Result<ExitStatus> {
-    let files = resolve_default_files(args.files, false); // @@Todo: add stdin support.
+fn fmt(args: FormatCommand) -> Result<ExitStatus> {
+    let FormatCommand { files, check, diff, shared } = args;
+    let files = resolve_default_files(files, false); // @@Todo: add stdin support.
 
-    // Fix rules are as follows:
-    // - By default, generate all fixes, but don't apply them to the filesystem.
-    // - If `--fix` or `--fix-only` is set, apply applicable fixes to the filesystem
-    //   (or print them to stdout, if we're reading from stdin).
-    // - If `--diff` or `--fix-only` are set, don't print any violations (only
-    //   applicable fixes)
-
-    let fix_mode = if args.diff {
+    // The formatted templates are written back to their files, unless `--check`
+    // or `--diff` asks to only show which of them would change, or how.
+    let fix_mode = if check {
+        FixMode::Check
+    } else if diff {
         FixMode::Diff
-    } else if args.fix {
-        FixMode::Apply
     } else {
-        FixMode::Generate
+        FixMode::Apply
     };
 
-    let settings = Settings::new(args.respect_gitignore, fix_mode, args.dump_ast, args.dialect);
-    let builder = WorkspaceBuilder::new()
+    let settings = Settings::new(shared.respect_gitignore(), fix_mode, false, shared.dialect);
+    let mut workspace = build_workspace(settings);
+
+    let FormatResults { reports, counts } = commands::fmt::fmt(&files, &mut workspace)?;
+    let status = consume_diagnostics(&workspace, reports)?;
+
+    if let Some(summary) = counts.summary(fix_mode) {
+        stream_writeln!(workspace.error_stream(), "{summary}");
+    }
+
+    let status = if shared.deny_warnings { status.deny_warnings() } else { status };
+
+    // A template that `--check` or `--diff` finds isn't formatted fails the
+    // run, so that CI can require that templates are formatted.
+    let would_reformat = counts.changed != 0 && matches!(fix_mode, FixMode::Check | FixMode::Diff);
+    Ok(if would_reformat { status.would_reformat() } else { status })
+}
+
+/// Whether what goes to `stderr`, i.e. diagnostics and logs, is coloured: on a
+/// terminal, unless `NO_COLOR` asks for none, but not in a file or a pipe, e.g.
+/// a CI log.
+fn stderr_colours() -> bool {
+    let no_colour = std::env::var_os("NO_COLOR").is_some_and(|value| !value.is_empty());
+    io::stderr().is_terminal() && !no_colour
+}
+
+/// A workspace with the given `settings`, which writes to `stdout` and
+/// `stderr`.
+fn build_workspace(settings: Settings) -> Workspace {
+    WorkspaceBuilder::new()
         .with_settings(settings)
         .with_stdout(CompilerOutputStream::stdout())
-        .with_stderr(CompilerOutputStream::stderr());
-    let mut workspace = builder.build();
-
-    let messages = commands::fmt::fmt(&files, &mut workspace)?;
-    let status = consume_diagnostics(&workspace, messages)?;
-    Ok(if args.deny_warnings { status.deny_warnings() } else { status })
+        .with_stderr(CompilerOutputStream::stderr())
+        .build()
 }
 
 fn version() -> Result<ExitStatus> {
@@ -175,7 +191,8 @@ fn consume_diagnostics(workspace: &Workspace, diagnostics: Reports) -> Result<Ex
     }
 
     if !diagnostics.is_empty() {
-        stream_writeln!(stderr, "{}", Reporter::new(workspace, diagnostics));
+        let mut reporter = Reporter::new(workspace, diagnostics);
+        stream_writeln!(stderr, "{}", reporter.with_colours(stderr_colours()));
     }
 
     // ##Hack: to prevent the compiler from printing this message when the pipeline
@@ -211,5 +228,13 @@ mod test_super {
         assert_eq!(ExitStatus::Warnings.deny_warnings(), ExitStatus::Failure);
         assert_eq!(ExitStatus::Success.deny_warnings(), ExitStatus::Success);
         assert_eq!(ExitStatus::Failure.deny_warnings(), ExitStatus::Failure);
+    }
+
+    #[test]
+    fn test_would_reformat() {
+        assert_eq!(ExitStatus::Success.would_reformat(), ExitStatus::Failure);
+        assert_eq!(ExitStatus::Warnings.would_reformat(), ExitStatus::Failure);
+        assert_eq!(ExitStatus::Failure.would_reformat(), ExitStatus::Failure);
+        assert_eq!(ExitStatus::Error.would_reformat(), ExitStatus::Error);
     }
 }

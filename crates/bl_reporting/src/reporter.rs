@@ -26,6 +26,9 @@ pub struct Reporter<'a, S: HasSource> {
 /// The default renderer for the reporter.
 const DEFAULT_RENDERER: Renderer = Renderer::styled();
 
+/// The renderer for reports that aren't coloured, see [Reporter::with_colours].
+const PLAIN_RENDERER: Renderer = Renderer::plain();
+
 impl<'a, S: HasSource> Reporter<'a, S> {
     pub fn new(sources: &'a S, reports: Vec<Report>) -> Self {
         Self { reports, renderer: None, sources }
@@ -33,6 +36,13 @@ impl<'a, S: HasSource> Reporter<'a, S> {
 
     pub fn with_renderer(&mut self, renderer: &'a Renderer) -> &mut Self {
         self.renderer = Some(renderer);
+        self
+    }
+
+    /// Colour the reports, or don't, e.g. when they go to a file or a pipe
+    /// rather than a terminal.
+    pub fn with_colours(&mut self, colours: bool) -> &mut Self {
+        self.renderer = Some(if colours { &DEFAULT_RENDERER } else { &PLAIN_RENDERER });
         self
     }
 }

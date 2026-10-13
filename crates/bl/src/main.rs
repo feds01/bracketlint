@@ -2,7 +2,7 @@
 
 use std::process::ExitCode;
 
-use bracketlint::{cli::Cli, run};
+use bracketlint::{ExitStatus, cli::Cli, run};
 use clap::Parser;
 
 // Parsing and formatting make many small allocations, which mimalloc serves
@@ -15,16 +15,26 @@ pub fn main() -> ExitCode {
     #[cfg(windows)]
     assert!(colored::control::set_virtual_terminal(true).is_ok());
 
+    // An argument that starts with `@` names a file of arguments, which may not
+    // exist.
     let args = wild::args_os();
-    let args = argfile::expand_args_from(args, argfile::parse_fromfile, argfile::PREFIX).unwrap();
+    let args = match argfile::expand_args_from(args, argfile::parse_fromfile, argfile::PREFIX) {
+        Ok(args) => args,
+        Err(e) => {
+            eprintln!("error: couldn't read the arguments in a file: {e}");
+            return ExitStatus::Error.into();
+        }
+    };
 
     let args = Cli::parse_from(args);
 
     match run(args) {
         Ok(status) => status.into(),
+        // An error that stops the run, rather than one in a template, is an
+        // internal error.
         Err(e) => {
             eprintln!("error: {e}");
-            ExitCode::from(1)
+            ExitStatus::Error.into()
         }
     }
 }

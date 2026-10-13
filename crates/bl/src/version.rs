@@ -6,8 +6,8 @@ pub struct VersionInfo {}
 
 impl fmt::Display for VersionInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // @@Todo: actually integrate this with the version information.
-        write!(f, "0.1.0")
+        // The version in `crates/bl/Cargo.toml`, which `--version` prints too.
+        write!(f, "{}", env!("CARGO_PKG_VERSION"))
     }
 }
 

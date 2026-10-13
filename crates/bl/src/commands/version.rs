@@ -4,7 +4,7 @@ use anyhow::Result;
 
 pub fn version() -> Result<()> {
     let version_info = crate::version::version();
-    println!("bl {}", version_info);
+    println!("bracketlint {}", version_info);
 
     Ok(())
 }

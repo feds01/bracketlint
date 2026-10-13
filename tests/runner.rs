@@ -248,8 +248,7 @@ fn handle_test(test: TestingInput) {
     let error_stream = CompilerOutputStream::stderr;
 
     // Setup the logger for the test case.
-    LOGGER.error_stream.set(error_stream()).unwrap();
-    LOGGER.output_stream.set(output_stream()).unwrap();
+    LOGGER.error_stream.set(output_stream()).unwrap();
     LOGGER.set_messaging_format(MessagingFormat::Normal);
     log::set_logger(&LOGGER).unwrap_or_else(|_| panic!("couldn't initiate logger"));
     log::set_max_level(log::LevelFilter::Info);
@@ -272,7 +271,7 @@ fn handle_test(test: TestingInput) {
             workspace.settings.parser_settings.dump_ast = true;
             commands::check::check(&files, &mut workspace).unwrap()
         }
-        StageKind::Fmt => commands::fmt::fmt(&files, &mut workspace).unwrap(),
+        StageKind::Fmt => commands::fmt::fmt(&files, &mut workspace).unwrap().reports,
     };
 
     // Based on the specified metadata within the test case itself, we know
