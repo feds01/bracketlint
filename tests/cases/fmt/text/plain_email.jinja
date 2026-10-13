@@ -1,0 +1,16 @@
+// run=pass, stage=fmt, markup=text
+
+Hi {{user.name|title}},
+{# The greeting is followed by one blank line. #}
+
+{%- if orders %}
+Your orders:
+{% for order in orders -%}
+    * {{ order.id }}   {{order.total}}
+{%- endfor %}
+{% else %}
+    You have no orders.
+{%endif%}
+{%- set footer = "Thanks" %}
+{{ footer }}
+	Tabs stay as they are.

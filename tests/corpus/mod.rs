@@ -26,6 +26,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use bl_workspace::config::Markup;
 use check::CheckedSource;
 use source::Source;
 
@@ -57,5 +58,26 @@ fn corpus() {
     for checked in &results {
         let path = corpus_dir().join("baselines").join(format!("{}.txt", checked.source.name));
         assert_snapshot(&path, &checked.baseline()).unwrap();
+    }
+}
+
+/// Formatting a template that outputs text, see [Markup::Text], keeps all of
+/// its source between its tags, which is output as it is written, and changes
+/// its tags only by their whitespace. The real-world templates are HTML, but
+/// they hold each kind of tag that a template that outputs text can.
+#[test]
+fn text_is_kept_between_tags() {
+    for source in Source::read_all() {
+        for template in source.templates() {
+            let format = |contents: &str| check::format(source.dialect, Markup::Text, contents);
+            let Ok(formatted) = format(&template.contents) else {
+                continue;
+            };
+
+            let (path, contents) = (&template.path, &template.contents);
+            assert_eq!(check::between_tags(contents), check::between_tags(&formatted), "{path}");
+            assert_eq!(check::tags(contents), check::tags(&formatted), "{path}");
+            assert_eq!(format(&formatted).ok().as_ref(), Some(&formatted), "{path}");
+        }
     }
 }

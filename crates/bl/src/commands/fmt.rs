@@ -74,7 +74,8 @@ pub fn fmt(files: &[PathBuf], workspace: &mut Workspace) -> Result<FormatResults
 
     debug!("found {} files", files.len());
 
-    let options = FormatterOptions::default();
+    let options =
+        FormatterOptions { markup: workspace.settings.markup, ..FormatterOptions::default() };
     let mut counts = FormatCounts::default();
     let mut parse_diagnostics = Reports::default();
     let mut format_diagnostics = Reports::default();

@@ -29,7 +29,8 @@
 //! A case can also set the template dialect to parse it in, e.g.
 //! `dialect=liquid`, as `--dialect` does. Otherwise it is parsed in the
 //! dialect that its extension names, e.g. `.liquid`, or as Django, like any
-//! `.html` file.
+//! `.html` file. It can set what it outputs, e.g. `markup=text`, as a
+//! project's `bracketlint.toml` does.
 #![cfg(test)]
 
 use std::{
@@ -257,7 +258,8 @@ fn handle_test(test: TestingInput) {
     // without its configuration line.
     let case = CaseCopy::new(&test).unwrap();
     let files = vec![case.path.clone()];
-    let settings = Settings::new(true, FixMode::Generate, false, test.metadata.dialect);
+    let mut settings = Settings::new(true, FixMode::Generate, false, test.metadata.dialect);
+    settings.markup = test.metadata.markup;
     let builder = WorkspaceBuilder::new()
         .with_settings(settings)
         .with_stdout(output_stream())
@@ -298,7 +300,8 @@ fn assert_formats_stably(test: &TestingInput, case: &CaseCopy) {
     let dialect =
         test.metadata.dialect.or_else(|| Dialect::from_path(&case.path)).unwrap_or_default();
 
-    let format = |contents: &str| match corpus::check::format(dialect, contents) {
+    let markup = test.metadata.markup;
+    let format = |contents: &str| match corpus::check::format(dialect, markup, contents) {
         Ok(formatted) => formatted,
         Err(outcome) => panic!("`{}` failed to format: {:?}", test.path.display(), outcome.error),
     };
