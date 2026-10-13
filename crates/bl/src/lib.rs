@@ -99,7 +99,7 @@ pub fn check(args: CheckCommand) -> Result<ExitStatus> {
 
     // There are no lint rules yet, so there are no fixes to apply.
     let settings =
-        Settings::new(shared.respect_gitignore, FixMode::default(), dump_ast, shared.dialect);
+        Settings::new(shared.respect_gitignore(), FixMode::default(), dump_ast, shared.dialect);
     let mut workspace = build_workspace(settings);
 
     let messages = commands::check::check(&files, &mut workspace)?;
@@ -119,7 +119,7 @@ fn fmt(args: FormatCommand) -> Result<ExitStatus> {
         FixMode::Generate
     };
 
-    let settings = Settings::new(shared.respect_gitignore, fix_mode, false, shared.dialect);
+    let settings = Settings::new(shared.respect_gitignore(), fix_mode, false, shared.dialect);
     let mut workspace = build_workspace(settings);
 
     let messages = commands::fmt::fmt(&files, &mut workspace)?;

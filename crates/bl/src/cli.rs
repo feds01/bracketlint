@@ -75,7 +75,7 @@ pub struct SharedArgs {
     /// Respect file exclusions via `.gitignore` and other standard ignore
     /// files. Use `--no-respect-gitignore` to disable.
     #[arg(long, overrides_with("no_respect_gitignore"), help_heading = "File selection")]
-    pub respect_gitignore: bool,
+    respect_gitignore: bool,
 
     #[clap(long, overrides_with("respect_gitignore"), hide = true)]
     no_respect_gitignore: bool,
@@ -94,4 +94,13 @@ pub struct SharedArgs {
             .map(|name| name.parse::<Dialect>().unwrap())
     )]
     pub dialect: Option<Dialect>,
+}
+
+impl SharedArgs {
+    /// Whether to skip the files that `.gitignore` and other ignore files
+    /// exclude, which is the default, unless `--no-respect-gitignore` is the
+    /// last of the two flags that is passed.
+    pub fn respect_gitignore(&self) -> bool {
+        !self.no_respect_gitignore
+    }
 }
