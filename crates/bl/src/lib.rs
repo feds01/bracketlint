@@ -17,7 +17,7 @@ use bl_lints::settings::FixMode;
 use bl_reporting::{Reporter, Reports, pluralise};
 use bl_utils::{logging::ToolLogger, stream::CompilerOutputStream, stream_writeln};
 use bl_workspace::{Workspace, WorkspaceBuilder, settings::Settings};
-use cli::LintCommand;
+use cli::{CheckCommand, FormatCommand};
 use crash::crash_handler;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -93,64 +93,48 @@ fn resolve_default_files(files: Vec<PathBuf>, is_stdin: bool) -> Vec<PathBuf> {
     }
 }
 
-pub fn check(args: LintCommand) -> Result<ExitStatus> {
-    let files = resolve_default_files(args.files, false); // @@Todo: add stdin support.
+pub fn check(args: CheckCommand) -> Result<ExitStatus> {
+    let CheckCommand { files, dump_ast, shared } = args;
+    let files = resolve_default_files(files, false); // @@Todo: add stdin support.
 
-    // Fix rules are as follows:
-    // - By default, generate all fixes, but don't apply them to the filesystem.
-    // - If `--fix` or `--fix-only` is set, apply applicable fixes to the filesystem
-    //   (or print them to stdout, if we're reading from stdin).
-    // - If `--diff` or `--fix-only` are set, don't print any violations (only
-    //   applicable fixes)
-
-    let fix_mode = if args.diff {
-        FixMode::Diff
-    } else if args.fix {
-        FixMode::Apply
-    } else {
-        FixMode::Generate
-    };
-
-    let settings = Settings::new(args.respect_gitignore, fix_mode, args.dump_ast, args.dialect);
-    let builder = WorkspaceBuilder::new()
-        .with_settings(settings)
-        .with_stdout(CompilerOutputStream::stdout())
-        .with_stderr(CompilerOutputStream::stderr());
-    let mut workspace = builder.build();
+    // There are no lint rules yet, so there are no fixes to apply.
+    let settings =
+        Settings::new(shared.respect_gitignore, FixMode::default(), dump_ast, shared.dialect);
+    let mut workspace = build_workspace(settings);
 
     let messages = commands::check::check(&files, &mut workspace)?;
     let status = consume_diagnostics(&workspace, messages)?;
-    Ok(if args.deny_warnings { status.deny_warnings() } else { status })
+    Ok(if shared.deny_warnings { status.deny_warnings() } else { status })
 }
 
-fn fmt(args: LintCommand) -> Result<ExitStatus> {
-    let files = resolve_default_files(args.files, false); // @@Todo: add stdin support.
+fn fmt(args: FormatCommand) -> Result<ExitStatus> {
+    let FormatCommand { files, fix, diff, shared } = args;
+    let files = resolve_default_files(files, false); // @@Todo: add stdin support.
 
-    // Fix rules are as follows:
-    // - By default, generate all fixes, but don't apply them to the filesystem.
-    // - If `--fix` or `--fix-only` is set, apply applicable fixes to the filesystem
-    //   (or print them to stdout, if we're reading from stdin).
-    // - If `--diff` or `--fix-only` are set, don't print any violations (only
-    //   applicable fixes)
-
-    let fix_mode = if args.diff {
+    let fix_mode = if diff {
         FixMode::Diff
-    } else if args.fix {
+    } else if fix {
         FixMode::Apply
     } else {
         FixMode::Generate
     };
 
-    let settings = Settings::new(args.respect_gitignore, fix_mode, args.dump_ast, args.dialect);
-    let builder = WorkspaceBuilder::new()
-        .with_settings(settings)
-        .with_stdout(CompilerOutputStream::stdout())
-        .with_stderr(CompilerOutputStream::stderr());
-    let mut workspace = builder.build();
+    let settings = Settings::new(shared.respect_gitignore, fix_mode, false, shared.dialect);
+    let mut workspace = build_workspace(settings);
 
     let messages = commands::fmt::fmt(&files, &mut workspace)?;
     let status = consume_diagnostics(&workspace, messages)?;
-    Ok(if args.deny_warnings { status.deny_warnings() } else { status })
+    Ok(if shared.deny_warnings { status.deny_warnings() } else { status })
+}
+
+/// A workspace with the given `settings`, which writes to `stdout` and
+/// `stderr`.
+fn build_workspace(settings: Settings) -> Workspace {
+    WorkspaceBuilder::new()
+        .with_settings(settings)
+        .with_stdout(CompilerOutputStream::stdout())
+        .with_stderr(CompilerOutputStream::stderr())
+        .build()
 }
 
 fn version() -> Result<ExitStatus> {

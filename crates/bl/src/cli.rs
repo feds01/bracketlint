@@ -21,44 +21,57 @@ pub struct Cli {
     pub(crate) command: Command,
 
     /// Also print debug logs, such as how long each step of the run takes.
-    #[arg(short, long, global = true)]
+    #[arg(short, long, global = true, help_heading = "Log levels")]
     pub(crate) verbose: bool,
 }
 
 #[derive(Debug, clap::Subcommand)]
 pub enum Command {
-    /// The check command checks the given files or directories for linting
-    /// errors.
-    Check(LintCommand),
+    /// Report problems in the templates in the given files or directories.
+    Check(CheckCommand),
 
-    /// Format the given files or directories.
-    Fmt(LintCommand),
+    /// Format the templates in the given files or directories.
+    Fmt(FormatCommand),
 
     /// Print the version of bracketlint.
     Version,
 }
 
-#[derive(Clone, Debug, clap::Parser)]
-pub struct LintCommand {
-    /// List of files or directories to check.
-    #[clap(help = "List of files or directories to check [default: .]")]
+#[derive(Clone, Debug, clap::Args)]
+pub struct CheckCommand {
+    /// The files or directories to check [default: .]
     pub files: Vec<PathBuf>,
 
-    /// Apply fixes to resolve lint violations.
-    /// Use `--no-fix` to disable or `--unsafe-fixes` to include unsafe fixes.
-    #[arg(long, overrides_with("no_fix"))]
+    /// Dump the generated AST for the given files.
+    #[arg(long)]
+    pub dump_ast: bool,
+
+    #[command(flatten)]
+    pub shared: SharedArgs,
+}
+
+#[derive(Clone, Debug, clap::Args)]
+pub struct FormatCommand {
+    /// The files or directories to format [default: .]
+    pub files: Vec<PathBuf>,
+
+    /// Write the formatted templates back to their files, rather than print
+    /// them.
+    #[arg(long)]
     pub fix: bool,
 
-    #[clap(long, overrides_with("fix"), hide = true)]
-    no_fix: bool,
+    /// Print a diff of how formatting changes each template, rather than the
+    /// formatted template.
+    #[arg(long, conflicts_with = "fix")]
+    pub diff: bool,
 
-    /// Enable preview mode; checks will include unstable rules and fixes.
-    /// Use `--no-preview` to disable.
-    #[arg(long, overrides_with("no_preview"))]
-    pub preview: bool,
-    #[clap(long, overrides_with("preview"), hide = true)]
-    no_preview: bool,
+    #[command(flatten)]
+    pub shared: SharedArgs,
+}
 
+/// The arguments that `check` and `fmt` share.
+#[derive(Clone, Debug, clap::Args)]
+pub struct SharedArgs {
     /// Respect file exclusions via `.gitignore` and other standard ignore
     /// files. Use `--no-respect-gitignore` to disable.
     #[arg(long, overrides_with("no_respect_gitignore"), help_heading = "File selection")]
@@ -66,23 +79,6 @@ pub struct LintCommand {
 
     #[clap(long, overrides_with("respect_gitignore"), hide = true)]
     no_respect_gitignore: bool,
-
-    /// Avoid writing any fixed files back; instead, output a diff for each
-    /// changed file to stdout, and exit 0 if there are no diffs.
-    /// Implies `--fix-only`.
-    #[arg(long, conflicts_with = "show_fixes")]
-    pub diff: bool,
-
-    /// Show an enumeration of all fixed lint violations.
-    /// Use `--no-show-fixes` to disable.
-    #[arg(long, overrides_with("no_show_fixes"))]
-    show_fixes: bool,
-    #[clap(long, overrides_with("show_fixes"), hide = true)]
-    no_show_fixes: bool,
-
-    /// Dump the generated AST for the given files.
-    #[arg(long)]
-    pub dump_ast: bool,
 
     /// Exit with 1 when there are warnings, as when there are errors. By
     /// default, only errors fail the run.
