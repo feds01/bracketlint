@@ -35,11 +35,15 @@ $ cargo install --git https://github.com/feds01/bracketlint bracketlint
 ### Usage
 
 ```bash
-$ bracketlint check templates/   # report problems in the templates
-$ bracketlint fmt templates/     # print the formatted templates
+$ bracketlint check templates/        # report problems in the templates
+$ bracketlint fmt templates/          # format the templates in place
+$ bracketlint fmt --check templates/  # list the templates that formatting would change
+$ bracketlint fmt --diff templates/   # print a diff of how formatting would change them
 ```
 
-Each file is read in the dialect that its extension names: `.jinja` is Jinja, `.liquid` is Liquid, `.njk` is Nunjucks and `.twig` is Twig. Any other file, such as `.html`, is read as Django. To read every file in one dialect instead, pass `--dialect`:
+`fmt --check` and `fmt --diff` don't write any file, and exit with 1 if formatting would change a template, so CI can require formatted templates. The list and the diff go to stdout, and everything else to stderr, so `bracketlint fmt --diff templates/ > changes.diff` writes a plain diff that `patch -p0` applies.
+
+Files that `.gitignore` and other ignore files exclude are skipped, unless you pass `--no-respect-gitignore`. Each file is read in the dialect that its extension names: `.jinja` is Jinja, `.liquid` is Liquid, `.njk` is Nunjucks and `.twig` is Twig. Any other file, such as `.html`, is read as Django. To read every file in one dialect instead, pass `--dialect`:
 
 ```bash
 $ bracketlint check --dialect liquid theme/
@@ -50,6 +54,8 @@ Only errors fail a run. A warning, such as another dialect's spelling of a tag, 
 ```bash
 $ bracketlint check --deny-warnings templates/
 ```
+
+`bracketlint` exits with 0 when a run passes, 1 when it fails, and 2 when it couldn't run, e.g. when an argument is wrong, or it crashed. Pass `-v` (`--verbose`) to also print debug logs, such as how long each step of a run takes.
 
 ### Development
 
