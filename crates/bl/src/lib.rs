@@ -31,7 +31,7 @@ pub enum ExitStatus {
     /// Linting was successful but there were linting errors, or `fmt --check`
     /// or `fmt --diff` found templates that formatting would change.
     Failure,
-    /// Linting failed.
+    /// Linting failed, as bracketlint crashed or couldn't run.
     Error,
 }
 

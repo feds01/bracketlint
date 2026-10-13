@@ -2,7 +2,7 @@
 
 use std::process::ExitCode;
 
-use bracketlint::{cli::Cli, run};
+use bracketlint::{ExitStatus, cli::Cli, run};
 use clap::Parser;
 
 // Parsing and formatting make many small allocations, which mimalloc serves
@@ -22,9 +22,11 @@ pub fn main() -> ExitCode {
 
     match run(args) {
         Ok(status) => status.into(),
+        // An error that stops the run, rather than one in a template, is an
+        // internal error.
         Err(e) => {
             eprintln!("error: {e}");
-            ExitCode::from(1)
+            ExitStatus::Error.into()
         }
     }
 }
