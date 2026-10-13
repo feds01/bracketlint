@@ -1,0 +1,18 @@
+// run=pass, stage=fmt
+
+<div>
+<p>{% blocktranslate %}Deleting the selected {{ objects_name }} would result in deleting related objects, but your account doesn't have permission to delete them.{% endblocktranslate %}</p>
+<p>{% blocktrans count counter=items|length %}There is   {{ counter }} item.{% plural %}There are
+  {{ counter }} items.{% endblocktrans %}</p>
+{% blocktranslate trimmed %}
+    Kept as it is written,
+       even when trimmed.
+{% endblocktranslate %}
+</div>
+<small>
+    {% blocktrans count product.num_reviews as num_reviews %}
+        {{ num_reviews }} customer review
+    {% plural %}
+        {{ num_reviews }} customer reviews
+    {% endblocktrans %}
+</small>
