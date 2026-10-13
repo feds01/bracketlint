@@ -12,7 +12,7 @@ use bl_utils::{stream_write, stream_writeln, timed};
 use bl_workspace::{Member, Workspace, resolver::find_files_in_paths};
 use log::{Level, debug, warn};
 
-use super::{file_error, relative_path, walk_error};
+use super::{file_error, relative_path, sort_files, walk_error};
 
 /// What came of formatting the templates.
 #[derive(Debug, Default)]
@@ -60,11 +60,12 @@ impl FormatCounts {
 
 pub fn fmt(files: &[PathBuf], workspace: &mut Workspace) -> Result<FormatResults> {
     // Firstly, we need to discover all of the files in the provided paths.
-    let files = timed(
+    let mut files = timed(
         || find_files_in_paths(files, &workspace.settings),
         log::Level::Debug,
         |duration| debug!("resolved files in {duration:?}"),
     )?;
+    sort_files(&mut files);
 
     if files.is_empty() {
         warn!("no template files found in the given paths");

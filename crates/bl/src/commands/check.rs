@@ -10,15 +10,16 @@ use bl_utils::timed;
 use bl_workspace::{Workspace, resolver::find_files_in_paths};
 use log::{Level, debug, warn};
 
-use super::{file_error, walk_error};
+use super::{file_error, sort_files, walk_error};
 
 pub fn check(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
     // Firstly, we need to discover all of the files in the provided paths.
-    let files = timed(
+    let mut files = timed(
         || find_files_in_paths(files, &workspace.settings),
         log::Level::Debug,
         |duration| debug!("resolved files in {duration:?}"),
     )?;
+    sort_files(&mut files);
 
     if files.is_empty() {
         warn!("no template files found in the given paths");

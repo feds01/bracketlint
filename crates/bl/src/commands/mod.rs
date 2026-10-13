@@ -7,6 +7,19 @@ pub mod version;
 use std::{env, io, path::Path};
 
 use bl_reporting::{Report, ReportKind};
+use bl_workspace::resolver::ResolvedFile;
+
+/// Sort the `files` that the walker found by their paths, after the paths
+/// that it couldn't search. It searches them in parallel, so it finds them in
+/// no set order, but each run should name the files, and report the problems
+/// in them, in the same order.
+pub(crate) fn sort_files(files: &mut [Result<ResolvedFile, ignore::Error>]) {
+    fn path(file: &Result<ResolvedFile, ignore::Error>) -> Option<&Path> {
+        file.as_ref().ok().map(ResolvedFile::path)
+    }
+
+    files.sort_by(|a, b| path(a).cmp(&path(b)));
+}
 
 /// The path of `path` from the current directory, as a user names it, or
 /// `path` itself if it isn't in the current directory.
