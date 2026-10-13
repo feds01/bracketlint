@@ -4,4 +4,4 @@ error: encountered unclosed delimiter `{{`, add a `}}` after the inner expressio
 1 | <p>{{ user.name </p>
   |    -
   |
-  = note: this file is parsed as Django, the default, since neither `--dialect` nor its extension names a dialect
+  = note: this file is parsed as Django, the default, since neither `--dialect`, its extension nor `bracketlint.toml` names a dialect

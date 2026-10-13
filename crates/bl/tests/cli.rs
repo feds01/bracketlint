@@ -180,3 +180,15 @@ fn a_missing_file_of_arguments_fails_the_run() {
     assert_eq!(output.status.code(), Some(2), "{}", stderr(&output));
     assert!(stderr(&output).contains("couldn't read the arguments"), "{}", stderr(&output));
 }
+
+#[test]
+fn invalid_project_settings_fail_the_run() {
+    let dir = project("invalid_settings", &[("bracketlint.toml", "markup = \"markdown\"\n")]);
+
+    for command in ["check", "fmt"] {
+        let output = bracketlint(&dir, &[command]);
+        assert_eq!(output.status.code(), Some(2), "`{command}`: {}", stderr(&output));
+        assert!(stderr(&output).contains("bracketlint.toml` isn't valid"), "{}", stderr(&output));
+        assert!(stderr(&output).contains("unknown variant `markdown`"), "{}", stderr(&output));
+    }
+}

@@ -6,7 +6,7 @@ error: expected a tag, however received the keyword `else`
   |
   = help: expected a `identifier`
   = help: `{% else %}` in a loop is how Jinja, Liquid, Nunjucks and Twig write `{% empty %}`, pass `--dialect` with the template's dialect if it is one of them
-  = note: this file is parsed as Django, the default, since neither `--dialect` nor its extension names a dialect
+  = note: this file is parsed as Django, the default, since neither `--dialect`, its extension nor `bracketlint.toml` names a dialect
 error: expected a tag, however received the keyword `endfor`
  --> $DIR/loop_else.html:1:55
   |
@@ -14,4 +14,4 @@ error: expected a tag, however received the keyword `endfor`
   |                                                       ------
   |
   = help: expected a `identifier`
-  = note: this file is parsed as Django, the default, since neither `--dialect` nor its extension names a dialect
+  = note: this file is parsed as Django, the default, since neither `--dialect`, its extension nor `bracketlint.toml` names a dialect

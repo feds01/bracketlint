@@ -47,7 +47,10 @@ pub(crate) fn note_dialect(reports: &mut Reports, member: &Member) {
     let source = match (member.dialect_source, dialect.extension()) {
         (DialectSource::Flag, _) => format!("from `--dialect {}`", dialect.name()),
         (DialectSource::Extension, Some(extension)) => format!("from its `.{extension}` extension"),
-        _ => "the default, since neither `--dialect` nor its extension names a dialect".to_string(),
+        (DialectSource::Project, _) => "from the `dialect` in `bracketlint.toml`".to_string(),
+        _ => "the default, since neither `--dialect`, its extension nor `bracketlint.toml` names \
+              a dialect"
+            .to_string(),
     };
     let message = format!("this file is parsed as {}, {source}", dialect.title());
 
