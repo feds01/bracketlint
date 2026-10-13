@@ -1,0 +1,5 @@
+// run=pass, stage=fmt
+
+{% if error.source %}
+<pre class="error-code govuk-!-margin-bottom-5" id="error-block"><code>{{ error.source.before }}</code><br><code id="error-line">{{ error.source.error }}</code></pre>
+{% endif %}

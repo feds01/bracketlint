@@ -6,7 +6,7 @@ use std::{cell::RefCell, collections::HashMap, ops::Range, rc::Rc};
 use biome_css_formatter::{self as css_formatter, context::CssFormatOptions};
 use biome_css_parser::{self as css_parser, CssOffsetParse, CssParserOptions};
 use biome_formatter::{
-    FormatError, IndentStyle, SourceMapGeneration, SourceMarker, prelude::Document,
+    FormatError, IndentStyle, LineWidth, SourceMapGeneration, SourceMarker, prelude::Document,
 };
 use biome_html_formatter::{HtmlFormatOptions, format_node};
 use biome_html_parser::{HtmlParse, HtmlParserOptions, parse_html_with_cache};
@@ -214,6 +214,63 @@ impl<'ctx> HasHTMLParsing<'ctx> for HTMLBiomeFormatter {
     /// tag splits is formatted with the HTML around it, see [Body].
     fn format(&mut self, contents: &str) -> FmtResult<Vec<HtmlPart>> {
         self.parts(contents, 0)
+    }
+
+    fn format_run(
+        &mut self,
+        contents: &str,
+        words: &[Range<usize>],
+        width: usize,
+    ) -> FmtResult<Option<Vec<HtmlPart>>> {
+        let parsed = self.parse(contents);
+        let root = parsed.syntax();
+
+        let scan = Scan::new(&root, contents.len());
+        if scan.verbatim.is_some() || !scan.bodies.is_empty() || scan.has_broken_tag() {
+            return Ok(None);
+        }
+
+        // A placeholder is a word of the text of an element when it is in the
+        // value of a piece of the element's content, as a whole.
+        let in_text = |word: &Range<usize>| {
+            let start = TextSize::from(word.start as u32);
+            root.token_at_offset(start).right_biased().is_some_and(|token| {
+                token.kind() == HtmlSyntaxKind::HTML_LITERAL
+                    && token
+                        .parent()
+                        .is_some_and(|node| node.kind() == HtmlSyntaxKind::HTML_CONTENT)
+                    && token.text_trimmed_range().end() >= TextSize::from(word.end as u32)
+            })
+        };
+
+        if !words.iter().all(in_text) {
+            return Ok(None);
+        }
+
+        // Text with a `<` or `>` in it is the rest of a tag, e.g. the
+        // attributes after `<{{ name }}`, which a template tag writes, or
+        // after a tag that a template tag cuts. Its lines aren't text's.
+        let is_tag_text = |token: &biome_rowan::SyntaxToken<_>| {
+            token.kind() == HtmlSyntaxKind::HTML_LITERAL
+                && token.parent().is_some_and(|node| node.kind() == HtmlSyntaxKind::HTML_CONTENT)
+                && token.text_trimmed().contains(['<', '>'])
+        };
+
+        if root.descendants_tokens(Direction::Next).any(|token| is_tag_text(&token)) {
+            return Ok(None);
+        }
+
+        let width = LineWidth::try_from(width as u16).unwrap_or_default();
+        self.options.html = self.options.html.clone().with_line_width(width);
+
+        // The run may close a `<pre>`, `<textarea>`, `<script>` or `<style>`
+        // that opens before it, whose content is kept as it is written.
+        let parts = self.parts(contents, 0)?;
+        if parts.iter().any(|part| matches!(part, HtmlPart::Verbatim { .. })) {
+            return Ok(None);
+        }
+
+        Ok(Some(parts))
     }
 }
 
