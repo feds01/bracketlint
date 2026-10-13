@@ -7,6 +7,7 @@ use std::{fmt, ops::Range};
 
 use annotate_snippets::{Annotation, AnnotationKind, Element, Level, Renderer, Snippet};
 use bl_ast::HasSource;
+use bl_utils::highlight::colours;
 
 use crate::{Report, ReportCodeBlock, ReportElement, Reports};
 
@@ -23,8 +24,10 @@ pub struct Reporter<'a, S: HasSource> {
     sources: &'a S,
 }
 
-/// The default renderer for the reporter.
-const DEFAULT_RENDERER: Renderer = Renderer::styled();
+/// The renderer for the reporter, which colours the reports unless messages
+/// aren't coloured, see [colours].
+const STYLED_RENDERER: Renderer = Renderer::styled();
+const PLAIN_RENDERER: Renderer = Renderer::plain();
 
 impl<'a, S: HasSource> Reporter<'a, S> {
     pub fn new(sources: &'a S, reports: Vec<Report>) -> Self {
@@ -39,7 +42,8 @@ impl<'a, S: HasSource> Reporter<'a, S> {
 
 impl<S: HasSource> fmt::Display for Reporter<'_, S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let renderer = self.renderer.unwrap_or(&DEFAULT_RENDERER);
+        let renderer =
+            self.renderer.unwrap_or(if colours() { &STYLED_RENDERER } else { &PLAIN_RENDERER });
 
         for report in self.reports.iter() {
             let level = Level::from(report.kind);

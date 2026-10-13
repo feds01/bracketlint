@@ -6,7 +6,7 @@ mod crash;
 pub(crate) mod version;
 
 use std::{
-    io::Write,
+    io::{self, IsTerminal, Write},
     panic,
     path::{Path, PathBuf},
     process::ExitCode,
@@ -15,7 +15,9 @@ use std::{
 use anyhow::{Ok, Result};
 use bl_lints::settings::FixMode;
 use bl_reporting::{Reporter, Reports, pluralise};
-use bl_utils::{logging::ToolLogger, stream::CompilerOutputStream, stream_writeln};
+use bl_utils::{
+    highlight::set_colours, logging::ToolLogger, stream::CompilerOutputStream, stream_writeln,
+};
 use bl_workspace::{Workspace, WorkspaceBuilder, settings::Settings};
 use cli::{CheckCommand, FormatCommand};
 use commands::fmt::FormatResults;
@@ -79,6 +81,11 @@ pub fn run(cli::Cli { command, verbose }: cli::Cli) -> Result<ExitStatus> {
     // that `--dump-ast` asks for, and the count of errors and warnings, so
     // only debug logs, such as timings, wait for `--verbose`.
     LOGGER.error_stream.set(CompilerOutputStream::stderr()).unwrap();
+
+    // Diagnostics and logs are coloured on a terminal, unless `NO_COLOR` asks
+    // for none, but not in a file or a pipe, e.g. a CI log.
+    let no_colour = std::env::var_os("NO_COLOR").is_some_and(|value| !value.is_empty());
+    set_colours(io::stderr().is_terminal() && !no_colour);
     log::set_max_level(if verbose { log::LevelFilter::Debug } else { log::LevelFilter::Info });
 
     // We also need to create a global-config

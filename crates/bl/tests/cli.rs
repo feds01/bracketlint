@@ -161,3 +161,13 @@ fn ignored_files_are_skipped_unless_asked_for() {
     let output = bracketlint(&dir, &["check", "--no-respect-gitignore"]);
     assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));
 }
+
+#[test]
+fn reports_in_a_pipe_are_not_coloured() {
+    let dir = project("not_coloured", &[("templates/page.html", BROKEN)]);
+
+    let output = bracketlint(&dir, &["check"]);
+    assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));
+    assert!(stderr(&output).contains("error"), "{}", stderr(&output));
+    assert!(!stderr(&output).contains('\u{1b}'), "{}", stderr(&output));
+}

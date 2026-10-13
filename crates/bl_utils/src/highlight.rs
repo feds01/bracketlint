@@ -17,7 +17,24 @@
 //! reporter.error().title(message);
 //! ```
 
-use std::ops::BitOr;
+use std::{
+    ops::BitOr,
+    sync::atomic::{AtomicBool, Ordering},
+};
+
+/// Whether messages are coloured, which they are unless [set_colours] turns
+/// it off, e.g. when they go to a file or a pipe rather than a terminal.
+static COLOURS: AtomicBool = AtomicBool::new(true);
+
+/// Colour messages, or don't, see [colours].
+pub fn set_colours(enabled: bool) {
+    COLOURS.store(enabled, Ordering::Relaxed);
+}
+
+/// Whether messages are coloured, e.g. by [highlight].
+pub fn colours() -> bool {
+    COLOURS.load(Ordering::Relaxed)
+}
 
 /// Variants of highlighter colour that can be used.
 pub enum Colour {
@@ -113,9 +130,14 @@ impl Highlighter for Decoration {
 
 /// General function to apply a highlighter on a string. This will call the
 /// provided [Highlighter] implementation and then apply it to the passed
-/// message, resetting the effect at the end of the message.
+/// message, resetting the effect at the end of the message. The message is
+/// left as it is when messages aren't coloured, see [colours].
 pub fn highlight(highlighter: impl Highlighter, message: impl ToString) -> String {
     const RESET: &str = "\u{001b}[0m";
+
+    if !colours() {
+        return message.to_string();
+    }
 
     highlighter
         .escape_code()
