@@ -18,6 +18,7 @@ use bl_reporting::{Reporter, Reports, pluralise};
 use bl_utils::{logging::ToolLogger, stream::CompilerOutputStream, stream_writeln};
 use bl_workspace::{Workspace, WorkspaceBuilder, settings::Settings};
 use cli::{CheckCommand, FormatCommand};
+use commands::fmt::FormatResults;
 use crash::crash_handler;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -27,7 +28,8 @@ pub enum ExitStatus {
     /// Linting was successful and there were linting warnings, but no errors.
     /// A warning doesn't fail the run, unless `--deny-warnings` is passed.
     Warnings,
-    /// Linting was successful but there were linting errors.
+    /// Linting was successful but there were linting errors, or `fmt --check`
+    /// or `fmt --diff` found templates that formatting would change.
     Failure,
     /// Linting failed.
     Error,
@@ -39,6 +41,15 @@ impl ExitStatus {
         match self {
             ExitStatus::Warnings => ExitStatus::Failure,
             status => status,
+        }
+    }
+
+    /// The status when `fmt --check` or `fmt --diff` finds templates that
+    /// formatting would change, which fail the run as errors do.
+    fn would_reformat(self) -> Self {
+        match self {
+            ExitStatus::Error => ExitStatus::Error,
+            _ => ExitStatus::Failure,
         }
     }
 }
@@ -108,23 +119,35 @@ pub fn check(args: CheckCommand) -> Result<ExitStatus> {
 }
 
 fn fmt(args: FormatCommand) -> Result<ExitStatus> {
-    let FormatCommand { files, fix, diff, shared } = args;
+    let FormatCommand { files, check, diff, shared } = args;
     let files = resolve_default_files(files, false); // @@Todo: add stdin support.
 
-    let fix_mode = if diff {
+    // The formatted templates are written back to their files, unless `--check`
+    // or `--diff` asks to only show which of them would change, or how.
+    let fix_mode = if check {
+        FixMode::Check
+    } else if diff {
         FixMode::Diff
-    } else if fix {
-        FixMode::Apply
     } else {
-        FixMode::Generate
+        FixMode::Apply
     };
 
     let settings = Settings::new(shared.respect_gitignore(), fix_mode, false, shared.dialect);
     let mut workspace = build_workspace(settings);
 
-    let messages = commands::fmt::fmt(&files, &mut workspace)?;
-    let status = consume_diagnostics(&workspace, messages)?;
-    Ok(if shared.deny_warnings { status.deny_warnings() } else { status })
+    let FormatResults { reports, counts } = commands::fmt::fmt(&files, &mut workspace)?;
+    let status = consume_diagnostics(&workspace, reports)?;
+
+    if let Some(summary) = counts.summary(fix_mode) {
+        stream_writeln!(workspace.error_stream(), "{summary}");
+    }
+
+    let status = if shared.deny_warnings { status.deny_warnings() } else { status };
+
+    // A template that `--check` or `--diff` finds isn't formatted fails the
+    // run, so that CI can require that templates are formatted.
+    let would_reformat = counts.changed != 0 && matches!(fix_mode, FixMode::Check | FixMode::Diff);
+    Ok(if would_reformat { status.would_reformat() } else { status })
 }
 
 /// A workspace with the given `settings`, which writes to `stdout` and
@@ -195,5 +218,13 @@ mod test_super {
         assert_eq!(ExitStatus::Warnings.deny_warnings(), ExitStatus::Failure);
         assert_eq!(ExitStatus::Success.deny_warnings(), ExitStatus::Success);
         assert_eq!(ExitStatus::Failure.deny_warnings(), ExitStatus::Failure);
+    }
+
+    #[test]
+    fn test_would_reformat() {
+        assert_eq!(ExitStatus::Success.would_reformat(), ExitStatus::Failure);
+        assert_eq!(ExitStatus::Warnings.would_reformat(), ExitStatus::Failure);
+        assert_eq!(ExitStatus::Failure.would_reformat(), ExitStatus::Failure);
+        assert_eq!(ExitStatus::Error.would_reformat(), ExitStatus::Error);
     }
 }

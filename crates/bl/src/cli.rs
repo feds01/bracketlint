@@ -30,7 +30,7 @@ pub enum Command {
     /// Report problems in the templates in the given files or directories.
     Check(CheckCommand),
 
-    /// Format the templates in the given files or directories.
+    /// Format the templates in the given files or directories, in place.
     Fmt(FormatCommand),
 
     /// Print the version of bracketlint.
@@ -55,14 +55,14 @@ pub struct FormatCommand {
     /// The files or directories to format [default: .]
     pub files: Vec<PathBuf>,
 
-    /// Write the formatted templates back to their files, rather than print
-    /// them.
+    /// Don't write the formatted templates back. Instead, name each file that
+    /// formatting would change, and exit with 1 if there are any.
     #[arg(long)]
-    pub fix: bool,
+    pub check: bool,
 
-    /// Print a diff of how formatting changes each template, rather than the
-    /// formatted template.
-    #[arg(long, conflicts_with = "fix")]
+    /// Don't write the formatted templates back. Instead, print a diff of how
+    /// formatting would change each file, and exit with 1 if there are any.
+    #[arg(long, conflicts_with = "check")]
     pub diff: bool,
 
     #[command(flatten)]

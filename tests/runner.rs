@@ -273,7 +273,7 @@ fn handle_test(test: TestingInput) {
             workspace.settings.parser_settings.dump_ast = true;
             commands::check::check(&files, &mut workspace).unwrap()
         }
-        StageKind::Fmt => commands::fmt::fmt(&files, &mut workspace).unwrap(),
+        StageKind::Fmt => commands::fmt::fmt(&files, &mut workspace).unwrap().reports,
     };
 
     // Based on the specified metadata within the test case itself, we know

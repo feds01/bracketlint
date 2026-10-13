@@ -35,6 +35,14 @@ impl<'a> Diff<'a> {
         let diff = TextDiff::from_lines(original, modified);
         Self { original, modified, header: None, diff, missing_newline_hint: true }
     }
+
+    /// Name the `original` and `modified` files in a `---` and `+++` header
+    /// before the hunks, as `diff -u` does, so that the diff can be applied
+    /// with `patch` or `git apply`.
+    pub fn with_header(mut self, original: &'a str, modified: &'a str) -> Self {
+        self.header = Some((original, modified));
+        self
+    }
 }
 
 impl fmt::Display for Diff<'_> {
@@ -74,5 +82,29 @@ impl fmt::Display for Diff<'_> {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test_super {
+    use super::*;
+
+    #[test]
+    fn test_unified_diff() {
+        // `colored` colours the diff if `stdout` is a terminal, which it can be
+        // while the tests run.
+        colored::control::set_override(false);
+
+        let diff = Diff::new("a\nb\nc\n", "a\nB\nc\n").with_header("page.html", "page.html");
+        assert_eq!(
+            diff.to_string(),
+            "--- page.html\n+++ page.html\n@@ -1,3 +1,3 @@\n a\n-b\n+B\n c\n"
+        );
+
+        let diff = Diff::new("a", "b");
+        assert_eq!(
+            diff.to_string(),
+            "@@ -1 +1 @@\n-a\n\\ No newline at end of file\n+b\n\\ No newline at end of file\n"
+        );
     }
 }
