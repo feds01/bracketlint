@@ -7,12 +7,12 @@ use bl_arena::Arena;
 use bl_fmt::{FormatQuery, FormatQueryResult, FormatterOptions, fmt_module};
 use bl_lints::{diff::Diff, settings::FixMode};
 use bl_parse::{ParseQuery, ParseQueryResult, parse_source};
-use bl_reporting::{Reports, pluralise};
+use bl_reporting::{Report, Reports, pluralise};
 use bl_utils::{stream_write, stream_writeln, timed};
 use bl_workspace::{Member, Workspace, resolver::find_files_in_paths};
-use log::{Level, debug};
+use log::{Level, debug, warn};
 
-use super::relative_path;
+use super::{file_error, relative_path, walk_error};
 
 /// What came of formatting the templates.
 #[derive(Debug, Default)]
@@ -67,7 +67,7 @@ pub fn fmt(files: &[PathBuf], workspace: &mut Workspace) -> Result<FormatResults
     )?;
 
     if files.is_empty() {
-        // @@Todo: warn the user that there were no files to check.
+        warn!("no template files found in the given paths");
         return Ok(FormatResults::default());
     }
 
@@ -106,10 +106,7 @@ pub fn fmt(files: &[PathBuf], workspace: &mut Workspace) -> Result<FormatResults
 
                         arena.reset();
                     }
-                    Err(err) => {
-                        // @@todo: Create a diagnostic for the error, and print it!
-                        println!("error: {}", err);
-                    }
+                    Err(err) => parse_diagnostics.push(walk_error(&err)),
                 }
             }
         },
@@ -128,14 +125,14 @@ pub fn fmt(files: &[PathBuf], workspace: &mut Workspace) -> Result<FormatResults
 /// What came of formatting one template.
 #[derive(Default)]
 struct FormattedFile {
-    /// The diagnostics from parsing the template.
+    /// The diagnostics from reading and parsing the template.
     parse_diagnostics: Reports,
 
-    /// The diagnostics from formatting the template.
+    /// The diagnostics from formatting the template, and writing it back.
     format_diagnostics: Reports,
 
     /// Whether formatting changes the template, or `None` if it isn't
-    /// formatted.
+    /// formatted, or couldn't be written back.
     changed: Option<bool>,
 }
 
@@ -148,9 +145,12 @@ fn format_file(
     options: FormatterOptions,
 ) -> FormattedFile {
     // We first need to convert this to a workspace member.
-    let Ok(contents) = fs::read_to_string(&path) else {
-        // @@Todo: add an error for the queue.
-        return FormattedFile::default();
+    let contents = match fs::read_to_string(&path) {
+        Ok(contents) => contents,
+        Err(err) => {
+            let parse_diagnostics = vec![file_error("read", &path, &err)];
+            return FormattedFile { parse_diagnostics, ..Default::default() };
+        }
     };
 
     let source = workspace.reserve_member(path, contents);
@@ -166,21 +166,34 @@ fn format_file(
         return FormattedFile { parse_diagnostics: diagnostics, ..Default::default() };
     };
 
-    let FormatQueryResult { buffer, diagnostics: format_diagnostics } =
+    let FormatQueryResult { buffer, diagnostics: mut format_diagnostics } =
         fmt_module(FormatQuery { member, source, options, document });
     let changed = buffer != member.contents();
-    emit_formatted(workspace, member, &buffer, changed);
 
-    FormattedFile { parse_diagnostics: diagnostics, format_diagnostics, changed: Some(changed) }
+    let changed = match emit_formatted(workspace, member, &buffer, changed) {
+        Ok(()) => Some(changed),
+        Err(report) => {
+            format_diagnostics.push(report);
+            None
+        }
+    };
+
+    FormattedFile { parse_diagnostics: diagnostics, format_diagnostics, changed }
 }
 
 /// Emit the formatted `buffer` of `member` as the fix mode asks: as the whole
 /// of it, or, if formatting `changed` the member, by writing it to the
-/// member's file, naming the file, or as a diff.
+/// member's file, naming the file, or as a diff. Fails with an error if the
+/// file couldn't be written.
 ///
 /// @@Todo: factor this out into a general interface for emitting
 /// changes/applying them.
-fn emit_formatted(workspace: &Workspace, member: &Member, buffer: &str, changed: bool) {
+fn emit_formatted(
+    workspace: &Workspace,
+    member: &Member,
+    buffer: &str,
+    changed: bool,
+) -> Result<(), Report> {
     let mut stdout = workspace.output_stream();
 
     match workspace.settings.linter_settings.fix_mode {
@@ -190,7 +203,8 @@ fn emit_formatted(workspace: &Workspace, member: &Member, buffer: &str, changed:
         _ if !changed => {}
 
         FixMode::Apply => {
-            fs::write(&member.path, buffer).expect("failed to write to file");
+            fs::write(&member.path, buffer)
+                .map_err(|err| file_error("write", &member.path, &err))?;
         }
         FixMode::Check => {
             stream_writeln!(stdout, "Would reformat: {}", relative_path(&member.path).display());
@@ -201,6 +215,8 @@ fn emit_formatted(workspace: &Workspace, member: &Member, buffer: &str, changed:
             stream_write!(stdout, "{diff}");
         }
     }
+
+    Ok(())
 }
 
 #[cfg(test)]

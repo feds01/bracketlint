@@ -859,6 +859,7 @@ dependencies = [
  "bl_workspace",
  "clap",
  "colored",
+ "ignore",
  "log",
  "mimalloc",
  "once_cell",

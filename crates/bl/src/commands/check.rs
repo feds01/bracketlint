@@ -8,7 +8,9 @@ use bl_parse::{ParseQuery, ParseQueryResult, emit_source_tree, parse_source};
 use bl_reporting::Reports;
 use bl_utils::timed;
 use bl_workspace::{Workspace, resolver::find_files_in_paths};
-use log::{Level, debug};
+use log::{Level, debug, warn};
+
+use super::{file_error, walk_error};
 
 pub fn check(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
     // Firstly, we need to discover all of the files in the provided paths.
@@ -19,7 +21,7 @@ pub fn check(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
     )?;
 
     if files.is_empty() {
-        // @@Todo: warn the user that there were no files to check.
+        warn!("no template files found in the given paths");
         return Ok(Reports::default());
     }
 
@@ -50,10 +52,7 @@ pub fn check(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
                         ));
                         arena.reset();
                     }
-                    Err(err) => {
-                        // @@todo: Create a diagnostic for the error, and print it!
-                        println!("error: {}", err);
-                    }
+                    Err(err) => pipeline_diagnostics.push(walk_error(&err)),
                 }
             }
         },
@@ -70,9 +69,9 @@ pub fn check(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
 /// for it, and return the diagnostics from parsing it.
 fn check_file(workspace: &mut Workspace, path: PathBuf, arena: &Arena) -> Reports {
     // We first need to convert this to a workspace member.
-    let Ok(contents) = fs::read_to_string(&path) else {
-        // @@Todo: add an error for the queue.
-        return Reports::default();
+    let contents = match fs::read_to_string(&path) {
+        Ok(contents) => contents,
+        Err(err) => return vec![file_error("read", &path, &err)],
     };
 
     let id = workspace.reserve_member(path, contents);
