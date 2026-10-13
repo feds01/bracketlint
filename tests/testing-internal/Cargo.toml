@@ -12,4 +12,5 @@ itertools = { workspace = true }
 quote = { workspace = true }
 
 bl_ast = { workspace = true }
+bl_workspace = { workspace = true }
 bracketlint = { path = "../../crates/bl" }

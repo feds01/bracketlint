@@ -11,6 +11,8 @@ use bl_ast::Dialect;
 use bl_lints::settings::FixMode;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 
+use crate::config::{Markup, ProjectConfig};
+
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
 pub enum FilePattern {
     Builtin(&'static str),
@@ -146,6 +148,10 @@ pub struct ParserSettings {
     /// The dialect to parse every file in, instead of picking one from each
     /// file's extension.
     pub dialect: Option<Dialect>,
+
+    /// The dialect that the project's `bracketlint.toml` sets for the files
+    /// whose extension doesn't name one.
+    pub project_dialect: Option<Dialect>,
 }
 
 impl ParserSettings {
@@ -155,9 +161,10 @@ impl ParserSettings {
             return (dialect, DialectSource::Flag);
         }
 
-        match Dialect::from_path(path) {
-            Some(dialect) => (dialect, DialectSource::Extension),
-            None => (Dialect::default(), DialectSource::Default),
+        match (Dialect::from_path(path), self.project_dialect) {
+            (Some(dialect), _) => (dialect, DialectSource::Extension),
+            (None, Some(dialect)) => (dialect, DialectSource::Project),
+            (None, None) => (Dialect::default(), DialectSource::Default),
         }
     }
 }
@@ -170,6 +177,10 @@ pub enum DialectSource {
 
     /// The file's extension identifies it, see [Dialect::from_path].
     Extension,
+
+    /// The project's `bracketlint.toml` sets it for files whose extension
+    /// doesn't name one.
+    Project,
 
     /// Nothing names it, so it is the default, Django.
     Default,
@@ -186,6 +197,10 @@ pub struct Settings {
 
     /// Settings to do with the linter.
     pub linter_settings: LinterSettings,
+
+    /// What the templates output, which decides what the formatter can change
+    /// between their tags.
+    pub markup: Markup,
 }
 
 impl Settings {
@@ -197,10 +212,19 @@ impl Settings {
     ) -> Self {
         Settings {
             respect_gitignore,
-            parser_settings: ParserSettings { dump_ast, dialect },
+            parser_settings: ParserSettings { dump_ast, dialect, project_dialect: None },
             file_resolver: FileResolverSettings::new(),
             linter_settings: LinterSettings { fix_mode },
+            markup: Markup::default(),
         }
+    }
+
+    /// The settings, with those that the project's `bracketlint.toml` sets.
+    pub fn with_project(mut self, project: ProjectConfig) -> Self {
+        let ProjectConfig { dialect, markup } = project;
+        self.parser_settings.project_dialect = dialect;
+        self.markup = markup;
+        self
     }
 
     pub fn should_dump_ast(&self) -> bool {
@@ -231,7 +255,7 @@ mod test_super {
 
     #[test]
     fn test_dialect_for() {
-        let by_extension = ParserSettings { dump_ast: false, dialect: None };
+        let by_extension = ParserSettings { dump_ast: false, dialect: None, project_dialect: None };
         assert_eq!(
             by_extension.dialect_for(Path::new("cart.liquid")),
             (Dialect::Liquid, DialectSource::Extension)
@@ -242,7 +266,8 @@ mod test_super {
         );
 
         // `--dialect` wins over the extension.
-        let overridden = ParserSettings { dump_ast: false, dialect: Some(Dialect::Twig) };
+        let overridden =
+            ParserSettings { dump_ast: false, dialect: Some(Dialect::Twig), project_dialect: None };
         assert_eq!(
             overridden.dialect_for(Path::new("cart.liquid")),
             (Dialect::Twig, DialectSource::Flag)
@@ -250,6 +275,22 @@ mod test_super {
         assert_eq!(
             overridden.dialect_for(Path::new("index.html")),
             (Dialect::Twig, DialectSource::Flag)
+        );
+
+        // The project's dialect is for the files whose extension doesn't name
+        // one.
+        let project = ParserSettings {
+            dump_ast: false,
+            dialect: None,
+            project_dialect: Some(Dialect::Jinja),
+        };
+        assert_eq!(
+            project.dialect_for(Path::new("index.html")),
+            (Dialect::Jinja, DialectSource::Project)
+        );
+        assert_eq!(
+            project.dialect_for(Path::new("cart.liquid")),
+            (Dialect::Liquid, DialectSource::Extension)
         );
     }
 }

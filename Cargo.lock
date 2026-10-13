@@ -677,6 +677,7 @@ dependencies = [
  "biome_languages",
  "biome_rowan",
  "bl_ast",
+ "bl_lexer",
  "bl_macros",
  "bl_reporting",
  "bl_workspace",
@@ -754,6 +755,7 @@ name = "bl_testing_internal"
 version = "0.1.0"
 dependencies = [
  "bl_ast",
+ "bl_workspace",
  "bracketlint",
  "itertools 0.15.0",
  "quote",
@@ -835,6 +837,8 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "tempfile",
+ "toml",
 ]
 
 [[package]]

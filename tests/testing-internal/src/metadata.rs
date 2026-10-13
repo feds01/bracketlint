@@ -9,6 +9,7 @@ use std::{
 };
 
 use bl_ast::Dialect;
+use bl_workspace::config::Markup;
 use itertools::{Itertools, peek_nth};
 use quote::{ToTokens, quote};
 
@@ -152,11 +153,14 @@ pub struct TestMetadata {
     /// The dialect to parse the test case in, instead of picking one from its
     /// extension.
     pub dialect: Option<Dialect>,
+
+    /// What the test case outputs, as a project's `bracketlint.toml` sets it.
+    pub markup: Markup,
 }
 
 impl ToTokens for TestMetadata {
     fn to_tokens(&self, tokens: &mut quote::__private::TokenStream) {
-        let TestMetadata { stage, completion, warnings, args, skip, dialect } = &self;
+        let TestMetadata { stage, completion, warnings, args, skip, dialect, markup } = &self;
         let args = args.clone();
 
         let stage: quote::__private::TokenStream = format!("StageKind::{stage:?}").parse().unwrap();
@@ -168,6 +172,8 @@ impl ToTokens for TestMetadata {
             }
             None => quote!(None),
         };
+        let markup: quote::__private::TokenStream =
+            format!("::bl_workspace::config::Markup::{markup:?}").parse().unwrap();
 
         tokens.extend(quote! ( TestMetadata {
             completion: #completion,
@@ -175,7 +181,8 @@ impl ToTokens for TestMetadata {
             warnings: #warnings,
             args: #args,
             skip: #skip,
-            dialect: #dialect
+            dialect: #dialect,
+            markup: #markup
         }))
     }
 }
@@ -200,6 +207,9 @@ pub struct TestMetadataBuilder {
 
     /// The dialect to parse the test case in.
     dialect: Option<Dialect>,
+
+    /// What the test case outputs.
+    markup: Markup,
 }
 
 impl TestMetadataBuilder {
@@ -212,6 +222,7 @@ impl TestMetadataBuilder {
             skip: false,
             args: TestArgs::new(),
             dialect: None,
+            markup: Markup::default(),
         }
     }
 
@@ -251,6 +262,12 @@ impl TestMetadataBuilder {
         self
     }
 
+    /// Specify what the test case outputs.
+    pub fn with_markup(&mut self, markup: Markup) -> &mut Self {
+        self.markup = markup;
+        self
+    }
+
     /// Build the [TestMetadata], defaulting to the specified defaults
     /// for any missing property.
     pub fn build(self) -> TestMetadata {
@@ -263,6 +280,7 @@ impl TestMetadataBuilder {
             args: self.args,
             skip: self.skip,
             dialect: self.dialect,
+            markup: self.markup,
         }
     }
 }
@@ -409,6 +427,15 @@ pub fn parse_test_case_metadata(path: &PathBuf) -> Result<ParsedMetadata, io::Er
                         builder.with_dialect(dialect);
                     }
                     Err(_) => warnings.push(ParseWarning::unrecognised_value(key, value)),
+                },
+                "markup" => match value.as_str() {
+                    "html" => {
+                        builder.with_markup(Markup::Html);
+                    }
+                    "text" => {
+                        builder.with_markup(Markup::Text);
+                    }
+                    _ => warnings.push(ParseWarning::unrecognised_value(key, value)),
                 },
                 _ => {
                     warnings.push(ParseWarning::unrecognised_key(key));

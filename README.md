@@ -43,7 +43,7 @@ $ bracketlint fmt --diff templates/   # print a diff of how formatting would cha
 
 `fmt --check` and `fmt --diff` don't write any file, and exit with 1 if formatting would change a template, so CI can require formatted templates. The list and the diff go to stdout, and everything else to stderr, so `bracketlint fmt --diff templates/ > changes.diff` writes a plain diff that `patch -p0` applies.
 
-Files that `.gitignore` and other ignore files exclude are skipped, unless you pass `--no-respect-gitignore`. Each file is read in the dialect that its extension names: `.jinja` is Jinja, `.liquid` is Liquid, `.njk` is Nunjucks and `.twig` is Twig. Any other file, such as `.html`, is read as Django. To read every file in one dialect instead, pass `--dialect`:
+Files that `.gitignore` and other ignore files exclude are skipped, unless you pass `--no-respect-gitignore`. Each file is read in the dialect that its extension names: `.jinja` is Jinja, `.liquid` is Liquid, `.njk` is Nunjucks and `.twig` is Twig. Any other file, such as `.html`, is read as Django, unless the project's [`bracketlint.toml`](#configuration) sets another dialect. To read every file in one dialect instead, pass `--dialect`:
 
 ```bash
 $ bracketlint check --dialect liquid theme/
@@ -56,6 +56,22 @@ $ bracketlint check --deny-warnings templates/
 ```
 
 `bracketlint` exits with 0 when a run passes, 1 when it fails, and 2 when it couldn't run, e.g. when an argument is wrong, or it crashed. Pass `-v` (`--verbose`) to also print debug logs, such as how long each step of a run takes.
+
+### Configuration
+
+A project's settings go in a `bracketlint.toml`, which bracketlint reads from the current directory, or else the closest of its parents that has one:
+
+```toml
+# The dialect of the templates whose extension doesn't name one, such as
+# `.html`, which are otherwise read as Django.
+dialect = "jinja"
+
+# What the templates output: `html`, the default, or `text`, such as
+# Markdown, plain-text emails or prompts for a language model.
+markup = "text"
+```
+
+Whitespace in a `text` template is part of its output, so `bracketlint fmt` keeps all of the text between its tags exactly as it is written, and only formats the tags. In an `html` template, it indents the text and wraps its lines, as HTML shows a run of whitespace as a single space.
 
 ### Development
 

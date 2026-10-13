@@ -4,7 +4,8 @@ Each `.html`, `.jinja`, `.liquid` and `.twig` file here is a test case, and
 the `.stdout`/`.stderr` files next to it are snapshots of its output,
 re-generated with `just update-snapshots`. A case is parsed in the dialect that
 its extension names, as `bracketlint` does, unless its configuration sets
-another, e.g. `dialect=liquid`.
+another, e.g. `dialect=liquid`. A case is HTML, unless its configuration says
+that it outputs text, `markup=text`, as a project's `bracketlint.toml` can.
 The first line of a case configures the run, e.g. `// run=fail, stage=check`
 (the keys are parsed in `tests/testing-internal/src/metadata.rs`). It isn't
 part of the template: the case runs without it and the blank line after it,

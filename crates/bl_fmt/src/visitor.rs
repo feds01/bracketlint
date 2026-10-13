@@ -4,10 +4,15 @@ use bl_ast::{
     AstVisitorMutSelf, ByteRange, Dialect, SourceId, Span, SpannedSource,
     ast_visitor_mut_self_default_impl, walk_mut_self,
 };
+use bl_lexer::{
+    Lexer,
+    token::{Delimiter, TokenKind},
+};
 use bl_reporting::{
     DiagnosticsMut,
     inline::{InlineSnippet, note_on_span},
 };
+use bl_workspace::config::Markup;
 
 use crate::{
     adapters::{
@@ -38,6 +43,61 @@ pub(crate) struct Formatter<'fmt, EngineAdaptor: ExternalLanguagesEngineAdaptor>
 
     /// What the formatter reports while it formats all of the template.
     diagnostics: FmtDiagnostics,
+
+    /// The tags of a template that outputs text, see [Markup::Text], whose
+    /// source between the tags is copied rather than laid out.
+    text: Option<Splice>,
+}
+
+/// The tags of a template that outputs text, see [Markup::Text], in which the
+/// whitespace between the tags is output as it is written. Each tag is
+/// formatted in its place, and the source between it and the one before it
+/// is copied as it is, so none of the layout applies.
+struct Splice {
+    /// Where each `{% %}` and `{{ }}` tag is in the source, in order.
+    tags: Vec<ByteRange>,
+
+    /// The index of the next tag in [Self::tags] that could be formatted.
+    next: usize,
+
+    /// Where in the source the formatter has copied or formatted up to.
+    copied: usize,
+}
+
+impl Splice {
+    /// The tags of the template in `source`, as the lexer finds them in
+    /// `dialect`, without those in a tag, e.g. the lines of a Liquid
+    /// `{% liquid %}` tag.
+    fn new(source: SpannedSource, id: SourceId, dialect: Dialect) -> Self {
+        let tokens = Lexer::new(source, id, dialect).tokenise().tokens;
+        let mut tags = vec![];
+
+        let mut index = 0;
+        while let Some(token) = tokens.get(index) {
+            index += 1;
+
+            if let TokenKind::Tree(delimiter, len) = token.kind {
+                if matches!(delimiter, Delimiter::Percent | Delimiter::Brace) {
+                    tags.push(token.span);
+                }
+
+                index += len as usize;
+            }
+        }
+
+        Splice { tags, next: 0, copied: 0 }
+    }
+
+    /// The next tag in the source, which starts after what has been copied.
+    fn next_tag(&mut self) -> ByteRange {
+        while self.tags.get(self.next).is_some_and(|tag| tag.start() < self.copied) {
+            self.next += 1;
+        }
+
+        let tag = *self.tags.get(self.next).expect("the lexer finds each tag that the parser does");
+        self.next += 1;
+        tag
+    }
 }
 
 impl<EngineAdaptor: ExternalLanguagesEngineAdaptor> Formatter<'_, EngineAdaptor> {
@@ -98,17 +158,40 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
             },
             exact: None,
             diagnostics: FmtDiagnostics::new(),
+            text: (options.markup == Markup::Text).then(|| Splice::new(source, id, dialect)),
         }
     }
 
     /// Convert the formatter into the buffer, and what it reported.
-    pub fn finish(self) -> (String, FmtDiagnostics) {
+    pub fn finish(mut self) -> (String, FmtDiagnostics) {
+        // In text, the source after the last tag is copied as it is.
+        self.copy_source(self.ctx.source.source.len());
+
         (self.buffer, self.diagnostics)
+    }
+
+    /// Copy the source up to `end` as it is written, from where the formatter
+    /// last copied or formatted up to, in a template that outputs text, see
+    /// [Splice].
+    fn copy_source(&mut self, end: usize) {
+        let Some(text) = &mut self.text else {
+            return;
+        };
+
+        if end > text.copied {
+            self.buffer.push_str(&self.ctx.source.source[text.copied..end]);
+            text.copied = end;
+        }
     }
 
     /// Apply an indent to the buffer.
     #[inline(always)]
     pub fn add_indent(&mut self) {
+        // The indent in text is output, so it is kept as it is written.
+        if self.text.is_some() {
+            return;
+        }
+
         let size = self.ctx.indent_level();
 
         self.buffer.push_str(" ".repeat(size as usize).as_str());
@@ -137,7 +220,8 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
     /// whitespace and the engines trim it, which would otherwise turn
     /// `{{ a }}, {{ b }}` into `{{ a }},{{ b }}` and change the output.
     fn space_from_previous(&mut self, start: usize) {
-        if is_inline_space(self.whitespace_before(start))
+        if self.text.is_none()
+            && is_inline_space(self.whitespace_before(start))
             && !self.at_line_start()
             && !self.buffer.ends_with(char::is_whitespace)
         {
@@ -148,6 +232,12 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
     /// End the current line, without any spaces at its end, e.g. the one
     /// that a piece of HTML ends with before a tag that starts a line.
     pub fn end_line(&mut self) {
+        // The line breaks in text are output, so they are kept as they are
+        // written.
+        if self.text.is_some() {
+            return;
+        }
+
         let len = self.buffer.trim_end_matches([' ', '\t']).len();
         self.buffer.truncate(len);
         self.buffer.push('\n');
@@ -259,6 +349,13 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         trim: bl_ast::TrimMarker,
         f: F,
     ) -> Result<(), FmtError> {
+        // In text, the tag takes the place of the next one in the source, after
+        // the source before it, which is copied as it is.
+        let tag = self.text.as_mut().map(Splice::next_tag);
+        if let Some(tag) = tag {
+            self.copy_source(tag.start());
+        }
+
         self.push_hunk(kind.left());
         self.push_marker(trim.left);
         self.push_hunk(" ");
@@ -270,6 +367,10 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         self.push_hunk(" ");
         self.push_marker(trim.right);
         self.push_hunk(kind.right());
+
+        if let (Some(text), Some(tag)) = (&mut self.text, tag) {
+            text.copied = tag.end() + 1;
+        }
 
         Ok(())
     }
@@ -491,6 +592,10 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
     /// starts one with it, and otherwise follows what comes before it after a
     /// space when the source has one.
     fn push_kept_source(&mut self, range: ByteRange) {
+        if self.text.is_some() {
+            return self.copy_source(range.end() + 1);
+        }
+
         let whitespace = self.whitespace_before(range.start());
         if whitespace.contains('\n') && !self.at_line_start() {
             self.end_line();
@@ -559,7 +664,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
                 // Check if the next line is the end of the line, otherwise the
                 // following text continues the line.
                 if span.end() + 1 == line_end {
-                    self.push_hunk("\n");
+                    self.end_line();
                 }
 
                 Ok(())
@@ -1002,6 +1107,12 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         &mut self,
         node: bl_ast::AstNodeRef<bl_ast::Text>,
     ) -> Result<Self::TextRet, Self::Error> {
+        // Text in a template that outputs text is copied as it is written,
+        // with the source before the next tag, see [Splice].
+        if self.text.is_some() {
+            return Ok(());
+        }
+
         let start = node.range().start();
         let text = self.ctx.source.hunk(node.range());
 

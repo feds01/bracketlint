@@ -12,7 +12,7 @@ use bl_ast::Dialect;
 use bl_fmt::{FormatQuery, FormatQueryResult, FormatterOptions, fmt_module};
 use bl_parse::{ParseQuery, ParseQueryResult, parse_source};
 use bl_reporting::Reports;
-use bl_workspace::{WorkspaceMembers, settings::DialectSource};
+use bl_workspace::{WorkspaceMembers, config::Markup, settings::DialectSource};
 use strum::{EnumString, IntoStaticStr};
 
 use super::source::Source;
@@ -100,7 +100,7 @@ pub fn parse_baseline(baseline: &str) -> BTreeMap<String, Status> {
 
 /// How the template `contents` does in `dialect`.
 fn check(dialect: Dialect, contents: &str) -> Outcome {
-    let formatted = match format(dialect, contents) {
+    let formatted = match format(dialect, Markup::Html, contents) {
         Ok(formatted) => formatted,
         Err(failed) => return failed,
     };
@@ -112,7 +112,7 @@ fn check(dialect: Dialect, contents: &str) -> Outcome {
         return Outcome::failed(Status::ChangedTags, error);
     }
 
-    match format(dialect, &formatted) {
+    match format(dialect, Markup::Html, &formatted) {
         Ok(again) if again == formatted => Outcome::OK,
         Ok(_) => Outcome { status: Status::Unstable, error: None },
         Err(failed) => Outcome {
@@ -122,8 +122,9 @@ fn check(dialect: Dialect, contents: &str) -> Outcome {
     }
 }
 
-/// Parse and format `contents` in `dialect`, as `bracketlint fmt` does.
-pub(crate) fn format(dialect: Dialect, contents: &str) -> Result<String, Outcome> {
+/// Parse and format `contents` in `dialect`, which outputs `markup`, as
+/// `bracketlint fmt` does.
+pub(crate) fn format(dialect: Dialect, markup: Markup, contents: &str) -> Result<String, Outcome> {
     let mut members = WorkspaceMembers::new();
     let id = members.reserve_member(
         PathBuf::from("template"),
@@ -142,7 +143,7 @@ pub(crate) fn format(dialect: Dialect, contents: &str) -> Result<String, Outcome
 
     run_stage(Status::FmtError, || {
         let document = document.expect("Attempted to format a module without a document.");
-        let options = FormatterOptions::default();
+        let options = FormatterOptions { markup, ..FormatterOptions::default() };
         let FormatQueryResult { buffer, diagnostics } =
             fmt_module(FormatQuery { member, source: id, options, document });
         (buffer, diagnostics)
@@ -168,17 +169,28 @@ fn run_stage<T>(status: Status, stage: impl FnOnce() -> (T, Reports)) -> Result<
 
 /// The template tags in `text`, i.e. its `{% %}`, `{{ }}` and `{# #}`, without
 /// their whitespace.
-fn tags(text: &str) -> Vec<String> {
-    let mut tags = vec![];
-    let mut rest = text;
+pub(crate) fn tags(text: &str) -> Vec<String> {
+    split_tags(text).0
+}
 
-    while let Some(start) = rest.find('{') {
+/// The source of `text` between its template tags, see [tags], as it is
+/// written.
+pub(crate) fn between_tags(text: &str) -> Vec<&str> {
+    split_tags(text).1
+}
+
+/// The template tags in `text`, see [tags], and the source between them.
+fn split_tags(text: &str) -> (Vec<String>, Vec<&str>) {
+    let (mut tags, mut between) = (vec![], vec![]);
+    let (mut rest, mut from) = (text, 0);
+
+    while let Some(start) = rest[from..].find('{').map(|start| from + start) {
         let end = match rest[start + 1..].chars().next() {
             Some('%') => "%}",
             Some('{') => "}}",
             Some('#') => "#}",
             _ => {
-                rest = &rest[start + 1..];
+                from = start + 1;
                 continue;
             }
         };
@@ -186,14 +198,17 @@ fn tags(text: &str) -> Vec<String> {
         let Some(length) = rest[start + 2..].find(end) else { break };
         let tag = &rest[start..start + 2 + length + 2];
         tags.push(tag.split_whitespace().collect());
-        rest = &rest[start + tag.len()..];
+        between.push(&rest[..start]);
+        (rest, from) = (&rest[start + tag.len()..], 0);
     }
 
-    tags
+    between.push(rest);
+    (tags, between)
 }
 
 #[test]
 fn test_tags() {
     let text = "<p class=\"{ a }\">{{ a }}{%- if b -%}{#\n c #}</p>{% unclosed";
     assert_eq!(tags(text), ["{{a}}", "{%-ifb-%}", "{#c#}"]);
+    assert_eq!(between_tags(text), ["<p class=\"{ a }\">", "", "", "</p>{% unclosed"]);
 }

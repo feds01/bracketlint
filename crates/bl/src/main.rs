@@ -31,9 +31,10 @@ pub fn main() -> ExitCode {
     match run(args) {
         Ok(status) => status.into(),
         // An error that stops the run, rather than one in a template, is an
-        // internal error.
+        // internal error. It is printed with its causes, e.g. why a
+        // `bracketlint.toml` isn't valid.
         Err(e) => {
-            eprintln!("error: {e}");
+            eprintln!("error: {e:#}");
             ExitStatus::Error.into()
         }
     }

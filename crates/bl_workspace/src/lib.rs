@@ -3,6 +3,7 @@
 //! and information about a particular lint run. The [WorkspaceBuilder] is
 //! responsible for creating a [Workspace] instance.
 
+pub mod config;
 mod member;
 pub mod resolver;
 pub mod settings;

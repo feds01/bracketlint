@@ -180,3 +180,32 @@ fn a_missing_file_of_arguments_fails_the_run() {
     assert_eq!(output.status.code(), Some(2), "{}", stderr(&output));
     assert!(stderr(&output).contains("couldn't read the arguments"), "{}", stderr(&output));
 }
+
+#[test]
+fn invalid_project_settings_fail_the_run() {
+    let dir = project("invalid_settings", &[("bracketlint.toml", "markup = \"markdown\"\n")]);
+
+    for command in ["check", "fmt"] {
+        let output = bracketlint(&dir, &[command]);
+        assert_eq!(output.status.code(), Some(2), "`{command}`: {}", stderr(&output));
+        assert!(stderr(&output).contains("bracketlint.toml` isn't valid"), "{}", stderr(&output));
+        assert!(stderr(&output).contains("unknown variant `markdown`"), "{}", stderr(&output));
+    }
+}
+
+#[test]
+fn fmt_keeps_the_text_of_templates_that_output_text() {
+    let prompt =
+        "# Brief\n\n- {{brief}}\n- Keep    this.\n{%- if notes %}\n\n  {{ notes }}\n{%- endif %}\n";
+    let dir = project(
+        "text_markup",
+        &[("bracketlint.toml", "markup = \"text\"\n"), ("prompts/brief.liquid", prompt)],
+    );
+
+    let output = bracketlint(&dir, &["fmt"]);
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+
+    // Only the tags change, as the text is output as it is written.
+    let formatted = fs::read_to_string(dir.join("prompts/brief.liquid")).unwrap();
+    assert_eq!(formatted, prompt.replace("{{brief}}", "{{ brief }}"));
+}

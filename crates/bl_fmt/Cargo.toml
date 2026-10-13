@@ -10,6 +10,7 @@ itertools = { workspace = true }
 log = { workspace = true }
 
 bl_ast = { workspace = true }
+bl_lexer = { workspace = true }
 bl_workspace = { workspace = true }
 bl_reporting = { workspace = true }
 bl_macros = { workspace = true }
