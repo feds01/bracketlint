@@ -2,7 +2,7 @@
 //! resources on the disk. This file primarily has the `generate_tests` macro
 //! that will read a directory and generate various test cases from the provided
 //! `case.hash` files and names of the directories that contain the cases.
-#![feature(iter_intersperse, proc_macro_tracked_path)]
+#![feature(iter_intersperse, proc_macro_diagnostic, proc_macro_tracked_path)]
 
 extern crate proc_macro;
 
@@ -15,8 +15,7 @@ use bl_testing_internal::metadata::{
     ParseWarning, ParsedMetadata, TestMetadata, parse_test_case_metadata,
 };
 use convert_case::{Case, Casing};
-use proc_macro::{Span, TokenStream};
-use proc_macro_error2::{Diagnostic, Level, proc_macro_error};
+use proc_macro::{Diagnostic, Level, Span, TokenStream};
 use quote::{format_ident, quote};
 use regex::Regex;
 use syn::{
@@ -108,7 +107,9 @@ fn create_test_entry_from_path(test_name: String, path: PathBuf) -> TestEntry {
             }
         };
 
-        Diagnostic::new(Level::Warning, message).help(format!("occurred at file: {path:?}")).emit();
+        Diagnostic::spanned(Span::call_site(), Level::Warning, message)
+            .help(format!("occurred at file: {path:?}"))
+            .emit();
     }
 
     TestEntry { path, test_name, metadata }
@@ -177,30 +178,27 @@ fn read_tests_from_dir(
 /// ```
 ///
 /// - `TEST_DIR` must be a string literal path, relative to the file in which
-///   the macro is invoked,
-/// which is the root directory of the test folder structure (whose name is not
-/// included in the test function names).
+///   the macro is invoked, which is the root directory of the test folder
+///   structure (whose name is not included in the test function names).
 ///
 /// - `TEST_PATTERN` must be a string literal regular expression, which should
-///   match some leaf node
-/// of the test folder structure. The generator will stop generating sub-tests
-/// for a subfolder once any file in that subfolder matches `TEST_PATTERN`. For
-/// example, if the test folder structure is such that some test folder
-/// `test_foo/` contains files `case.hash` and `output`, specifying either of `"
-/// output"` or `"case.hash"` as `TEST_PATTERN` will result in a test case being
-/// generated for `test_foo`, but no further (i.e. not `test_foo__output` or
-/// `test_foo__case__hash`).
+///   match some leaf node of the test folder structure. The generator will stop
+///   generating sub-tests for a subfolder once any file in that subfolder
+///   matches `TEST_PATTERN`. For example, if the test folder structure is such
+///   that some test folder `test_foo/` contains files `case.hash` and `output`,
+///   specifying either of `"output"` or `"case.hash"` as `TEST_PATTERN` will
+///   result in a test case being generated for `test_foo`, but no further (i.e.
+///   not `test_foo__output` or `test_foo__case__hash`).
 ///
 /// - `FN_PREFIX` is a unique prefix for the generated function in case the
-///   macro is used more than once
-/// in a single file for generating more than one test file with a potentially
-/// different internal test logic. The prefix must be a specified string
-/// literal, leaving it empty will generate the normal test name.
+///   macro is used more than once in a single file for generating more than one
+///   test file with a potentially different internal test logic. The prefix
+///   must be a specified string literal, leaving it empty will generate the
+///   normal test name.
 ///
 /// Every generated test case body will invoke this function with the
 /// appropriate [`TestingInput`](hash_testing_internal::TestingInput). Within
 /// this function, the actual test logic should be written.
-#[proc_macro_error]
 #[proc_macro]
 pub fn generate_tests(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as GenerateTestsInput);
