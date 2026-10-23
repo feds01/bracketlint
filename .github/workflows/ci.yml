@@ -38,3 +38,12 @@ jobs:
 
       - name: Check formatting
         run: "cargo fmt --all -- --check"
+
+  deny:
+    name: Dependency policy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v7
+      - name: Check licenses, advisories and sources
+        uses: EmbarkStudios/cargo-deny-action@v2
