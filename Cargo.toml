@@ -12,7 +12,9 @@ resolver = "2"
 authors = ["Alexander Fedotov <alexander.fedotov.uk@gmail.com>"]
 edition = "2024"
 license = "MIT"
+homepage = "https://github.com/feds01/bracketlint"
 repository = "https://github.com/feds01/bracketlint"
+publish = false
 
 
 [workspace.dependencies]

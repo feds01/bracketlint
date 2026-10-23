@@ -1,0 +1,56 @@
+# How `just changelog` writes CHANGELOG.md with git-cliff (https://git-cliff.org):
+# a section for each release, with an entry for each pull request merged
+# since the one before it. The entry is the pull request's title, which is a
+# conventional commit, as GitHub's merge commit keeps it. Only what users
+# notice is listed, the features, fixes, performance and documentation;
+# refactors, tests, benchmarks, builds and CI stay in the history.
+
+[changelog]
+header = """
+# Changelog
+
+What changed for bracketlint's users in each release. dist shows a release's
+section as its notes on GitHub.
+
+"""
+body = """
+{% if version -%}
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else -%}
+## Unreleased
+{% endif -%}
+{% if previous.version %}
+[Changes since {{ previous.version }}](https://github.com/feds01/bracketlint/compare/{{ previous.version }}...{{ version | default(value="HEAD") }})
+{% endif -%}
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | striptags | trim }}
+{% for commit in commits %}
+- {% if commit.breaking %}**Breaking:** {% endif -%}
+{% if commit.scope %}**{{ commit.scope }}:** {% endif -%}
+{{ commit.message }}\
+{% endfor %}
+{% endfor %}
+
+"""
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+filter_commits = true
+protect_breaking_commits = true
+tag_pattern = "v[0-9].*"
+sort_commits = "oldest"
+commit_preprocessors = [
+  # Every commit is marked, so that only merges of pull requests, which the
+  # next step rewrites to their titles, remain conventional commits.
+  { pattern = "^", replace = "commit: " },
+  { pattern = '^commit: Merge pull request #(\d+) from \S+\s+(.*)', replace = "$2 ([#$1](https://github.com/feds01/bracketlint/pull/$1))" },
+]
+commit_parsers = [
+  { message = "^feat", group = "<!-- 0 -->Features" },
+  { message = "^fix", group = "<!-- 1 -->Fixes" },
+  { message = "^perf", group = "<!-- 2 -->Performance" },
+  { message = "^docs", group = "<!-- 3 -->Documentation" },
+  { message = ".*", skip = true },
+]

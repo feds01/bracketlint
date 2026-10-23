@@ -1,0 +1,38 @@
+# Publish the Homebrew formula of a release to the tap, feds01/homebrew-tap.
+# The release workflow that dist generates calls it with the release's plan.
+name: Publish the Homebrew formula
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+
+jobs:
+  publish-homebrew-formula:
+    runs-on: ubuntu-22.04
+    env:
+      PLAN: ${{ inputs.plan }}
+    steps:
+      # This repository, for its justfile.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          path: bracketlint
+      # The tap, which the formula is pushed to.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: feds01/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          persist-credentials: true
+          path: tap
+      # The release's artifacts, the formula among them.
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: artifacts-*
+          path: tap/Formula/
+          merge-multiple: true
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+      - name: Commit and push the formula
+        run: just --justfile bracketlint/justfile publish-formula tap
