@@ -8,7 +8,13 @@
 
 Prebuilt binaries for macOS (Apple Silicon, Intel), Linux (x86_64, arm64; statically linked) and Windows ship with every [release](https://github.com/feds01/bracketlint/releases). No Rust toolchain needed.
 
-macOS / Linux:
+With [Homebrew](https://brew.sh), on macOS or Linux:
+
+```bash
+$ brew install feds01/tap/bracketlint
+```
+
+With the install script, on macOS / Linux:
 
 ```bash
 $ curl --proto '=https' --tlsv1.2 -LsSf https://github.com/feds01/bracketlint/releases/latest/download/bracketlint-installer.sh | sh
@@ -91,8 +97,6 @@ $ just bench             # run benchmarks
 
 ### Releasing
 
-Releases are built by [dist](https://github.com/axodotdev/cargo-dist) (`.github/workflows/release.yml`, config in `dist-workspace.toml`). Bump `version` in `crates/bl/Cargo.toml`, merge, then from an up-to-date `main` push a matching tag:
+Bump `version` in `crates/bl/Cargo.toml`, and with it `Cargo.lock`, and run `just changelog <version>`, which writes [CHANGELOG.md](CHANGELOG.md) with [git-cliff](https://git-cliff.org) from the titles of the pull requests merged since the last release (see [cliff.toml](cliff.toml)). Merge that to `main`, then run `just release` to tag it. [dist](https://github.com/axodotdev/cargo-dist) (`.github/workflows/release.yml`, configured in `dist-workspace.toml`) builds the binaries and installers, and publishes the GitHub release, with the release's section of the changelog as its notes, and the Homebrew formula, to [feds01/homebrew-tap](https://github.com/feds01/homebrew-tap).
 
-```bash
-$ just release   # tags v<version> from crates/bl/Cargo.toml and pushes it
-```
+A pull request's title is its entry in the changelog, so write it as a conventional commit, as in `feat(parse): …`. Features, fixes, performance and documentation are listed; other types are not.

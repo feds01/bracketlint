@@ -8,7 +8,12 @@ cargo-dist-version = "0.33.0"
 # CI backends to support
 ci = "github"
 # The installers to generate for each app
-installers = ["shell", "powershell"]
+installers = ["shell", "powershell", "homebrew"]
+# The Homebrew tap that the formula is published to: `brew install feds01/tap/bracketlint`
+tap = "feds01/homebrew-tap"
+# Publish the Homebrew formula with each release, by our own job, which runs
+# `just publish-formula`.
+publish-jobs = ["./publish-homebrew"]
 # Target platforms to build apps for (Rust target-triple syntax)
 targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-musl", "x86_64-apple-darwin", "x86_64-unknown-linux-musl", "x86_64-pc-windows-msvc"]
 # Path that installers should place binaries in
@@ -19,3 +24,12 @@ hosting = "github"
 install-updater = false
 # Only run the release workflow for release tags, never on PRs
 pr-run-mode = "skip"
+
+# The permissions of our publish job, which pushes to the tap with its own token.
+[dist.github-custom-job-permissions]
+"publish-homebrew" = { contents = "read" }
+
+# The versions of the GitHub actions that the release workflow uses
+[dist.github-action-commits]
+# v7.0.1
+"actions/checkout" = "3d3c42e5aac5ba805825da76410c181273ba90b1"

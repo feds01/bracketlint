@@ -5,7 +5,14 @@ description = "A linter and formatter for Django, Jinja, Liquid, Nunjucks and Tw
 authors = { workspace = true }
 edition = { workspace = true }
 license = { workspace = true }
+homepage = { workspace = true }
 repository = { workspace = true }
+publish = { workspace = true }
+
+# `publish = false` keeps the crate off crates.io; it must still be released
+# by cargo-dist.
+[package.metadata.dist]
+dist = true
 
 [dependencies]
 bl_arena = { workspace = true }
