@@ -1,0 +1,22 @@
+info: parsed module '$DIR/loop_conditional_iterator_twig.html' as twig:
+body
+└─for
+  ├─target
+  │ └─name "x"
+  ├─iterator
+  │ └─cond_expr
+  │   ├─condition
+  │   │ └─var_expr
+  │   │   └─name "a"
+  │   ├─then
+  │   │ └─var_expr
+  │   │   └─name "b"
+  │   └─otherwise
+  │     └─var_expr
+  │       └─name "c"
+  └─loop_body
+    └─body
+      └─inline
+        └─var_expr
+          └─name "x"
+

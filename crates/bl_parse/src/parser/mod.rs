@@ -2026,14 +2026,16 @@ impl<'s, 'a> Parser<'s, 'a> {
                 g.parse_token(TokenKind::Keyword(Keyword::In))?;
 
                 // The iterator can have operators in [Jinja], [Nunjucks] and
-                // [Twig], e.g. `{% for i in 1..n %}`, but isn't a conditional
-                // expression, since an `if` after it is the loop's filter in
-                // Jinja.
+                // [Twig], e.g. `{% for i in 1..n %}`. It can be a conditional
+                // expression in Nunjucks and Twig, but not in Jinja, since an
+                // `if` after it is the loop's filter there.
                 //
                 // [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L240-L243
                 // [Nunjucks]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/parser.js#L191
                 // [Twig]: https://github.com/twigphp/Twig/blob/v3.30.0/src/TokenParser/ForTokenParser.php#L39-L40
-                let iterator = if g.options.dialect.loop_iterator_takes_operators() {
+                let iterator = if g.options.dialect.loop_iterator_takes_conditionals() {
+                    g.parse_compound_expr(ast::Dialect::CONDITIONAL_BINDING_POWER)?
+                } else if g.options.dialect.loop_iterator_takes_operators() {
                     g.parse_compound_expr(ast::Dialect::CONDITIONAL_BINDING_POWER + 1)?
                 } else {
                     g.parse_expr()?
