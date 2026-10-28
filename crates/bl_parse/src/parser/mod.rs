@@ -2338,7 +2338,10 @@ impl<'s, 'a> Parser<'s, 'a> {
         };
 
         let clauses = self.nodes_with_joined_span(clauses, start);
-        let if_block = ast::If { clauses, otherwise, else_trim, end_trim, else_markup, end_markup };
+        let if_block = self.node_with_joined_span(
+            ast::If { clauses, otherwise, else_trim, end_trim, else_markup, end_markup },
+            start,
+        );
         Ok(self.node_with_joined_span(ast::Statement::Tag(ast::Tag::If(if_block)), start))
     }
 
@@ -2984,15 +2987,16 @@ impl<'s, 'a> Parser<'s, 'a> {
             },
         )?;
 
-        Ok(self.node_with_joined_span(
-            ast::Statement::Tag(ast::Tag::Capture(ast::Capture {
+        let capture = self.node_with_joined_span(
+            ast::Capture {
                 name,
                 block_body,
                 trim: ast::TrimTag { start: trim, end: end_trim },
                 end_markup,
-            })),
+            },
             token.span,
-        ))
+        );
+        Ok(self.node_with_joined_span(ast::Statement::Tag(ast::Tag::Capture(capture)), token.span))
     }
 
     /// Parse an [`extends`] statement, i.e.

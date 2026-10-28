@@ -664,6 +664,9 @@ define_tree! {
     /// in the tree in their place, without them in its span, and the span of
     /// the expression around it covers them.
     ///
+    /// ##Note: The expressions that are much larger than the others are behind
+    /// an [AstNode], so that an [Expr] stays small, as a [Tag] does.
+    ///
     /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#logic
     /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#logic
     /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#logic
@@ -682,7 +685,7 @@ define_tree! {
         Bin(BinExpr),
         Var(VarExpr),
         Call(CallExpr),
-        MacroCall(MacroCallExpr),
+        MacroCall(Child!(MacroCallExpr)),
         Access(AccessExpr),
         Index(IndexExpr),
         FilteredExpr(FilteredExpr),
@@ -1267,7 +1270,7 @@ define_tree! {
         Assignment(Assignment),
 
         /// The `{% macro name() %}` tag, ending with `{% endmacro %}`
-        MacroDef(MacroDef),
+        MacroDef(Child!(MacroDef)),
 
         /// The `{% include "file" %}` tag
         Include(Include),
@@ -1279,7 +1282,7 @@ define_tree! {
         Import(Import),
 
         /// The `{% if condition %}` tag
-        If(If),
+        If(Child!(If)),
 
         /// The `{% for item in items %}` tag
         For(Child!(For)),
@@ -1304,7 +1307,7 @@ define_tree! {
         /// `{% endcapture %}`
         ///
         /// [Liquid]: https://shopify.github.io/liquid/tags/variable/#capture
-        Capture(Capture),
+        Capture(Child!(Capture)),
 
         /// The [Liquid] `{% liquid %}` tag, with a tag on each of its lines
         ///

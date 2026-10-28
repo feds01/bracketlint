@@ -1034,7 +1034,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             bl_ast::Tag::Block(block) => self.visit_block(block.ast_ref()),
             bl_ast::Tag::With(with) => self.visit_with(with.ast_ref()),
             bl_ast::Tag::Extends(extends) => self.visit_extends(node.with_body(extends)),
-            bl_ast::Tag::If(if_block) => self.visit_if(node.with_body(if_block)),
+            bl_ast::Tag::If(if_block) => self.visit_if(if_block.ast_ref()),
             bl_ast::Tag::For(for_loop) => self.visit_for(for_loop.ast_ref()),
             bl_ast::Tag::Case(case) => self.visit_case(case.ast_ref()),
             bl_ast::Tag::Guard(guard) => self.visit_guard(guard.ast_ref()),
