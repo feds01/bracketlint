@@ -1,0 +1,6 @@
+info: parsed module '$DIR/parentheses_call_jinja.html' as jinja:
+body
+└─inline
+  └─var_expr
+    └─name "x"
+

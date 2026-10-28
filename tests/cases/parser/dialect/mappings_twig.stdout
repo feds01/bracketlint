@@ -77,9 +77,8 @@ body
   └─mapping_expr
     ├─pair
     │ ├─key
-    │ │ └─group_expr
-    │ │   └─var_expr
-    │ │     └─name "key"
+    │ │ └─var_expr
+    │ │   └─name "key"
     │ └─value
     │   └─lit_expr
     │     └─str_lit 'value'

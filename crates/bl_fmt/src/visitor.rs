@@ -348,6 +348,56 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         self.push_hunk(source);
     }
 
+    /// Visit `expr`, which a tag holds whole, e.g. the condition of an
+    /// `{% if %}`, in the parentheses that group it, e.g. `(a or b)` rather
+    /// than `a or b` in `{{ (a or b) }}`. The tree has no node for them, see
+    /// [bl_ast::Expr], so they are found in the source around the expression.
+    fn visit_tag_expr(&mut self, expr: bl_ast::AstNodeRef<bl_ast::Expr>) -> FmtResult<()> {
+        let inner = expr.range();
+        let outer = self.with_parentheses(inner);
+
+        if outer != inner {
+            self.push_source(ByteRange::new(outer.start(), inner.start() - 1));
+        }
+
+        self.visit_expr(expr)?;
+
+        if outer != inner {
+            self.push_source(ByteRange::new(inner.end() + 1, outer.end()));
+        }
+
+        Ok(())
+    }
+
+    /// The range of the expression at `range` with the parentheses that group
+    /// it, see [Formatter::visit_tag_expr].
+    ///
+    /// ##Note: Any `(` before the expression and `)` after it are taken to
+    /// group it, which only holds for an expression that a tag holds whole. In
+    /// `f(a)`, they are the call's.
+    fn with_parentheses(&self, mut range: ByteRange) -> ByteRange {
+        // Parentheses only group an expression in [Jinja], [Nunjucks] and
+        // [Twig].
+        //
+        // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#logic
+        // [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#logic
+        // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#logic
+        if !self.ctx.dialect.has_grouping() {
+            return range;
+        }
+
+        let source = self.ctx.source.source;
+        loop {
+            let before = source[..range.start()].trim_end();
+            let after = source[range.end() + 1..].trim_start();
+            if !(before.ends_with('(') && after.starts_with(')')) {
+                return range;
+            }
+
+            range = ByteRange::new(before.len() - 1, source.len() - after.len());
+        }
+    }
+
     /// Run a function with an increased indent level.
     ///
     /// Assume that the formatter function is called within a block, meaning
@@ -655,7 +705,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
             // Format the tag on its own, to know how wide it is.
             let bl_ast::Inline { expr, trim } = inline;
             let len = self.buffer.len();
-            self.within_tag(TagKind::Inline, *trim, |this| this.visit_expr(expr.ast_ref()))?;
+            self.within_tag(TagKind::Inline, *trim, |this| this.visit_tag_expr(expr.ast_ref()))?;
             let tag = self.buffer.split_off(len);
 
             let word = text.len();
@@ -1087,7 +1137,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             this.push_hunk("with");
             if let Some(value) = value {
                 this.push_hunk(" ");
-                this.push_source(value.range());
+                this.visit_tag_expr(value.ast_ref())?;
                 if *only {
                     this.push_hunk(" only");
                 }
@@ -1141,7 +1191,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             this.push_hunk(" ");
             this.push_source(target.ast_ref().range());
             this.push_hunk(" in ");
-            this.visit_expr(iterator.ast_ref())?;
+            this.visit_tag_expr(iterator.ast_ref())?;
 
             // Keep the modifiers in the order they are written, e.g. `reversed`
             // and `limit: 2` in Liquid, which come before the guard.
@@ -1161,7 +1211,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             // Check if we have an if guard on the loop itself.
             if let Some(guard) = guard {
                 this.push_hunk(" if ");
-                this.visit_expr(guard.ast_ref())?;
+                this.visit_tag_expr(guard.ast_ref())?;
             }
 
             Ok(())
@@ -1256,7 +1306,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
                 }
                 bl_ast::ClauseKind::Unless => this.push_hunk("unless "),
             }
-            this.visit_expr(condition.ast_ref())
+            this.visit_tag_expr(condition.ast_ref())
         })?;
         self.end_line();
 
@@ -1280,7 +1330,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         self.start_item(node.range().start());
         self.within_tag(TagKind::Block, trim.start, |this| {
             this.push_hunk("case ");
-            this.visit_expr(subject.ast_ref())
+            this.visit_tag_expr(subject.ast_ref())
         })?;
         self.end_line();
 
@@ -1459,7 +1509,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         // line break can matter, e.g. after a `//` comment in a script.
         self.start_item(start);
         self.within_tag(TagKind::Inline, *trim, |this| {
-            this.visit_expr(expr.ast_ref())?;
+            this.visit_tag_expr(expr.ast_ref())?;
             Ok(())
         })
     }
@@ -1474,7 +1524,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
 
         self.within_tag(TagKind::Block, *trim, |this| {
             this.push_hunk("extends ");
-            this.visit_expr(template.ast_ref())
+            this.visit_tag_expr(template.ast_ref())
         })?;
         self.end_line();
 

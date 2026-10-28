@@ -3,4 +3,10 @@
 {% if (a) %}
     <p>{{ post.render( user ) }}</p>
 {% endif %}
+{% for x in (a if b else c) %}
+    <p>{{ x }}</p>
+{% endfor %}
+{% for x in (items) if (x.visible) %}
+    <p>{{ (x.name) }}</p>
+{% endfor %}
 

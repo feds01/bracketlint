@@ -3,15 +3,14 @@ body
 ├─inline
 │ └─bin_expr
 │   ├─lhs
-│   │ └─group_expr
-│   │   └─bin_expr
-│   │     ├─lhs
-│   │     │ └─var_expr
-│   │     │   └─name "a"
-│   │     ├─operator `or`
-│   │     └─rhs
-│   │       └─var_expr
-│   │         └─name "b"
+│   │ └─bin_expr
+│   │   ├─lhs
+│   │   │ └─var_expr
+│   │   │   └─name "a"
+│   │   ├─operator `or`
+│   │   └─rhs
+│   │     └─var_expr
+│   │       └─name "b"
 │   ├─operator `and`
 │   └─rhs
 │     └─var_expr
@@ -24,15 +23,14 @@ body
 │     │   ├─lhs
 │     │   │ └─bin_expr
 │     │   │   ├─lhs
-│     │   │   │ └─group_expr
-│     │   │   │   └─bin_expr
-│     │   │   │     ├─lhs
-│     │   │   │     │ └─var_expr
-│     │   │   │     │   └─name "a"
-│     │   │   │     ├─operator `+`
-│     │   │   │     └─rhs
-│     │   │   │       └─var_expr
-│     │   │   │         └─name "b"
+│     │   │   │ └─bin_expr
+│     │   │   │   ├─lhs
+│     │   │   │   │ └─var_expr
+│     │   │   │   │   └─name "a"
+│     │   │   │   ├─operator `+`
+│     │   │   │   └─rhs
+│     │   │   │     └─var_expr
+│     │   │   │       └─name "b"
 │     │   │   ├─operator `*`
 │     │   │   └─rhs
 │     │   │     └─var_expr
@@ -46,9 +44,8 @@ body
 ├─inline
 │ └─filtered_expr
 │   ├─subject
-│   │ └─group_expr
-│   │   └─var_expr
-│   │     └─name "name"
+│   │ └─var_expr
+│   │   └─name "name"
 │   └─filter
 │     ├─name "upper"
 │     └─args

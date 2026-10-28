@@ -1002,8 +1002,11 @@ impl<'s, 'a> Parser<'s, 'a> {
         }
 
         // A name that is followed by anything other than an operator, e.g.
-        // `{{ x "a" b=c }}`, is called with the rest as its arguments.
-        if !self.exhausted() && subject.body.is_var() {
+        // `{{ x "a" b=c }}`, is called with the rest as its arguments. A name
+        // in parentheses, e.g. `(x)`, is a name in the tree too, but its span
+        // leaves out the parentheses that `subject_span` covers, and it isn't
+        // called.
+        if !self.exhausted() && subject.body.is_var() && subject.range() == subject_span {
             // This might be a call expression, try and parse the arguments
             let args = self.parse_args()?;
 
@@ -1192,7 +1195,7 @@ impl<'s, 'a> Parser<'s, 'a> {
             //
             // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#logic
             // [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#logic
-            // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#operators
+            // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#logic
             TokenKind::Tree(Delimiter::Paren, _) if self.options.dialect.has_grouping() => {
                 return self.parse_parenthesised_expr(token);
             }
@@ -1468,10 +1471,11 @@ impl<'s, 'a> Parser<'s, 'a> {
     }
 
     /// Parse an expression in parentheses, e.g. `(a or b)`, which groups it.
-    /// In [Jinja], items separated by commas are a tuple instead, e.g.
-    /// `('a', 'b')`, as are `()` and a single item with a comma after it. In
-    /// [Nunjucks], they are a group of several expressions, e.g.
-    /// `(rows.unshift(row), rows)`, which is a tuple here too.
+    /// The tree has no node for the parentheses, see [ast::Expr], so this is
+    /// the expression in them. In [Jinja], items separated by commas are a
+    /// tuple instead, e.g. `('a', 'b')`, as are `()` and a single item with a
+    /// comma after it. In [Nunjucks], they are a group of several expressions,
+    /// e.g. `(rows.unshift(row), rows)`, which is a tuple here too.
     ///
     /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L685-L752
     /// [Nunjucks]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/parser.js#L1147-L1176
@@ -1488,9 +1492,7 @@ impl<'s, 'a> Parser<'s, 'a> {
             if !(tuples && g.exhausted()) {
                 let expr = g.parse_compound_expr(0)?;
                 if !(tuples && g.peek_kind() == Some(TokenKind::Comma)) {
-                    return Ok(
-                        g.node_with_span(ast::Expr::Group(ast::GroupExpr { expr }), token.span)
-                    );
+                    return Ok(expr);
                 }
 
                 items.push(expr);

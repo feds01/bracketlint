@@ -1,7 +1,6 @@
 info: parsed module '$DIR/parentheses_twig_tuple.html' as twig:
 body
 └─inline
-  └─group_expr
-    └─var_expr
-      └─name "a"
+  └─var_expr
+    └─name "a"
 

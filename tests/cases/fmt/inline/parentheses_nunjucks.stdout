@@ -1,0 +1,8 @@
+{% extends ('base.njk') %}
+<p>{{ (a or b) }}</p>
+{% if a %}
+    <p>a</p>
+{% elif (b) %}
+    <p>b</p>
+{% endif %}
+

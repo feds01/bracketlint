@@ -14,25 +14,23 @@ body
             ├─condition
             │ └─bin_expr
             │   ├─lhs
-            │   │ └─group_expr
-            │   │   └─bin_expr
-            │   │     ├─lhs
-            │   │     │ └─index_expr
-            │   │     │   ├─subject
-            │   │     │   │ └─var_expr
-            │   │     │   │   └─name "content"
-            │   │     │   └─index
-            │   │     │     └─lit_expr
-            │   │     │       └─int_lit 1
-            │   │     ├─operator `==`
-            │   │     └─rhs
-            │   │       └─lit_expr
-            │   │         └─str_lit ""
+            │   │ └─bin_expr
+            │   │   ├─lhs
+            │   │   │ └─index_expr
+            │   │   │   ├─subject
+            │   │   │   │ └─var_expr
+            │   │   │   │   └─name "content"
+            │   │   │   └─index
+            │   │   │     └─lit_expr
+            │   │   │       └─int_lit 1
+            │   │   ├─operator `==`
+            │   │   └─rhs
+            │   │     └─lit_expr
+            │   │       └─str_lit ""
             │   ├─operator `or`
             │   └─rhs
-            │     └─group_expr
-            │       └─var_expr
-            │         └─name "skip"
+            │     └─var_expr
+            │       └─name "skip"
             └─clause_body
               └─body
                 └─continue

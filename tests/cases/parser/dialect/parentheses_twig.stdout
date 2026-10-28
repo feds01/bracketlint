@@ -3,15 +3,14 @@ body
 ├─inline
 │ └─bin_expr
 │   ├─lhs
-│   │ └─group_expr
-│   │   └─bin_expr
-│   │     ├─lhs
-│   │     │ └─var_expr
-│   │     │   └─name "a"
-│   │     ├─operator `or`
-│   │     └─rhs
-│   │       └─var_expr
-│   │         └─name "b"
+│   │ └─bin_expr
+│   │   ├─lhs
+│   │   │ └─var_expr
+│   │   │   └─name "a"
+│   │   ├─operator `or`
+│   │   └─rhs
+│   │     └─var_expr
+│   │       └─name "b"
 │   ├─operator `and`
 │   └─rhs
 │     └─var_expr
@@ -19,15 +18,14 @@ body
 ├─inline
 │ └─filtered_expr
 │   ├─subject
-│   │ └─group_expr
-│   │   └─bin_expr
-│   │     ├─lhs
-│   │     │ └─lit_expr
-│   │     │   └─str_lit 'HELLO'
-│   │     ├─operator `~`
-│   │     └─rhs
-│   │       └─var_expr
-│   │         └─name "name"
+│   │ └─bin_expr
+│   │   ├─lhs
+│   │   │ └─lit_expr
+│   │   │   └─str_lit 'HELLO'
+│   │   ├─operator `~`
+│   │   └─rhs
+│   │     └─var_expr
+│   │       └─name "name"
 │   └─filter
 │     ├─name "lower"
 │     └─args
@@ -37,15 +35,14 @@ body
       ├─condition
       │ └─unary_expr
       │   ├─unary operator `not`
-      │   └─group_expr
-      │     └─bin_expr
-      │       ├─lhs
-      │       │ └─var_expr
-      │       │   └─name "a"
-      │       ├─operator `==`
-      │       └─rhs
-      │         └─var_expr
-      │           └─name "b"
+      │   └─bin_expr
+      │     ├─lhs
+      │     │ └─var_expr
+      │     │   └─name "a"
+      │     ├─operator `==`
+      │     └─rhs
+      │       └─var_expr
+      │         └─name "b"
       └─clause_body
         └─body
 

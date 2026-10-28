@@ -332,7 +332,7 @@ impl Dialect {
     ///
     /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#logic
     /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#logic
-    /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#operators
+    /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#logic
     pub fn has_grouping(self) -> bool {
         matches!(self, Dialect::Jinja | Dialect::Nunjucks | Dialect::Twig)
     }
