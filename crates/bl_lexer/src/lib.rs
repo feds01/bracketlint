@@ -5,8 +5,6 @@
 pub mod diagnostics;
 pub mod token;
 
-use std::cell::Cell;
-
 use bl_ast::{BinOp, ByteRange, Dialect, Keyword, SourceId, Span, SpannedSource};
 use bl_reporting::DiagnosticsMut;
 use diagnostics::{LexerDiagnostics, LexerError, LexerErrorKind};
@@ -20,6 +18,22 @@ const EOF_CHAR: char = '\0';
 /// up front, so that the tokens rarely need to grow. Half of real-world
 /// templates have more than 13 bytes per token, and the densest about 4.
 const BYTES_PER_TOKEN: usize = 8;
+
+/// A table of whether each byte is one that the closure accepts, so that a byte
+/// is looked up with one load.
+macro_rules! byte_table {
+    (|$byte:ident| $accepts:expr) => {{
+        let mut table = [false; 256];
+        let mut index = 0;
+        while index < table.len() {
+            let $byte = index as u8;
+            table[index] = $accepts;
+            index += 1;
+        }
+
+        table
+    }};
+}
 
 /// Information about a tree that is being lexed by the [Lexer]. Includes
 /// information about the start of the lexer (in the token buffer), and if the
@@ -64,11 +78,11 @@ pub struct Lexer<'lex> {
     pub spanned: SpannedSource<'lex>,
 
     /// Location of the lexer in the current stream.
-    offset: Cell<usize>,
+    offset: usize,
 
     /// The offset that the lexer stops at, which is the end of the source,
     /// except while it lexes a line of a Liquid `{% liquid %}` tag.
-    end: Cell<usize>,
+    end: usize,
 
     /// The ID of the member that the lexer is processing, useful for error
     /// reporting.
@@ -82,12 +96,12 @@ pub struct Lexer<'lex> {
 
     pub has_fatal_error: bool,
 
-    tree: Cell<Option<TreeInfo>>,
+    tree: Option<TreeInfo>,
 
     /// Whether the next token is the file that an `include` names, which can
     /// be a path, since the token before it is the tag's name, see
     /// [Lexer::at_include_path].
-    path_next: Cell<bool>,
+    path_next: bool,
 
     /// The tokens that the lexer has produced.
     pub tokens: Vec<Token>,
@@ -95,17 +109,31 @@ pub struct Lexer<'lex> {
 
 impl<'lex> Lexer<'lex> {
     pub fn new(spanned: SpannedSource<'lex>, id: SourceId, dialect: Dialect) -> Self {
+        Self::with_buffer(spanned, id, dialect, Vec::new())
+    }
+
+    /// Create a lexer that pushes its tokens to `buffer`, after clearing it,
+    /// so that the memory of a buffer that lexed another source is reused.
+    pub fn with_buffer(
+        spanned: SpannedSource<'lex>,
+        id: SourceId,
+        dialect: Dialect,
+        mut buffer: Vec<Token>,
+    ) -> Self {
+        buffer.clear();
+        buffer.reserve(spanned.source.len() / BYTES_PER_TOKEN);
+
         Self {
             id,
             dialect,
             spanned,
             diagnostics: LexerDiagnostics::default(),
-            tokens: Vec::with_capacity(spanned.source.len() / BYTES_PER_TOKEN),
+            tokens: buffer,
             has_fatal_error: false,
-            tree: Cell::new(None),
-            offset: Cell::new(0),
-            end: Cell::new(spanned.source.len()),
-            path_next: Cell::new(false),
+            tree: None,
+            offset: 0,
+            end: spanned.source.len(),
+            path_next: false,
         }
     }
 
@@ -127,12 +155,19 @@ impl<'lex> Lexer<'lex> {
         TokenKind::Err
     }
 
-    /// Moves to the next character.
+    /// Moves to the next character. It is almost always ASCII, so its byte is
+    /// read directly, and only a character of several bytes is decoded.
     #[inline]
     fn next(&mut self) -> Option<char> {
         let slice = unsafe { self.as_slice() };
+        let &byte = slice.as_bytes().first()?;
+        if byte.is_ascii() {
+            self.offset += 1;
+            return Some(char::from(byte));
+        }
+
         let ch = slice.chars().next()?;
-        self.offset.update(|x| x + ch.len_utf8());
+        self.offset += ch.len_utf8();
         Some(ch)
     }
 
@@ -140,10 +175,16 @@ impl<'lex> Lexer<'lex> {
     /// If requested position doesn't exist, `EOF_CHAR` is returned.
     /// However, getting `EOF_CHAR` doesn't always mean actual end of file,
     /// it should be checked with `is_eof` method.
+    #[inline]
     fn nth_char(&self, n: usize) -> char {
         let slice = unsafe { self.as_slice() };
 
-        slice.chars().nth(n).unwrap_or(EOF_CHAR)
+        // The characters up to the `n`th are almost always ASCII, and then the
+        // `n`th is the `n`th byte.
+        match slice.as_bytes().get(..=n) {
+            Some(bytes) if bytes.is_ascii() => char::from(bytes[n]),
+            _ => slice.chars().nth(n).unwrap_or(EOF_CHAR),
+        }
     }
 
     /// Peeks the next symbol from the input stream without consuming it.
@@ -159,49 +200,44 @@ impl<'lex> Lexer<'lex> {
     }
 
     #[inline]
-    fn skip_ascii(&self) {
-        self.offset.update(|x| x + 1);
+    fn skip_ascii(&mut self) {
+        self.offset += 1;
     }
 
     /// Get the remaining un-lexed contents as a raw string.
     #[inline]
-    unsafe fn as_slice(&self) -> &str {
-        let offset = self.offset.get();
+    unsafe fn as_slice(&self) -> &'lex str {
+        let offset = self.offset;
 
         // ##Safety: We rely that the byte offset is correctly computed when stepping
         // over the characters in the iterator.
         unsafe {
             std::str::from_utf8_unchecked(
-                self.spanned.source.as_bytes().get_unchecked(offset..self.end.get()),
+                self.spanned.source.as_bytes().get_unchecked(offset..self.end),
             )
         }
     }
 
     /// Checks if there is nothing more to consume.
     fn is_eof(&self) -> bool {
-        self.end.get() == self.offset.get()
+        self.end == self.offset
     }
 
     /// Returns amount of already consumed symbols.
     #[inline(always)]
     fn len_consumed(&self) -> usize {
-        self.offset.get() - 1
+        self.offset - 1
     }
 
     /// Skip the whitespace before the next token. It is almost always ASCII,
     /// so its bytes are checked directly, up to the first non-ASCII byte, from
     /// where [char::is_whitespace] decides.
-    fn skip_whitespace(&self) {
+    fn skip_whitespace(&mut self) {
         let rest = unsafe { self.as_slice() }.as_bytes();
+        let len =
+            rest.iter().position(|&byte| !WHITESPACE[usize::from(byte)]).unwrap_or(rest.len());
 
-        // The ASCII characters that `char::is_whitespace` accepts, which include
-        // the vertical tab that `u8::is_ascii_whitespace` leaves out.
-        let len = rest
-            .iter()
-            .position(|byte| !matches!(byte, b' ' | b'\t' | b'\n' | b'\x0B' | b'\x0C' | b'\r'))
-            .unwrap_or(rest.len());
-
-        self.offset.update(|x| x + len);
+        self.offset += len;
 
         if rest.get(len).is_some_and(|byte| !byte.is_ascii()) {
             self.eat_while_and_discard(char::is_whitespace);
@@ -212,41 +248,48 @@ impl<'lex> Lexer<'lex> {
     /// encounters whilst eating the input, this is useful because in some
     /// cases we don't want to preserve what the token represents, such as
     /// comments or white-spaces...
-    fn eat_while_and_discard(&self, mut condition: impl FnMut(char) -> bool) {
+    fn eat_while_and_discard(&mut self, mut condition: impl FnMut(char) -> bool) {
         if self.is_eof() {
             return;
         }
 
         let slice = unsafe { self.as_slice() };
         let index = slice.find(|c| !condition(c)).unwrap_or(slice.len());
-        self.offset.update(|x| x + index);
+        self.offset += index;
     }
 
     /// Eat while the condition holds, and produces a slice from where it began
     /// to eat the input and where it finished, this is sometimes beneficial
     /// as the slice doesn't have to be re-allocated as a string.
-    fn eat_while_and_slice(&self, condition: impl FnMut(char) -> bool) -> &str {
+    fn eat_while_and_slice(&mut self, condition: impl FnMut(char) -> bool) -> &'lex str {
         if self.is_eof() {
             return "";
         }
 
         // Capture the range of the slice, and then finally update the offset
-        let start = self.offset.get();
+        let start = self.offset;
         self.eat_while_and_discard(condition);
-        let consumed = self.offset.get();
+        let consumed = self.offset;
         let end = if consumed == start { start } else { consumed - 1 };
 
         self.spanned.hunk(ByteRange::new(start, end))
     }
 
-    pub fn advance_token(&mut self) -> Option<Token> {
+    /// Lex the next token, or the next tree with each of its tokens, and push
+    /// them. Returns whether there was one, and so `false` at the end of the
+    /// source or of the tree being lexed, or after a fatal error.
+    ///
+    /// ##Note: The tokens are pushed here, rather than returned, so that the
+    /// token after a tree is lexed by the loop that lexed the tree's opener,
+    /// rather than by a recursive call that returns it.
+    fn advance_token(&mut self) -> bool {
         // First, discard all of the white-space characters that we encounter
         // before we start lexing the next token.
         self.skip_whitespace();
 
         // Record where the token starts, and then we can start lexing the
         // token.
-        let offset = self.offset.get();
+        let offset = self.offset;
 
         let on_tree = |this: &mut Self, delimiter: Delimiter| {
             // The length and the span of the tree are set once it closes.
@@ -256,7 +299,7 @@ impl<'lex> Lexer<'lex> {
             this.eat_token_tree(delimiter);
 
             if this.has_fatal_error {
-                return None;
+                return false;
             }
 
             // The contents of a `{% raw %}` block, as in [Jinja], [Liquid] and
@@ -285,59 +328,64 @@ impl<'lex> Lexer<'lex> {
                 this.hunk("enddoc");
             }
 
-            // Immediately try to index the next token...
-            this.advance_token()
+            true
         };
 
-        // Each line of a `liquid` tag is a tag without delimiters, or a comment
-        // if it starts with `#`.
-        if let Some(info) = self.tree.get()
+        // Each line of a [`liquid`] tag, which only Liquid has, is a tag without
+        // delimiters, or a comment if it starts with `#`.
+        //
+        // [`liquid`]: https://shopify.github.io/liquid/tags/template/#liquid
+        if self.dialect.has_liquid_tag()
+            && let Some(info) = self.tree
             && self.at_liquid_line(info)
         {
             if self.peek() != '#' {
                 return on_tree(self, Delimiter::Line);
             }
 
-            self.offset.set(self.line_end());
-            return Some(Token::new(
-                TokenKind::Comment,
-                ByteRange::new(offset, self.len_consumed()),
-            ));
+            self.offset = self.line_end();
+            let span = ByteRange::new(offset, self.len_consumed());
+            self.tokens.push(Token::new(TokenKind::Comment, span));
+            return true;
         }
 
-        let kind = if self.path_next.take() && self.at_include_path() {
+        let kind = if std::mem::take(&mut self.path_next) && self.at_include_path() {
             self.include_path()
-        } else if let Some(mut info) = self.tree.get() {
-            match self.next()? {
+        } else if let Some(mut info) = self.tree {
+            let Some(c) = self.next() else {
+                return false;
+            };
+
+            match c {
                 '%' => match self.peek() {
                     '}' => {
                         info.delimiter = Some(Delimiter::Percent);
-                        self.tree.set(Some(info));
+                        self.tree = Some(info);
 
                         self.skip_ascii();
-                        return None;
+                        return false;
                     }
                     _ => TokenKind::Percent,
                 },
                 // A `}` closes a mapping, e.g. the first in `{a: {b: 1}}`.
                 '}' if info.opener == Delimiter::Curly => {
                     info.delimiter = Some(Delimiter::Curly);
-                    self.tree.set(Some(info));
-                    return None;
+                    self.tree = Some(info);
+                    return false;
                 }
                 '}' => match self.peek() {
                     '}' => {
                         info.delimiter = Some(Delimiter::Brace);
-                        self.tree.set(Some(info));
+                        self.tree = Some(info);
                         self.skip_ascii();
-                        return None;
+                        return false;
                     }
                     _ => TokenKind::RightDelim(Delimiter::Brace),
                 },
                 c @ (')' | ']') => {
                     info.delimiter = Some(Delimiter::try_from(c).unwrap());
-                    self.tree.set(Some(info));
-                    return None;
+                    self.tree = Some(info);
+                    return false;
                 }
                 ch @ ('(' | '[') => {
                     return on_tree(self, Delimiter::try_from(ch).unwrap());
@@ -465,7 +513,11 @@ impl<'lex> Lexer<'lex> {
                 c => TokenKind::Unexpected(c),
             }
         } else {
-            match self.next()? {
+            let Some(c) = self.next() else {
+                return false;
+            };
+
+            match c {
                 '{' => {
                     // we need to handle whether this a variable block, we have a few options:
                     //
@@ -500,9 +552,9 @@ impl<'lex> Lexer<'lex> {
             }
         };
 
-        // If we reach here, that means we can return a token.
         let location = ByteRange::new(offset, self.len_consumed());
-        Some(Token::new(kind, location))
+        self.tokens.push(Token::new(kind, location));
+        true
     }
 
     /// This will essentially recursively consume tokens until it reaches the
@@ -512,7 +564,7 @@ impl<'lex> Lexer<'lex> {
     /// behaviour is desired and avoids performing complex delimiter depth
     /// analysis later on.
     fn eat_token_tree(&mut self, delimiter: Delimiter) -> TokenKind {
-        let delim_offset = self.offset.get() - delimiter.width(); // we need to ge the previous location to accurately denote the error...
+        let delim_offset = self.offset - delimiter.width(); // we need to ge the previous location to accurately denote the error...
 
         // A whitespace control marker belongs to the delimiter before it, e.g.
         // the `-` in `{%-`. The markers are all ASCII.
@@ -524,40 +576,38 @@ impl<'lex> Lexer<'lex> {
 
         // A line of a `liquid` tag has no closing delimiter, and ends at the end
         // of the line instead.
-        let end = self.end.get();
+        let end = self.end;
         if delimiter == Delimiter::Line {
-            self.end.set(self.line_end());
+            self.end = self.line_end();
         }
 
         // we need to reset self.prev here as it might be polluted with previous token
         // trees
-        let tree = Cell::new(Some(TreeInfo {
+        let outer = self.tree.replace(TreeInfo {
             start: self.tokens.len(),
             opener: delimiter,
             delimiter: None,
-        }));
-        self.tree.swap(&tree);
+        });
 
         // `None` here doesn't just mean EOF, it could also be that
         // the next token failed to be parsed.
         while !self.is_eof() {
             match self.advance_token() {
-                Some(token) => self.tokens.push(token),
+                true => {}
                 // A closing delimiter in a line closes nothing, e.g. the `)` in
                 // `echo total)`, and the rest of the line is still lexed.
-                None if delimiter == Delimiter::Line => {
-                    let Some(TreeInfo { delimiter: Some(closer), start, opener }) = self.tree.get()
+                false if delimiter == Delimiter::Line => {
+                    let Some(TreeInfo { delimiter: Some(closer), start, opener }) = self.tree
                     else {
                         break;
                     };
 
-                    let span =
-                        ByteRange::new(self.offset.get() - closer.width(), self.len_consumed());
+                    let span = ByteRange::new(self.offset - closer.width(), self.len_consumed());
                     let kind = self.emit_error(LexerErrorKind::UnexpectedClose(closer), span);
                     self.tokens.push(Token::new(kind, span));
-                    self.tree.set(Some(TreeInfo { start, opener, delimiter: None }));
+                    self.tree = Some(TreeInfo { start, opener, delimiter: None });
                 }
-                None => break,
+                false => break,
             }
         }
 
@@ -566,15 +616,15 @@ impl<'lex> Lexer<'lex> {
         // retrieve the one that we were working with. Beyond this point,
         // everyone should refer to `tree`, not `self.tree` since this is now
         // the old one.
-        self.tree.swap(&tree);
-        self.end.set(end);
+        let tree = std::mem::replace(&mut self.tree, outer);
+        self.end = end;
 
         // If there is a fatal error, then we need to abort
         if self.has_fatal_error {
             return TokenKind::Err;
         }
 
-        match tree.get() {
+        match tree {
             // A line closes at its end, rather than at a delimiter.
             Some(TreeInfo { delimiter: closer, start, .. })
                 if closer == Some(delimiter)
@@ -595,7 +645,7 @@ impl<'lex> Lexer<'lex> {
                 // still close, e.g. the `]` in `items[f(0]` closes the `[` tree. There is
                 // nothing to step back over at the end of the source.
                 if matches!(tree, Some(TreeInfo { delimiter: Some(_), .. })) {
-                    self.offset.set(self.offset.get() - 1);
+                    self.offset -= 1;
                 }
 
                 self.emit_error(
@@ -608,16 +658,14 @@ impl<'lex> Lexer<'lex> {
 
     /// Consume the lexer and produce a stream of tokens.
     pub fn tokenise(mut self) -> LexerMetadata {
-        while let Some(token) = self.advance_token() {
-            self.tokens.push(token);
-        }
+        while self.advance_token() {}
 
         LexerMetadata { tokens: self.tokens, diagnostics: self.diagnostics }
     }
 
     fn number(&mut self, skip: ShouldSkip) -> TokenKind {
         // record the start location of the literal
-        let start = self.offset.get() - (skip as usize);
+        let start = self.offset - (skip as usize);
 
         // If we didn't get a radix, then we eat all the digits that we can, and then
         // check if it is a float literal.
@@ -670,7 +718,7 @@ impl<'lex> Lexer<'lex> {
     }
 
     /// Consume only decimal digits up to encountering a non-decimal digit.
-    fn eat_decimal_digits(&self, radix: u32) -> &str {
+    fn eat_decimal_digits(&mut self, radix: u32) -> &'lex str {
         self.eat_while_and_slice(move |c| c.is_digit(radix))
     }
 
@@ -694,7 +742,7 @@ impl<'lex> Lexer<'lex> {
             })
             .unwrap_or(rest.len());
 
-        self.offset.update(|x| x + len);
+        self.offset += len;
         TokenKind::Text
     }
 
@@ -702,28 +750,28 @@ impl<'lex> Lexer<'lex> {
         let is_double = start == '"';
         let mut closed = false;
 
-        let start = self.offset.get();
+        let start = self.offset;
 
-        while let Some(c) = self.next() {
-            match c {
-                '"' if is_double => {
-                    closed = true;
-                    break;
-                }
-                '\'' if !is_double => {
-                    closed = true;
-                    break;
-                }
-                // A backslash escapes the character after it, e.g. `\"`.
-                '\\' => {
-                    self.next();
-                }
-                _c => continue,
+        // The quote and the backslash are ASCII, so they can't be part of a
+        // multi-byte character, and the bytes can be searched for them.
+        let quote = if is_double { b'"' } else { b'\'' };
+        while let Some(index) = memchr::memchr2(quote, b'\\', unsafe { self.as_slice() }.as_bytes())
+        {
+            let byte = self.spanned.source.as_bytes()[self.offset + index];
+            self.offset += index + 1;
+
+            if byte == quote {
+                closed = true;
+                break;
             }
+
+            // A backslash escapes the character after it, e.g. `\"`.
+            self.next();
         }
 
         // Report that the literal is unclosed and set the error as being fatal
         if !closed {
+            self.offset = self.end;
             return self.emit_fatal_error(
                 LexerErrorKind::UnclosedStringLit,
                 ByteRange::new(start, self.len_consumed()),
@@ -738,7 +786,7 @@ impl<'lex> Lexer<'lex> {
     fn ident(&mut self, first: char) -> TokenKind {
         debug_assert!(is_ident_start(first));
 
-        let start = self.offset.get() - first.len_utf8();
+        let start = self.offset - first.len_utf8();
 
         // The characters of an identifier are all ASCII, so its bytes are
         // scanned directly. It can contain a `-`, but not the whitespace control
@@ -751,26 +799,33 @@ impl<'lex> Lexer<'lex> {
         // [Liquid]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/block_body.rb#L7-L8
         // [`TagName`]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid.rb#L34
         let bytes = self.spanned.source.as_bytes();
-        let dash_is_marker = self.is_trim_marker('-');
         let word = self.dialect.tag_names_are_word_characters() && self.at_any_tag_name();
-        let mut end = self.offset.get();
+        let mut end = self.offset;
 
-        while let Some(&byte) = bytes.get(end) {
-            let at_marker = byte == b'-'
-                && dash_is_marker
-                && matches!(
-                    (bytes.get(end + 1), bytes.get(end + 2)),
-                    (Some(b'%' | b'}'), Some(b'}'))
-                );
+        loop {
+            // A `-` is rare in a name, so the bytes up to one are scanned on
+            // their own, and whether the `-` ends the name is only checked then.
+            while let Some(&byte) = bytes.get(end)
+                && ID_CONTINUE[usize::from(byte)]
+            {
+                end += 1;
+            }
 
-            if !ID_CONTINUE[usize::from(byte)] || at_marker || (word && byte == b'-') {
+            let at_marker = || {
+                self.is_trim_marker('-')
+                    && matches!(
+                        (bytes.get(end + 1), bytes.get(end + 2)),
+                        (Some(b'%' | b'}'), Some(b'}'))
+                    )
+            };
+            if bytes.get(end) != Some(&b'-') || word || at_marker() {
                 break;
             }
 
             end += 1;
         }
 
-        self.offset.set(end);
+        self.offset = end;
 
         // [Liquid's lexer] lets a name end with one `?`, e.g.
         // `product.gift_card?`, though not a tag's name, see above.
@@ -780,7 +835,9 @@ impl<'lex> Lexer<'lex> {
             self.skip_ascii();
         }
 
-        let name = &self.spanned.source[start..self.offset.get()];
+        // ##Safety: Each byte of the name is ASCII, so it starts and ends on a
+        // character boundary.
+        let name = unsafe { self.spanned.source.get_unchecked(start..self.offset) };
         let kind = self.name_kind(name);
 
         // The file that an `include` or `include_relative` tag names comes
@@ -791,7 +848,7 @@ impl<'lex> Lexer<'lex> {
             && matches!(kind, TokenKind::Keyword(Keyword::Include | Keyword::IncludeRelative))
             && self.at_tag_name()
         {
-            self.path_next.set(true);
+            self.path_next = true;
         }
 
         kind
@@ -808,26 +865,31 @@ impl<'lex> Lexer<'lex> {
         // [`liquid`]: https://shopify.github.io/liquid/tags/template/#liquid
         // [`guard`]: https://twig.symfony.com/doc/3.x/tags/guard.html
         // [`include_relative`]: https://jekyllrb.com/docs/includes/#including-files-relative-to-another-file
-        let tag_keyword = match name {
-            "liquid" if self.dialect.has_liquid_tag() => Some(Keyword::Liquid),
-            "guard" if self.dialect.has_guard_blocks() => Some(Keyword::Guard),
-            "endguard" if self.dialect.has_guard_blocks() => Some(Keyword::EndGuard),
-            "include_relative" if self.dialect.include_takes_paths() => {
-                Some(Keyword::IncludeRelative)
-            }
-            _ => None,
-        };
+        if self.at_tag_name() {
+            let tag_keyword = match name {
+                "liquid" if self.dialect.has_liquid_tag() => Some(Keyword::Liquid),
+                "guard" if self.dialect.has_guard_blocks() => Some(Keyword::Guard),
+                "endguard" if self.dialect.has_guard_blocks() => Some(Keyword::EndGuard),
+                "include_relative" if self.dialect.include_takes_paths() => {
+                    Some(Keyword::IncludeRelative)
+                }
+                _ => None,
+            };
 
-        match (tag_keyword, self.dialect.keyword(name)) {
-            (Some(keyword), _) if self.at_tag_name() => TokenKind::Keyword(keyword),
-            (_, Some(keyword)) => TokenKind::Keyword(keyword),
-            (_, None) => TokenKind::Ident,
+            if let Some(keyword) = tag_keyword {
+                return TokenKind::Keyword(keyword);
+            }
+        }
+
+        match self.dialect.keyword(name) {
+            Some(keyword) => TokenKind::Keyword(keyword),
+            None => TokenKind::Ident,
         }
     }
 
     /// The contents of the `{% %}` tag that starts at the next `%`, after its
     /// whitespace control marker and whitespace.
-    fn tag_contents(&self) -> &str {
+    fn tag_contents(&self) -> &'lex str {
         let slice = unsafe { self.as_slice() };
         self.strip_trim_marker(&slice[1..]).trim_start()
     }
@@ -854,7 +916,7 @@ impl<'lex> Lexer<'lex> {
     /// Whether the token being lexed is the first in a `{% %}` tree, i.e. the
     /// name of the tag.
     fn at_tag_name(&self) -> bool {
-        self.tree.get().is_some_and(|info| {
+        self.tree.is_some_and(|info| {
             info.start == self.tokens.len()
                 && matches!(
                     self.tokens[info.start - 1].kind,
@@ -911,7 +973,7 @@ impl<'lex> Lexer<'lex> {
             len += c.len_utf8();
         }
 
-        self.offset.update(|x| x + len);
+        self.offset += len;
         TokenKind::Path
     }
 
@@ -919,7 +981,7 @@ impl<'lex> Lexer<'lex> {
     /// [Lexer::at_tag_name], or of a line of a `liquid` tag, which is a tag
     /// without its delimiters.
     fn at_any_tag_name(&self) -> bool {
-        self.tree.get().is_some_and(|info| info.start == self.tokens.len() && info.opener.is_tag())
+        self.tree.is_some_and(|info| info.start == self.tokens.len() && info.opener.is_tag())
     }
 
     /// Whether a line of a `liquid` tag starts here, i.e. the tree is a `{% %}`
@@ -952,22 +1014,22 @@ impl<'lex> Lexer<'lex> {
             None => line,
         };
 
-        self.offset.get() + line.trim_end().len()
+        self.offset + line.trim_end().len()
     }
 
     /// Lex a Liquid inline comment, i.e. `{% # note %}`, from its `%` up to its
     /// `%}`.
     fn inline_comment(&mut self) -> TokenKind {
-        let start = self.offset.get() - 1;
+        let start = self.offset - 1;
         let slice = unsafe { self.as_slice() };
 
         match slice[1..].find("%}") {
             Some(index) => {
-                self.offset.update(|x| x + index + 3);
+                self.offset += index + 3;
                 TokenKind::Comment
             }
             None => {
-                self.offset.set(self.end.get());
+                self.offset = self.end;
                 self.emit_error(
                     LexerErrorKind::Unclosed(Delimiter::Percent),
                     ByteRange::singleton(start),
@@ -1007,12 +1069,12 @@ impl<'lex> Lexer<'lex> {
     /// Lex the contents of a block as text, up to its `end` tag, e.g. `endraw`,
     /// or the end of the source if it has none.
     fn hunk(&mut self, end: &str) {
-        let start = self.offset.get();
+        let start = self.offset;
         let slice = unsafe { self.as_slice() };
         let len = find_end_tag(slice, end, self.dialect).unwrap_or(slice.len());
 
         if len > 0 {
-            self.offset.update(|x| x + len);
+            self.offset += len;
             self.tokens.push(Token::new(TokenKind::Text, ByteRange::new(start, start + len - 1)));
         }
     }
@@ -1035,13 +1097,14 @@ impl<'lex> Lexer<'lex> {
     }
 
     fn comment(&mut self) -> TokenKind {
-        while let Some(c) = self.next() {
-            if c == '#' && self.peek() == '}' {
-                self.skip_ascii();
-                break;
-            }
-        }
+        // The comment ends at the first `#}`, which is ASCII, so the bytes can
+        // be searched for it, as in [Lexer::text].
+        let rest = unsafe { self.as_slice() }.as_bytes();
+        let len = memchr::memchr_iter(b'#', rest)
+            .find(|&index| rest.get(index + 1) == Some(&b'}'))
+            .map_or(rest.len(), |index| index + "#}".len());
 
+        self.offset += len;
         TokenKind::Comment
     }
 }
@@ -1076,21 +1139,17 @@ fn is_ident_start(c: char) -> bool {
     c.is_ascii_alphabetic() || c == '_'
 }
 
-/// Whether each byte is valid as a non-first character of an identifier.
+/// Whether each byte is valid as a non-first character of an identifier,
+/// apart from a `-`, which is in some places, see [Lexer::ident].
 ///
 /// ##Note: Looking a byte up is one load, where checking which range it is in
 /// takes several branches, for each byte of each name.
-static ID_CONTINUE: [bool; 256] = {
-    let mut table = [false; 256];
-    let mut index = 0;
-    while index < table.len() {
-        let byte = index as u8;
-        table[index] = byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-';
-        index += 1;
-    }
+static ID_CONTINUE: [bool; 256] = byte_table!(|byte| byte.is_ascii_alphanumeric() || byte == b'_');
 
-    table
-};
+/// Whether each byte is an ASCII character that [char::is_whitespace] accepts,
+/// which include the vertical tab that [u8::is_ascii_whitespace] leaves out.
+static WHITESPACE: [bool; 256] =
+    byte_table!(|byte| matches!(byte, b' ' | b'\t' | b'\n' | b'\x0B' | b'\x0C' | b'\r'));
 
 #[cfg(test)]
 mod tests {
