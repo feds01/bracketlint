@@ -46,6 +46,7 @@ impl TestCase {
                 Dialect::Liquid,
                 include_str!("../resources/liquid_shop.liquid"),
             ),
+            Self::new("jinja_shop", Dialect::Jinja, include_str!("../resources/jinja_shop.html")),
             Self::new("django_nested_blocks", Dialect::Django, nested_blocks(200)),
             Self::new("django_many_tags", Dialect::Django, many_tags(500)),
         ]

@@ -1,0 +1,55 @@
+{# The product listing page of a shop. #}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/products.css') }}">
+<header class="page-header">
+<nav class="breadcrumbs">
+<a href="/">Home</a>
+{% for crumb in (breadcrumbs) if crumb.visible %}
+<span class="separator">/</span><a href="{{ crumb.url }}">{{ crumb.title|e }}</a>
+{% endfor %}
+</nav>
+<h1>{{ category.name ~ (' (' ~ category.count ~ ')' if category.count else '') }}</h1>
+{% if (category.description and (category.featured or not category.hidden)) %}
+<p class="lead">{{ category.description|striptags|truncate(120, killwords=true) }}</p>
+{% endif %}
+</header>
+<main>
+{% if products %}
+<ul class="product-list">
+{% for product in products|sort(attribute='name') %}
+<li class="product-card {{ 'sale' if product.on_sale }}" data-id="{{ product.id }}">
+<img src="{{ product.image.url }}" alt="{{ product.name }}" width="200" height="200">
+<h2><a href="{{ url_for('product', id=product.id) }}">{{ product.name|title }}</a></h2>
+{% if product.on_sale and (product.discount > 0 or product.clearance) %}
+<span class="price old">{{ '%.2f'|format(product.price) }}</span>
+<span class="price">{{ '%.2f'|format(product.price * (1 - product.discount / 100)) }}</span>
+{% elif (product.price == 0) and not product.preorder %}
+<span class="price">Free</span>
+{% else %}
+<span class="price">{{ '%.2f'|format(product.price) }}</span>
+{% endif %}
+<p>{{ product.summary|default('No description available.') }}</p>
+{% set reviews = (product.reviews|length) %}
+<small>{{ reviews }} review{{ 's' if (reviews != 1) }}</small>
+</li>
+{% else %}
+<li>No products.</li>
+{% endfor %}
+</ul>
+{% else %}
+<p class="empty">There are no products in this category yet.</p>
+{% endif %}
+<table class="specs">
+<thead><tr><th>Name</th><th>Value</th></tr></thead>
+<tbody>
+{% for key, value in category.specs.items() %}
+<tr><td>{{ key }}</td><td>{{ value if (value is not none) else '-' }}</td></tr>
+{% endfor %}
+</tbody>
+</table>
+<p>Page {{ page }} of {{ ((total + per_page - 1) // per_page)|int }}</p>
+</main>
+<script>
+const products = document.querySelectorAll(".product-card");
+function highlight(card){card.classList.add("active")}
+products.forEach(card=>card.addEventListener("click",()=>highlight(card)))
+</script>
