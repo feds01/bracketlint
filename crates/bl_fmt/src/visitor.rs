@@ -294,25 +294,13 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         self.buffer.is_empty() || self.buffer.ends_with('\n')
     }
 
-    /// The whitespace in the source right before `start`.
-    fn whitespace_before(&self, start: usize) -> &'fmt str {
-        let before = &self.ctx.source.source[..start];
-        &before[before.trim_end().len()..]
-    }
-
-    /// The whitespace in the source right after `range`.
-    fn whitespace_after(&self, range: ByteRange) -> &'fmt str {
-        let after = &self.ctx.source.source[range.end() + 1..];
-        &after[..after.len() - after.trim_start().len()]
-    }
-
     /// Separate an item that continues the current line from what precedes
     /// it with a single space, when the source has one. The lexer skips
     /// whitespace and the engines trim it, which would otherwise turn
     /// `{{ a }}, {{ b }}` into `{{ a }},{{ b }}` and change the output.
     fn space_from_previous(&mut self, start: usize) {
         if self.text.is_none()
-            && is_inline_space(self.whitespace_before(start))
+            && is_inline_space(self.ctx.source.whitespace_before(start))
             && !self.at_line_start()
             && !self.buffer.ends_with(char::is_whitespace)
         {
@@ -370,12 +358,10 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
     }
 
     /// The range of the expression at `range` with the parentheses that group
-    /// it, see [Formatter::visit_tag_expr].
-    ///
-    /// ##Note: Any `(` before the expression and `)` after it are taken to
-    /// group it, which only holds for an expression that a tag holds whole. In
-    /// `f(a)`, they are the call's.
-    fn with_parentheses(&self, mut range: ByteRange) -> ByteRange {
+    /// it, see [Formatter::visit_tag_expr]. Any `(` before the expression and
+    /// `)` after it group it, since a tag holds it whole, see
+    /// [SpannedSource::parenthesised].
+    fn with_parentheses(&self, range: ByteRange) -> ByteRange {
         // Parentheses only group an expression in [Jinja], [Nunjucks] and
         // [Twig].
         //
@@ -386,16 +372,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
             return range;
         }
 
-        let source = self.ctx.source.source;
-        loop {
-            let before = source[..range.start()].trim_end();
-            let after = source[range.end() + 1..].trim_start();
-            if !(before.ends_with('(') && after.starts_with(')')) {
-                return range;
-            }
-
-            range = ByteRange::new(before.len() - 1, source.len() - after.len());
-        }
+        self.ctx.source.parenthesised(range)
     }
 
     /// Run a function with an increased indent level.
@@ -447,7 +424,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
     /// on a line of its own, at the current indent, when the source starts one
     /// with it, and otherwise after a space when the source has one.
     fn start_item(&mut self, start: usize) {
-        if self.whitespace_before(start).contains('\n') && !self.at_line_start() {
+        if self.ctx.source.whitespace_before(start).contains('\n') && !self.at_line_start() {
             self.end_line();
         }
 
@@ -528,7 +505,8 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
             return Cow::Borrowed(name);
         };
 
-        let space = if self.whitespace_before(markup.start()).is_empty() { "" } else { " " };
+        let space =
+            if self.ctx.source.whitespace_before(markup.start()).is_empty() { "" } else { " " };
         Cow::Owned(format!("{name}{space}{}", self.ctx.source.hunk(markup)))
     }
 
@@ -762,7 +740,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         let mut from = match self.exact.filter(|&(_, len)| len == self.buffer.len()) {
             _ if !self.ctx.in_verbatim() => start,
             Some((end, _)) => end,
-            None => start - self.whitespace_before(start).len(),
+            None => start - self.ctx.source.whitespace_before(start).len(),
         };
 
         let end = start + text.len();
@@ -789,7 +767,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
 
         // The text starts a line when the source starts one with it.
         if !text.trim().is_empty()
-            && self.whitespace_before(start).contains('\n')
+            && self.ctx.source.whitespace_before(start).contains('\n')
             && !self.at_line_start()
         {
             self.end_line();
@@ -849,7 +827,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
             return self.copy_source(range.end() + 1);
         }
 
-        let whitespace = self.whitespace_before(range.start());
+        let whitespace = self.ctx.source.whitespace_before(range.start());
         if whitespace.contains('\n') && !self.at_line_start() {
             self.end_line();
         }
@@ -868,7 +846,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
     /// that its other lines still line up with it. Otherwise, it gets the
     /// current indent.
     fn indent_kept_source(&mut self, start: usize, source: &str) {
-        let whitespace = self.whitespace_before(start);
+        let whitespace = self.ctx.source.whitespace_before(start);
 
         match whitespace.rfind('\n') {
             Some(newline) if source.contains('\n') => self.push_hunk(&whitespace[newline + 1..]),
@@ -999,7 +977,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
 
                 // A tag that ends a line in the source ends it here too, e.g. an
                 // `{% include %}` on a line of its own.
-                let ends_line = self.whitespace_after(statement.range()).contains('\n');
+                let ends_line = self.ctx.source.whitespace_after(statement.range()).contains('\n');
 
                 if (keyword || ends_line) && !self.at_line_start() {
                     self.end_line();
@@ -1021,7 +999,8 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
             }
             // A comment that ends a line in the source ends it here too.
             (bl_ast::Statement::Comment(_), _) => {
-                if self.whitespace_after(statement.range()).contains('\n') && !self.at_line_start()
+                if self.ctx.source.whitespace_after(statement.range()).contains('\n')
+                    && !self.at_line_start()
                 {
                     self.end_line();
                 }
