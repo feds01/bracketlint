@@ -203,6 +203,56 @@ impl<'s> SpannedSource<'s> {
         self.source.is_empty()
     }
 
+    /// The whitespace right before `start`, as [char::is_whitespace] decides.
+    pub fn whitespace_before(&self, start: usize) -> &'s str {
+        let before = &self.source[..start];
+        let ascii = before.bytes().rev().take_while(|&byte| is_whitespace_byte(byte)).count();
+        let rest = &before[..before.len() - ascii];
+
+        // Whitespace is almost always ASCII, so its bytes are checked directly
+        // up to the first non-ASCII byte, as the lexer does, from where
+        // `char::is_whitespace` decides.
+        if rest.as_bytes().last().is_some_and(|byte| !byte.is_ascii()) {
+            return &before[rest.trim_end().len()..];
+        }
+
+        &before[rest.len()..]
+    }
+
+    /// The whitespace right after `range`, as [char::is_whitespace] decides.
+    pub fn whitespace_after(&self, range: ByteRange) -> &'s str {
+        let after = &self.source[range.end() + 1..];
+        let ascii = after.bytes().take_while(|&byte| is_whitespace_byte(byte)).count();
+        let rest = &after[ascii..];
+
+        // As in [SpannedSource::whitespace_before].
+        if rest.as_bytes().first().is_some_and(|byte| !byte.is_ascii()) {
+            return &after[..after.len() - rest.trim_start().len()];
+        }
+
+        &after[..ascii]
+    }
+
+    /// The range of `range` with the parentheses right around it, and the
+    /// whitespace inside them, e.g. that of `( (a) )` for the `a` in it.
+    ///
+    /// ##Note: Every `(` right before the range and `)` right after it are
+    /// taken, so the caller knows whether they are around it alone, e.g.
+    /// rather than the parentheses of the call in `f(a)`.
+    pub fn parenthesised(&self, mut range: ByteRange) -> ByteRange {
+        let bytes = self.source.as_bytes();
+
+        loop {
+            let open = range.start() - self.whitespace_before(range.start()).len();
+            let close = range.end() + 1 + self.whitespace_after(range).len();
+            if open == 0 || bytes[open - 1] != b'(' || bytes.get(close) != Some(&b')') {
+                return range;
+            }
+
+            range = ByteRange::new(open - 1, close);
+        }
+    }
+
     /// Get the line number of a particular byte position.
     pub fn line_number(&self, byte: usize) -> usize {
         self.line_ranges.line_number(byte)
@@ -229,6 +279,12 @@ impl<'s> SpannedSource<'s> {
     }
 }
 
+/// Whether `byte` is an ASCII character that [char::is_whitespace] accepts,
+/// which include the vertical tab that [u8::is_ascii_whitespace] leaves out.
+fn is_whitespace_byte(byte: u8) -> bool {
+    matches!(byte, b' ' | b'\t' | b'\n' | b'\x0B' | b'\x0C' | b'\r')
+}
+
 /// This implementation is intended for debugging purposes within the
 /// `bl_parser` crate.
 ///
@@ -241,5 +297,62 @@ impl HasSource for SpannedSource<'_> {
 
     fn path(&self, _: SourceId) -> &str {
         self.path.to_str().unwrap()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::{ByteRange, SpannedSource};
+    use crate::source::LineRanges;
+
+    /// Look up the source with `f`, as a [SpannedSource] of `contents`.
+    fn with_source<T>(contents: &str, f: impl FnOnce(SpannedSource) -> T) -> T {
+        let (path, lines) = (PathBuf::from("template"), LineRanges::new_from_str(contents));
+        f(SpannedSource::new(contents, &path, &lines))
+    }
+
+    /// The whitespace around a range is what [char::is_whitespace] accepts,
+    /// whether or not it is ASCII, e.g. a vertical tab or a no-break space.
+    #[test]
+    fn whitespace_is_what_char_is_whitespace_accepts() {
+        let cases =
+            [("a \t\nb", " \t\n"), ("a\x0Bb", "\x0B"), ("a \u{a0} b", " \u{a0} "), ("ab", "")];
+
+        for (contents, expected) in cases {
+            let b = contents.len() - 1;
+            let before = with_source(contents, |source| source.whitespace_before(b).to_string());
+            let after = with_source(contents, |source| {
+                source.whitespace_after(ByteRange::new(0, 0)).to_string()
+            });
+
+            assert_eq!(before, expected, "{contents:?}");
+            assert_eq!(after, expected, "{contents:?}");
+        }
+    }
+
+    /// Each pair of parentheses right around a range is taken, with the
+    /// whitespace inside it, up to the edges of the source.
+    #[test]
+    fn parenthesised_takes_each_pair_around_the_range() {
+        let cases = [
+            ("a", "a"),
+            ("(a)", "(a)"),
+            ("( (a) )", "( (a) )"),
+            ("{{ ((a)) }}", "((a))"),
+            ("(a) + (b)", "(a)"),
+            ("(a + b)", "a"),
+            ("(a", "a"),
+        ];
+
+        for (contents, expected) in cases {
+            let a = contents.find('a').unwrap();
+            let range = with_source(contents, |source| {
+                source.hunk(source.parenthesised(ByteRange::new(a, a))).to_string()
+            });
+
+            assert_eq!(range, expected, "{contents:?}");
+        }
     }
 }

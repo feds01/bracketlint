@@ -59,17 +59,16 @@ body
   └─clauses
     └─if_clause
       ├─condition
-      │ └─group_expr
-      │   └─cond_expr
-      │     ├─condition
-      │     │ └─var_expr
-      │     │   └─name "b"
-      │     ├─then
-      │     │ └─var_expr
-      │     │   └─name "a"
-      │     └─otherwise
-      │       └─var_expr
-      │         └─name "c"
+      │ └─cond_expr
+      │   ├─condition
+      │   │ └─var_expr
+      │   │   └─name "b"
+      │   ├─then
+      │   │ └─var_expr
+      │   │   └─name "a"
+      │   └─otherwise
+      │     └─var_expr
+      │       └─name "c"
       └─clause_body
         └─body
 

@@ -1,0 +1,7 @@
+error: unexpectedly encountered a string literal
+ --> $DIR/parentheses_call_jinja.html:1:8
+  |
+1 | {{ (x) "a" }}
+  |        ---
+  |
+  = note: this file is parsed as Jinja, from `--dialect jinja`

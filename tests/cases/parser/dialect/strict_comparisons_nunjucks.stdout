@@ -24,34 +24,32 @@ body
 │     ├─condition
 │     │ └─bin_expr
 │     │   ├─lhs
-│     │   │ └─group_expr
-│     │   │   └─bin_expr
-│     │   │     ├─lhs
-│     │   │     │ └─access_expr
-│     │   │     │   ├─subject
-│     │   │     │   │ └─var_expr
-│     │   │     │   │   └─name "params"
-│     │   │     │   └─field
-│     │   │     │     └─name "spellcheck"
-│     │   │     ├─operator `===`
-│     │   │     └─rhs
-│     │   │       └─var_expr
-│     │   │         └─name "false"
+│     │   │ └─bin_expr
+│     │   │   ├─lhs
+│     │   │   │ └─access_expr
+│     │   │   │   ├─subject
+│     │   │   │   │ └─var_expr
+│     │   │   │   │   └─name "params"
+│     │   │   │   └─field
+│     │   │   │     └─name "spellcheck"
+│     │   │   ├─operator `===`
+│     │   │   └─rhs
+│     │   │     └─var_expr
+│     │   │       └─name "false"
 │     │   ├─operator `or`
 │     │   └─rhs
-│     │     └─group_expr
-│     │       └─bin_expr
-│     │         ├─lhs
-│     │         │ └─access_expr
-│     │         │   ├─subject
-│     │         │   │ └─var_expr
-│     │         │   │   └─name "params"
-│     │         │   └─field
-│     │         │     └─name "spellcheck"
-│     │         ├─operator `===`
-│     │         └─rhs
-│     │           └─var_expr
-│     │             └─name "true"
+│     │     └─bin_expr
+│     │       ├─lhs
+│     │       │ └─access_expr
+│     │       │   ├─subject
+│     │       │   │ └─var_expr
+│     │       │   │   └─name "params"
+│     │       │   └─field
+│     │       │     └─name "spellcheck"
+│     │       ├─operator `===`
+│     │       └─rhs
+│     │         └─var_expr
+│     │           └─name "true"
 │     └─clause_body
 │       └─body
 └─inline

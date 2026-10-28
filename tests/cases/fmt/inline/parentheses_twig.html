@@ -1,0 +1,6 @@
+// run=pass, stage=fmt, dialect=twig
+
+<p>{{ ((a ~ b)) }}</p>
+<p>{{- ( a ? b : c ) -}}</p>
+{% with ({a: 1}) only %}<p>{{ a }}</p>{% endwith %}
+{% if a %}<p>a</p>{% elseif (b) %}<p>b</p>{% endif %}

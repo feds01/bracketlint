@@ -294,25 +294,13 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         self.buffer.is_empty() || self.buffer.ends_with('\n')
     }
 
-    /// The whitespace in the source right before `start`.
-    fn whitespace_before(&self, start: usize) -> &'fmt str {
-        let before = &self.ctx.source.source[..start];
-        &before[before.trim_end().len()..]
-    }
-
-    /// The whitespace in the source right after `range`.
-    fn whitespace_after(&self, range: ByteRange) -> &'fmt str {
-        let after = &self.ctx.source.source[range.end() + 1..];
-        &after[..after.len() - after.trim_start().len()]
-    }
-
     /// Separate an item that continues the current line from what precedes
     /// it with a single space, when the source has one. The lexer skips
     /// whitespace and the engines trim it, which would otherwise turn
     /// `{{ a }}, {{ b }}` into `{{ a }},{{ b }}` and change the output.
     fn space_from_previous(&mut self, start: usize) {
         if self.text.is_none()
-            && is_inline_space(self.whitespace_before(start))
+            && is_inline_space(self.ctx.source.whitespace_before(start))
             && !self.at_line_start()
             && !self.buffer.ends_with(char::is_whitespace)
         {
@@ -346,6 +334,45 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
     fn push_source(&mut self, range: ByteRange) {
         let source = self.ctx.source.hunk(range);
         self.push_hunk(source);
+    }
+
+    /// Visit `expr`, which a tag holds whole, e.g. the condition of an
+    /// `{% if %}`, in the parentheses that group it, e.g. `(a or b)` rather
+    /// than `a or b` in `{{ (a or b) }}`. The tree has no node for them, see
+    /// [bl_ast::Expr], so they are found in the source around the expression.
+    fn visit_tag_expr(&mut self, expr: bl_ast::AstNodeRef<bl_ast::Expr>) -> FmtResult<()> {
+        let inner = expr.range();
+        let outer = self.with_parentheses(inner);
+
+        if outer != inner {
+            self.push_source(ByteRange::new(outer.start(), inner.start() - 1));
+        }
+
+        self.visit_expr(expr)?;
+
+        if outer != inner {
+            self.push_source(ByteRange::new(inner.end() + 1, outer.end()));
+        }
+
+        Ok(())
+    }
+
+    /// The range of the expression at `range` with the parentheses that group
+    /// it, see [Formatter::visit_tag_expr]. Any `(` before the expression and
+    /// `)` after it group it, since a tag holds it whole, see
+    /// [SpannedSource::parenthesised].
+    fn with_parentheses(&self, range: ByteRange) -> ByteRange {
+        // Parentheses only group an expression in [Jinja], [Nunjucks] and
+        // [Twig].
+        //
+        // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#logic
+        // [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#logic
+        // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#logic
+        if !self.ctx.dialect.has_grouping() {
+            return range;
+        }
+
+        self.ctx.source.parenthesised(range)
     }
 
     /// Run a function with an increased indent level.
@@ -397,7 +424,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
     /// on a line of its own, at the current indent, when the source starts one
     /// with it, and otherwise after a space when the source has one.
     fn start_item(&mut self, start: usize) {
-        if self.whitespace_before(start).contains('\n') && !self.at_line_start() {
+        if self.ctx.source.whitespace_before(start).contains('\n') && !self.at_line_start() {
             self.end_line();
         }
 
@@ -478,7 +505,8 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
             return Cow::Borrowed(name);
         };
 
-        let space = if self.whitespace_before(markup.start()).is_empty() { "" } else { " " };
+        let space =
+            if self.ctx.source.whitespace_before(markup.start()).is_empty() { "" } else { " " };
         Cow::Owned(format!("{name}{space}{}", self.ctx.source.hunk(markup)))
     }
 
@@ -655,7 +683,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
             // Format the tag on its own, to know how wide it is.
             let bl_ast::Inline { expr, trim } = inline;
             let len = self.buffer.len();
-            self.within_tag(TagKind::Inline, *trim, |this| this.visit_expr(expr.ast_ref()))?;
+            self.within_tag(TagKind::Inline, *trim, |this| this.visit_tag_expr(expr.ast_ref()))?;
             let tag = self.buffer.split_off(len);
 
             let word = text.len();
@@ -712,7 +740,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
         let mut from = match self.exact.filter(|&(_, len)| len == self.buffer.len()) {
             _ if !self.ctx.in_verbatim() => start,
             Some((end, _)) => end,
-            None => start - self.whitespace_before(start).len(),
+            None => start - self.ctx.source.whitespace_before(start).len(),
         };
 
         let end = start + text.len();
@@ -739,7 +767,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
 
         // The text starts a line when the source starts one with it.
         if !text.trim().is_empty()
-            && self.whitespace_before(start).contains('\n')
+            && self.ctx.source.whitespace_before(start).contains('\n')
             && !self.at_line_start()
         {
             self.end_line();
@@ -799,7 +827,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
             return self.copy_source(range.end() + 1);
         }
 
-        let whitespace = self.whitespace_before(range.start());
+        let whitespace = self.ctx.source.whitespace_before(range.start());
         if whitespace.contains('\n') && !self.at_line_start() {
             self.end_line();
         }
@@ -818,7 +846,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
     /// that its other lines still line up with it. Otherwise, it gets the
     /// current indent.
     fn indent_kept_source(&mut self, start: usize, source: &str) {
-        let whitespace = self.whitespace_before(start);
+        let whitespace = self.ctx.source.whitespace_before(start);
 
         match whitespace.rfind('\n') {
             Some(newline) if source.contains('\n') => self.push_hunk(&whitespace[newline + 1..]),
@@ -949,7 +977,7 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
 
                 // A tag that ends a line in the source ends it here too, e.g. an
                 // `{% include %}` on a line of its own.
-                let ends_line = self.whitespace_after(statement.range()).contains('\n');
+                let ends_line = self.ctx.source.whitespace_after(statement.range()).contains('\n');
 
                 if (keyword || ends_line) && !self.at_line_start() {
                     self.end_line();
@@ -971,7 +999,8 @@ impl<'fmt, Adaptor: ExternalLanguagesEngineAdaptor> Formatter<'fmt, Adaptor> {
             }
             // A comment that ends a line in the source ends it here too.
             (bl_ast::Statement::Comment(_), _) => {
-                if self.whitespace_after(statement.range()).contains('\n') && !self.at_line_start()
+                if self.ctx.source.whitespace_after(statement.range()).contains('\n')
+                    && !self.at_line_start()
                 {
                     self.end_line();
                 }
@@ -1087,7 +1116,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             this.push_hunk("with");
             if let Some(value) = value {
                 this.push_hunk(" ");
-                this.push_source(value.range());
+                this.visit_tag_expr(value.ast_ref())?;
                 if *only {
                     this.push_hunk(" only");
                 }
@@ -1141,7 +1170,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             this.push_hunk(" ");
             this.push_source(target.ast_ref().range());
             this.push_hunk(" in ");
-            this.visit_expr(iterator.ast_ref())?;
+            this.visit_tag_expr(iterator.ast_ref())?;
 
             // Keep the modifiers in the order they are written, e.g. `reversed`
             // and `limit: 2` in Liquid, which come before the guard.
@@ -1161,7 +1190,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
             // Check if we have an if guard on the loop itself.
             if let Some(guard) = guard {
                 this.push_hunk(" if ");
-                this.visit_expr(guard.ast_ref())?;
+                this.visit_tag_expr(guard.ast_ref())?;
             }
 
             Ok(())
@@ -1256,7 +1285,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
                 }
                 bl_ast::ClauseKind::Unless => this.push_hunk("unless "),
             }
-            this.visit_expr(condition.ast_ref())
+            this.visit_tag_expr(condition.ast_ref())
         })?;
         self.end_line();
 
@@ -1280,7 +1309,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         self.start_item(node.range().start());
         self.within_tag(TagKind::Block, trim.start, |this| {
             this.push_hunk("case ");
-            this.visit_expr(subject.ast_ref())
+            this.visit_tag_expr(subject.ast_ref())
         })?;
         self.end_line();
 
@@ -1459,7 +1488,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
         // line break can matter, e.g. after a `//` comment in a script.
         self.start_item(start);
         self.within_tag(TagKind::Inline, *trim, |this| {
-            this.visit_expr(expr.ast_ref())?;
+            this.visit_tag_expr(expr.ast_ref())?;
             Ok(())
         })
     }
@@ -1474,7 +1503,7 @@ impl<E: ExternalLanguagesEngineAdaptor> AstVisitorMutSelf for Formatter<'_, E> {
 
         self.within_tag(TagKind::Block, *trim, |this| {
             this.push_hunk("extends ");
-            this.visit_expr(template.ast_ref())
+            this.visit_tag_expr(template.ast_ref())
         })?;
         self.end_line();
 

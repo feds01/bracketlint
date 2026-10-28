@@ -10,6 +10,7 @@ which is in `licenses/`.
 | `minimal_mistakes_single.liquid` | [`_layouts/single.html`](https://github.com/mmistakes/minimal-mistakes/blob/4.28.1/_layouts/single.html) from Minimal Mistakes 4.28.1 | MIT, [`licenses/minimal-mistakes.txt`](licenses/minimal-mistakes.txt) |
 | `django_shop.html` | Written for these benchmarks | MIT, as bracketlint |
 | `liquid_shop.liquid` | Written for these benchmarks | MIT, as bracketlint |
+| `jinja_shop.html` | Written for these benchmarks | MIT, as bracketlint |
 
 A template must parse without errors, and those in `TestCase::formattable`
 must also format without errors, or they would only benchmark the error path.

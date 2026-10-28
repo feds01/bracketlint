@@ -494,18 +494,6 @@ define_tree! {
         pub value: OptionalChild!(Expr),
     }
 
-    /// An expression in parentheses, e.g. `(a or b)` in [Jinja], [Nunjucks]
-    /// and [Twig], which groups it.
-    ///
-    /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#logic
-    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#logic
-    /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#logic
-    #[derive(Clone, Debug, PartialEq)]
-    #[node]
-    pub struct GroupExpr {
-        pub expr: Child!(Expr),
-    }
-
     /// A tuple, e.g. `('a', 'b')` in [Jinja], or a group of several expressions
     /// in [Nunjucks], e.g. `(rows.unshift(row), rows)`, which it [compiles] to
     /// JavaScript's, whose value is the last one's.
@@ -671,6 +659,14 @@ define_tree! {
     #[node]
     pub struct UnparsedExpr {}
 
+    /// An expression. Parentheses that group one, e.g. `(a or b)` in
+    /// [Jinja], [Nunjucks] and [Twig], have no node: the expression in them is
+    /// in the tree in their place, without them in its span, and the span of
+    /// the expression around it covers them.
+    ///
+    /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#logic
+    /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#logic
+    /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#logic
     #[derive(Clone, Debug, PartialEq)]
     #[node]
     pub enum Expr {
@@ -679,7 +675,6 @@ define_tree! {
         Lit(LitExpr),
         Array(ArrayExpr),
         Tuple(TupleExpr),
-        Group(GroupExpr),
         Mapping(MappingExpr),
         Cond(CondExpr),
         Arrow(ArrowExpr),

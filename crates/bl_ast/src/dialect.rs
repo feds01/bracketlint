@@ -332,7 +332,7 @@ impl Dialect {
     ///
     /// [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#logic
     /// [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#logic
-    /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#operators
+    /// [Twig]: https://twig.symfony.com/doc/3.x/templates.html#logic
     pub fn has_grouping(self) -> bool {
         matches!(self, Dialect::Jinja | Dialect::Nunjucks | Dialect::Twig)
     }
@@ -600,6 +600,22 @@ impl Dialect {
     /// [Twig]: https://github.com/twigphp/Twig/blob/v3.30.0/src/TokenParser/ForTokenParser.php#L39-L40
     pub fn loop_iterator_takes_operators(self) -> bool {
         matches!(self, Dialect::Jinja | Dialect::Nunjucks | Dialect::Twig)
+    }
+
+    /// Whether the iterator of a `for` loop can be a conditional expression,
+    /// e.g. `{% for x in a ? b : c %}`, as in [Nunjucks], whose
+    /// [`parseExpression`] reads an inline `if`, and [Twig], whose
+    /// [`Parser::parseExpression`] reads `? :` at the precedence it starts at.
+    /// [Jinja] reads it without one, since an `if` after it is the loop's
+    /// filter.
+    ///
+    /// [Nunjucks]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/parser.js#L191
+    /// [`parseExpression`]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/parser.js#L753-L756
+    /// [Twig]: https://github.com/twigphp/Twig/blob/v3.30.0/src/TokenParser/ForTokenParser.php#L40
+    /// [`Parser::parseExpression`]: https://github.com/twigphp/Twig/blob/v3.30.0/src/Parser.php#L414
+    /// [Jinja]: https://github.com/pallets/jinja/blob/3.1.6/src/jinja2/parser.py#L240-L243
+    pub fn loop_iterator_takes_conditionals(self) -> bool {
+        matches!(self, Dialect::Nunjucks | Dialect::Twig)
     }
 
     /// Whether the filter of a `for` loop is an expression, which can have
