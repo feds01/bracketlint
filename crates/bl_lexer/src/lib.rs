@@ -109,12 +109,26 @@ pub struct Lexer<'lex> {
 
 impl<'lex> Lexer<'lex> {
     pub fn new(spanned: SpannedSource<'lex>, id: SourceId, dialect: Dialect) -> Self {
+        Self::with_buffer(spanned, id, dialect, Vec::new())
+    }
+
+    /// Create a lexer that pushes its tokens to `buffer`, after clearing it,
+    /// so that the memory of a buffer that lexed another source is reused.
+    pub fn with_buffer(
+        spanned: SpannedSource<'lex>,
+        id: SourceId,
+        dialect: Dialect,
+        mut buffer: Vec<Token>,
+    ) -> Self {
+        buffer.clear();
+        buffer.reserve(spanned.source.len() / BYTES_PER_TOKEN);
+
         Self {
             id,
             dialect,
             spanned,
             diagnostics: LexerDiagnostics::default(),
-            tokens: Vec::with_capacity(spanned.source.len() / BYTES_PER_TOKEN),
+            tokens: buffer,
             has_fatal_error: false,
             tree: None,
             offset: 0,

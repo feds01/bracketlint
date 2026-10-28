@@ -29,6 +29,12 @@ impl Arena {
         ArenaVec { vec: bumpalo::collections::Vec::new_in(&self.bump) }
     }
 
+    /// Create an empty list with room for `capacity` items, which grows in the
+    /// arena once more are pushed to it.
+    pub fn vec_with_capacity<T>(&self, capacity: usize) -> ArenaVec<'_, T> {
+        ArenaVec { vec: bumpalo::collections::Vec::with_capacity_in(capacity, &self.bump) }
+    }
+
     /// Free everything in the arena at once, and keep its memory to allocate
     /// in again.
     pub fn reset(&mut self) {

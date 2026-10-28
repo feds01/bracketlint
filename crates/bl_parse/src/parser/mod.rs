@@ -33,6 +33,11 @@ use crate::{
     },
 };
 
+/// The number of statements that the list of a body has room for when it is
+/// created, so that most lists are allocated once, rather than grown in the
+/// arena from empty.
+const STATEMENTS: usize = 8;
+
 /// The context of the tag that the parser is currently in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TagContext {
@@ -657,7 +662,10 @@ impl<'s, 'a> Parser<'s, 'a> {
             return ast::TrimMarker::default();
         }
 
-        tag_trim(self._source.hunk(self.range()), self.options.dialect.trim_markers())
+        // The tag's bytes, as [SpannedSource::hunk] would slice them.
+        let (range, source) = (self.range(), self._source.source.as_bytes());
+        let tag = &source[range.start()..source.len().min(range.end() + 1)];
+        tag_trim(tag, self.options.dialect.trim_markers())
     }
 
     /// Run `g` in the tag that is the next token, like [Parser::in_tree], and
@@ -757,7 +765,7 @@ impl<'s, 'a> Parser<'s, 'a> {
         // }
 
         let start = self.current_pos();
-        let mut children = self.arena.vec();
+        let mut children = self.arena.vec_with_capacity(STATEMENTS);
 
         while self.peek().is_some() {
             match self.parse_statement() {
@@ -2227,7 +2235,7 @@ impl<'s, 'a> Parser<'s, 'a> {
         stop: impl Fn(Keyword) -> bool,
     ) -> ParseResult<AstNode<'a, ast::Body<'a>>> {
         let start = self.current_pos();
-        let mut contents = self.arena.vec();
+        let mut contents = self.arena.vec_with_capacity(STATEMENTS);
 
         while let Some(token) = self.peek() {
             if token.kind.is_tag_tree()
@@ -2830,7 +2838,7 @@ impl<'s, 'a> Parser<'s, 'a> {
         peek_fn: impl Fn(TokenKind) -> bool,
         g: impl FnMut(&mut Self) -> ParseResult<U>,
     ) -> ParseResult<(AstNode<'a, ast::Body<'a>>, TokenKind, U)> {
-        let mut statements = self.arena.vec();
+        let mut statements = self.arena.vec_with_capacity(STATEMENTS);
         let start = self.current_pos();
         let mut end: Option<_> = None;
 
@@ -3384,11 +3392,18 @@ impl<'s, 'a> Parser<'s, 'a> {
 
 /// The whitespace control markers of `tag`, which are any of `markers` right
 /// inside its two character delimiters.
-fn tag_trim(tag: &str, markers: &[char]) -> ast::TrimMarker {
-    let inner = tag.get(2..tag.len().saturating_sub(2)).unwrap_or_default();
-    let marker = |c: Option<char>| c.filter(|c| markers.contains(c));
+///
+/// ##Note: The delimiters and the markers are ASCII, so the markers are the
+/// bytes right inside the delimiters, and the tag needn't be decoded.
+fn tag_trim(tag: &[u8], markers: &[char]) -> ast::TrimMarker {
+    let Some(inner) = tag.get(2..tag.len().saturating_sub(2)).filter(|inner| !inner.is_empty())
+    else {
+        return ast::TrimMarker::default();
+    };
 
-    ast::TrimMarker { left: marker(inner.chars().next()), right: marker(inner.chars().next_back()) }
+    let marker =
+        |byte: u8| Some(char::from(byte)).filter(|c| byte.is_ascii() && markers.contains(c));
+    ast::TrimMarker { left: marker(inner[0]), right: marker(inner[inner.len() - 1]) }
 }
 
 #[cfg(test)]
@@ -3398,11 +3413,11 @@ mod test_super {
     #[test]
     fn test_tag_trim() {
         let both = ast::TrimMarker { left: Some('-'), right: Some('-') };
-        assert_eq!(tag_trim("{%- if x -%}", &['-']), both);
-        assert_eq!(tag_trim("{{- x }}", &['-']).left, Some('-'));
-        assert_eq!(tag_trim("{% if x %}", &['-']), ast::TrimMarker::default());
+        assert_eq!(tag_trim(b"{%- if x -%}", &['-']), both);
+        assert_eq!(tag_trim(b"{{- x }}", &['-']).left, Some('-'));
+        assert_eq!(tag_trim(b"{% if x %}", &['-']), ast::TrimMarker::default());
 
         // Django has no markers.
-        assert_eq!(tag_trim("{%- if x -%}", &[]), ast::TrimMarker::default());
+        assert_eq!(tag_trim(b"{%- if x -%}", &[]), ast::TrimMarker::default());
     }
 }

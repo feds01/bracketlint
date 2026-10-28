@@ -1118,18 +1118,25 @@ pub enum Syntax {
 impl Syntax {
     /// The tag that `name` is in some dialect, e.g. `elsif`, which starts an
     /// `elif` clause in Liquid.
+    ///
+    /// ##Note: The parser looks up the name of each tag that isn't a keyword,
+    /// so the syntaxes are looped over directly, which costs less than an
+    /// iterator that chains them.
     pub fn tag(name: &str) -> Option<Self> {
-        Dialect::ALL
-            .iter()
-            .flat_map(|&dialect| {
-                [
-                    Syntax::ElifTag(dialect),
-                    Syntax::EmptyLoopTag(dialect),
-                    Syntax::RawTag(dialect),
-                    Syntax::EndRawTag(dialect),
-                ]
-            })
-            .find(|syntax| syntax.tag_name() == Some(name))
+        for &dialect in Dialect::ALL {
+            for syntax in [
+                Syntax::ElifTag(dialect),
+                Syntax::EmptyLoopTag(dialect),
+                Syntax::RawTag(dialect),
+                Syntax::EndRawTag(dialect),
+            ] {
+                if syntax.tag_name() == Some(name) {
+                    return Some(syntax);
+                }
+            }
+        }
+
+        None
     }
 
     /// The name of the tag, as the dialect that it is held with spells it, if

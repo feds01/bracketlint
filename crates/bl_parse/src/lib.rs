@@ -1,5 +1,7 @@
 //! Contains all of the parsing logic for the `bl` project.
 
+use std::cell::Cell;
+
 use bl_arena::Arena;
 use bl_ast::{AstNode, AstNodeRef, AstVisitor, Dialect, Document, SourceId, Span, TempSourceMap};
 use bl_ast_utils::{AstTreePrinter, TreeWriter, TreeWriterConfig};
@@ -79,6 +81,14 @@ pub struct ParseQueryResult<'a> {
     pub diagnostics: Vec<Report>,
 }
 
+thread_local! {
+    /// The buffer that the last parse on this thread lexed its tokens into,
+    /// which the next one lexes into again, so that the memory for the tokens
+    /// is allocated once per thread rather than once per source, like the
+    /// arena that `bracketlint check` parses each source into.
+    static TOKENS: Cell<Vec<Token>> = const { Cell::new(Vec::new()) };
+}
+
 /// An entry point for the general framework to parse a module, into a tree in
 /// `arena`.
 pub fn parse_source<'a>(query: ParseQuery, arena: &'a Arena) -> ParseQueryResult<'a> {
@@ -89,7 +99,7 @@ pub fn parse_source<'a>(query: ParseQuery, arena: &'a Arena) -> ParseQueryResult
 
     // Lex the contents of the module or interactive block
     let LexerMetadata { tokens, mut diagnostics } =
-        Lexer::new(spanned, id, member.dialect).tokenise();
+        Lexer::with_buffer(spanned, id, member.dialect, TOKENS.take()).tokenise();
     let has_lexer_errors = diagnostics.has_errors();
     let mut reports = diagnostics.into_reports(Reports::from, Reports::from);
 
@@ -102,6 +112,7 @@ pub fn parse_source<'a>(query: ParseQuery, arena: &'a Arena) -> ParseQueryResult
 
     // Check if the lexer has errors...
     if has_lexer_errors {
+        TOKENS.set(tokens);
         note_dialect(&mut reports, member);
         return ParseQueryResult { node: None, diagnostics: reports };
     }
@@ -114,6 +125,7 @@ pub fn parse_source<'a>(query: ParseQuery, arena: &'a Arena) -> ParseQueryResult
     // Perform the parsing operation now... and send the result through the
     // message queue, regardless of it being an error or not.
     let node = parser.parse_document();
+    TOKENS.set(tokens);
 
     reports.extend(diagnostics.into_reports(Reports::from, Reports::from));
     note_dialect(&mut reports, member);
