@@ -275,9 +275,9 @@ impl<'lex> Lexer<'lex> {
         self.spanned.hunk(ByteRange::new(start, end))
     }
 
-    /// Lex the next token, or the next tree with each of its tokens, and push
-    /// them. Returns whether there was one, and so `false` at the end of the
-    /// source or of the tree being lexed, or after a fatal error.
+    /// Lex the next token outside of a tree, or the next tree with each of
+    /// its tokens, and push them. Returns whether there was one, and so `false`
+    /// at the end of the source, or after a fatal error.
     ///
     /// ##Note: The tokens are pushed here, rather than returned, so that the
     /// token after a tree is lexed by the loop that lexed the tree's opener,
@@ -290,270 +290,300 @@ impl<'lex> Lexer<'lex> {
         // Record where the token starts, and then we can start lexing the
         // token.
         let offset = self.offset;
-
-        let on_tree = |this: &mut Self, delimiter: Delimiter| {
-            // The length and the span of the tree are set once it closes.
-            let tree = this.tokens.len();
-            this.tokens
-                .push(Token::new(TokenKind::Tree(delimiter, 0), ByteRange::singleton(offset)));
-            this.eat_token_tree(delimiter);
-
-            if this.has_fatal_error {
-                return false;
-            }
-
-            // The contents of a `{% raw %}` block, as in [Jinja], [Liquid] and
-            // [Nunjucks], are output as they are written, so they are text
-            // rather than tokens.
-            //
-            // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#escaping
-            // [Liquid]: https://shopify.github.io/liquid/tags/template/#raw
-            // [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#raw
-            if this.dialect.has_raw_blocks()
-                && matches!(this.tokens[tree..], tree!(Percent, [kw!(Raw)]))
-            {
-                this.hunk("endraw");
-            }
-
-            // The contents of a `{% doc %}` block, as in [Liquid], are
-            // documentation that needn't be valid Liquid, so they are text too.
-            // One without its `{% enddoc %}` is lexed as usual, since it may be
-            // in a `{% comment %}`, or else the parser reports it.
-            //
-            // [Liquid]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/tags/doc.rb#L38-L55
-            if this.dialect.has_doc_blocks()
-                && matches!(this.tokens[tree..], tree!(Percent, [kw!(Doc)]))
-                && this.has_end_tag("enddoc")
-            {
-                this.hunk("enddoc");
-            }
-
-            true
+        let Some(c) = self.next() else {
+            return false;
         };
 
-        // Each line of a [`liquid`] tag, which only Liquid has, is a tag without
-        // delimiters, or a comment if it starts with `#`.
-        //
-        // [`liquid`]: https://shopify.github.io/liquid/tags/template/#liquid
-        if self.dialect.has_liquid_tag()
-            && let Some(info) = self.tree
-            && self.at_liquid_line(info)
-        {
-            if self.peek() != '#' {
-                return on_tree(self, Delimiter::Line);
-            }
-
-            self.offset = self.line_end();
-            let span = ByteRange::new(offset, self.len_consumed());
-            self.tokens.push(Token::new(TokenKind::Comment, span));
-            return true;
-        }
-
-        let kind = if std::mem::take(&mut self.path_next) && self.at_include_path() {
-            self.include_path()
-        } else if let Some(mut info) = self.tree {
-            let Some(c) = self.next() else {
-                return false;
-            };
-
-            match c {
-                '%' => match self.peek() {
-                    '}' => {
-                        info.delimiter = Some(Delimiter::Percent);
-                        self.tree = Some(info);
-
-                        self.skip_ascii();
-                        return false;
-                    }
-                    _ => TokenKind::Percent,
-                },
-                // A `}` closes a mapping, e.g. the first in `{a: {b: 1}}`.
-                '}' if info.opener == Delimiter::Curly => {
-                    info.delimiter = Some(Delimiter::Curly);
-                    self.tree = Some(info);
-                    return false;
-                }
-                '}' => match self.peek() {
-                    '}' => {
-                        info.delimiter = Some(Delimiter::Brace);
-                        self.tree = Some(info);
-                        self.skip_ascii();
-                        return false;
-                    }
-                    _ => TokenKind::RightDelim(Delimiter::Brace),
-                },
-                c @ (')' | ']') => {
-                    info.delimiter = Some(Delimiter::try_from(c).unwrap());
-                    self.tree = Some(info);
-                    return false;
-                }
-                ch @ ('(' | '[') => {
-                    return on_tree(self, Delimiter::try_from(ch).unwrap());
-                }
-                // A mapping in [Jinja], [Nunjucks] and [Twig], e.g. `{'a': 1}`.
+        let kind = match c {
+            '{' => {
+                // we need to handle whether this a variable block, we have a few options:
                 //
-                // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#literals
-                // [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#expressions
-                // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#literals
-                '{' if self.dialect.has_mappings() => {
-                    return on_tree(self, Delimiter::Curly);
-                }
-                // A whitespace control marker belongs to the delimiter after
-                // it, e.g. the `-` in `-%}`.
-                c if self.is_trim_marker(c) && self.at_closing_delimiter(0) => {
-                    return self.advance_token();
-                }
-                c if is_ident_start(c) => self.ident(c),
-                '0'..='9' => self.number(ShouldSkip::No),
-                '|' => TokenKind::Pipe,
-                // `!==` and `===` in [Nunjucks] and [Twig], which compare
-                // without converting either side.
-                //
-                // [Nunjucks]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/lexer.js#L165-L178
-                // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#comparisons
-                '!' => match self.peek() {
-                    '=' if self.dialect.has_strict_comparisons() && self.peek_second() == '=' => {
+                // 1. We have a variable block, which is `{{ ... }}`
+                // 2. We have a function block, which is `{% ... %}`
+                // 3. We have a comment block, which is `{# ... #}`
+                match self.peek() {
+                    '%' if self.at_inline_comment() => self.inline_comment(),
+                    c @ ('%' | '{') => {
                         self.skip_ascii();
-                        self.skip_ascii();
-                        TokenKind::NotEqEq
-                    }
-                    '=' => {
-                        self.skip_ascii();
-                        TokenKind::NotEq
-                    }
-                    _ => TokenKind::Exclamation,
-                },
-                ':' => TokenKind::Colon,
-                ',' => TokenKind::Comma,
-                // The conditional `a ? b : c`, and `a ?? b`, in [Twig]. The
-                // `?:` in `a ?: b` is a `?` and a `:`, since it can also be
-                // written `? :`.
-                //
-                // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#other-operators
-                '?' if self.dialect.has_conditional_operators() => match self.peek() {
-                    '?' => {
-                        self.skip_ascii();
-                        TokenKind::QuestionQuestion
-                    }
-                    _ => TokenKind::Question,
-                },
-                '.' => match self.peek() {
-                    '.' => {
-                        self.skip_ascii();
-                        TokenKind::DotDot
-                    }
-                    _ => TokenKind::Dot,
-                },
-                '=' => match self.peek() {
-                    '=' if self.dialect.has_strict_comparisons() && self.peek_second() == '=' => {
-                        self.skip_ascii();
-                        self.skip_ascii();
-                        TokenKind::EqEqEq
-                    }
-                    '=' => {
-                        self.skip_ascii();
-                        TokenKind::EqEq
-                    }
-                    // The arrow of an arrow function in [Twig], e.g. `x => x.name`.
-                    //
-                    // [Twig]: https://github.com/twigphp/Twig/blob/v3.30.0/src/ExpressionParser/Infix/ArrowExpressionParser.php#L28-L32
-                    '>' if self.dialect.has_arrow_functions() => {
-                        self.skip_ascii();
-                        TokenKind::Arrow
-                    }
-                    _ => TokenKind::Eq,
-                },
-                '>' => match self.peek() {
-                    '=' => {
-                        self.skip_ascii();
-                        TokenKind::GtEq
-                    }
-                    _ => TokenKind::Gt,
-                },
-                '<' => match self.peek() {
-                    // The spaceship operator `<=>` in [Twig].
-                    //
-                    // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#spaceship-operator
-                    '=' if self.dialect.has_spaceship_operator() && self.peek_second() == '>' => {
-                        self.skip_ascii();
-                        self.skip_ascii();
-                        TokenKind::Spaceship
-                    }
-                    '=' => {
-                        self.skip_ascii();
-                        TokenKind::LtEq
-                    }
-                    _ => TokenKind::Lt,
-                },
-                '-' => match self.peek() {
-                    c if c.is_ascii_digit() && !self.minus_subtracts() => {
-                        self.number(ShouldSkip::Yes)
-                    }
-                    _ => TokenKind::Minus,
-                },
-                '+' => TokenKind::Plus,
-                '*' => match self.peek() {
-                    '*' => {
-                        self.skip_ascii();
-                        TokenKind::StarStar
-                    }
-                    _ => TokenKind::Star,
-                },
-                '/' => match self.peek() {
-                    '/' => {
-                        self.skip_ascii();
-                        TokenKind::SlashSlash
-                    }
-                    _ => TokenKind::Slash,
-                },
-                // `~` is also Twig's whitespace control marker, which the arm
-                // for markers above takes when it is next to the delimiter.
-                '~' => TokenKind::Tilde,
-                c @ ('\'' | '"') => self.string(c),
-                c => TokenKind::Unexpected(c),
-            }
-        } else {
-            let Some(c) = self.next() else {
-                return false;
-            };
 
-            match c {
-                '{' => {
-                    // we need to handle whether this a variable block, we have a few options:
-                    //
-                    // 1. We have a variable block, which is `{{ ... }}`
-                    // 2. We have a function block, which is `{% ... %}`
-                    // 3. We have a comment block, which is `{# ... #}`
-                    match self.peek() {
-                        '%' if self.at_inline_comment() => self.inline_comment(),
-                        c @ ('%' | '{') => {
-                            self.skip_ascii();
-
-                            let delimiter =
-                                if c == '%' { Delimiter::Percent } else { Delimiter::Brace };
-                            return on_tree(self, delimiter);
-                        }
-                        // A `{# #}` comment, as in [Django], [Jinja], [Nunjucks]
-                        // and [Twig]. Liquid has none.
-                        //
-                        // [Django]: https://docs.djangoproject.com/en/stable/ref/templates/language/#comments
-                        // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#comments
-                        // [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#comments
-                        // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#comments
-                        '#' if self.dialect.has_hash_comments() => {
-                            self.skip_ascii();
-                            self.comment()
-                        }
-                        _ => self.text(),
+                        let delimiter =
+                            if c == '%' { Delimiter::Percent } else { Delimiter::Brace };
+                        return self.open_tree(delimiter, offset);
                     }
+                    // A `{# #}` comment, as in [Django], [Jinja], [Nunjucks]
+                    // and [Twig]. Liquid has none.
+                    //
+                    // [Django]: https://docs.djangoproject.com/en/stable/ref/templates/language/#comments
+                    // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#comments
+                    // [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#comments
+                    // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#comments
+                    '#' if self.dialect.has_hash_comments() => {
+                        self.skip_ascii();
+                        self.comment()
+                    }
+                    _ => self.text(),
                 }
-                // We assume that this is just "text"
-                _ => self.text(),
             }
+            // We assume that this is just "text"
+            _ => self.text(),
         };
 
         let location = ByteRange::new(offset, self.len_consumed());
         self.tokens.push(Token::new(kind, location));
+        true
+    }
+
+    /// Lex the next token in the tree that is being lexed, or the next tree in
+    /// it with each of its tokens, like [Lexer::advance_token], and push them.
+    /// Returns `false` at the end of the tree or of the source, or after a
+    /// fatal error.
+    ///
+    /// ##Note: Most tokens are in a tree, so this is inlined into the loop of
+    /// [Lexer::eat_token_tree], which then lexes each token of a tree without
+    /// a call, and makes one only for a tree in the tree, see
+    /// [Lexer::open_tree].
+    #[inline(always)]
+    fn advance_in_tree(&mut self) -> bool {
+        loop {
+            // First, discard all of the white-space characters that we
+            // encounter before we start lexing the next token.
+            self.skip_whitespace();
+
+            // Record where the token starts, and then we can start lexing the
+            // token.
+            let offset = self.offset;
+
+            // Each line of a [`liquid`] tag, which only Liquid has, is a tag
+            // without delimiters, or a comment if it starts with `#`.
+            //
+            // [`liquid`]: https://shopify.github.io/liquid/tags/template/#liquid
+            if self.dialect.has_liquid_tag()
+                && let Some(info) = self.tree
+                && self.at_liquid_line(info)
+            {
+                if self.peek() != '#' {
+                    return self.open_tree(Delimiter::Line, offset);
+                }
+
+                self.offset = self.line_end();
+                let span = ByteRange::new(offset, self.len_consumed());
+                self.tokens.push(Token::new(TokenKind::Comment, span));
+                return true;
+            }
+
+            let kind = if std::mem::take(&mut self.path_next) && self.at_include_path() {
+                self.include_path()
+            } else {
+                let (Some(mut info), Some(c)) = (self.tree, self.next()) else {
+                    return false;
+                };
+
+                match c {
+                    '%' => match self.peek() {
+                        '}' => {
+                            info.delimiter = Some(Delimiter::Percent);
+                            self.tree = Some(info);
+
+                            self.skip_ascii();
+                            return false;
+                        }
+                        _ => TokenKind::Percent,
+                    },
+                    // A `}` closes a mapping, e.g. the first in `{a: {b: 1}}`.
+                    '}' if info.opener == Delimiter::Curly => {
+                        info.delimiter = Some(Delimiter::Curly);
+                        self.tree = Some(info);
+                        return false;
+                    }
+                    '}' => match self.peek() {
+                        '}' => {
+                            info.delimiter = Some(Delimiter::Brace);
+                            self.tree = Some(info);
+                            self.skip_ascii();
+                            return false;
+                        }
+                        _ => TokenKind::RightDelim(Delimiter::Brace),
+                    },
+                    c @ (')' | ']') => {
+                        info.delimiter = Some(Delimiter::try_from(c).unwrap());
+                        self.tree = Some(info);
+                        return false;
+                    }
+                    ch @ ('(' | '[') => {
+                        return self.open_tree(Delimiter::try_from(ch).unwrap(), offset);
+                    }
+                    // A mapping in [Jinja], [Nunjucks] and [Twig], e.g. `{'a': 1}`.
+                    //
+                    // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#literals
+                    // [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#expressions
+                    // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#literals
+                    '{' if self.dialect.has_mappings() => {
+                        return self.open_tree(Delimiter::Curly, offset);
+                    }
+                    // A whitespace control marker belongs to the delimiter after
+                    // it, e.g. the `-` in `-%}`.
+                    c if self.is_trim_marker(c) && self.at_closing_delimiter(0) => continue,
+                    c if is_ident_start(c) => self.ident(c),
+                    '0'..='9' => self.number(ShouldSkip::No),
+                    '|' => TokenKind::Pipe,
+                    // `!==` and `===` in [Nunjucks] and [Twig], which compare
+                    // without converting either side.
+                    //
+                    // [Nunjucks]: https://github.com/mozilla/nunjucks/blob/v3.2.4/nunjucks/src/lexer.js#L165-L178
+                    // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#comparisons
+                    '!' => match self.peek() {
+                        '=' if self.dialect.has_strict_comparisons()
+                            && self.peek_second() == '=' =>
+                        {
+                            self.skip_ascii();
+                            self.skip_ascii();
+                            TokenKind::NotEqEq
+                        }
+                        '=' => {
+                            self.skip_ascii();
+                            TokenKind::NotEq
+                        }
+                        _ => TokenKind::Exclamation,
+                    },
+                    ':' => TokenKind::Colon,
+                    ',' => TokenKind::Comma,
+                    // The conditional `a ? b : c`, and `a ?? b`, in [Twig]. The
+                    // `?:` in `a ?: b` is a `?` and a `:`, since it can also be
+                    // written `? :`.
+                    //
+                    // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#other-operators
+                    '?' if self.dialect.has_conditional_operators() => match self.peek() {
+                        '?' => {
+                            self.skip_ascii();
+                            TokenKind::QuestionQuestion
+                        }
+                        _ => TokenKind::Question,
+                    },
+                    '.' => match self.peek() {
+                        '.' => {
+                            self.skip_ascii();
+                            TokenKind::DotDot
+                        }
+                        _ => TokenKind::Dot,
+                    },
+                    '=' => match self.peek() {
+                        '=' if self.dialect.has_strict_comparisons()
+                            && self.peek_second() == '=' =>
+                        {
+                            self.skip_ascii();
+                            self.skip_ascii();
+                            TokenKind::EqEqEq
+                        }
+                        '=' => {
+                            self.skip_ascii();
+                            TokenKind::EqEq
+                        }
+                        // The arrow of an arrow function in [Twig], e.g. `x => x.name`.
+                        //
+                        // [Twig]: https://github.com/twigphp/Twig/blob/v3.30.0/src/ExpressionParser/Infix/ArrowExpressionParser.php#L28-L32
+                        '>' if self.dialect.has_arrow_functions() => {
+                            self.skip_ascii();
+                            TokenKind::Arrow
+                        }
+                        _ => TokenKind::Eq,
+                    },
+                    '>' => match self.peek() {
+                        '=' => {
+                            self.skip_ascii();
+                            TokenKind::GtEq
+                        }
+                        _ => TokenKind::Gt,
+                    },
+                    '<' => match self.peek() {
+                        // The spaceship operator `<=>` in [Twig].
+                        //
+                        // [Twig]: https://twig.symfony.com/doc/3.x/templates.html#spaceship-operator
+                        '=' if self.dialect.has_spaceship_operator()
+                            && self.peek_second() == '>' =>
+                        {
+                            self.skip_ascii();
+                            self.skip_ascii();
+                            TokenKind::Spaceship
+                        }
+                        '=' => {
+                            self.skip_ascii();
+                            TokenKind::LtEq
+                        }
+                        _ => TokenKind::Lt,
+                    },
+                    '-' => match self.peek() {
+                        c if c.is_ascii_digit() && !self.minus_subtracts() => {
+                            self.number(ShouldSkip::Yes)
+                        }
+                        _ => TokenKind::Minus,
+                    },
+                    '+' => TokenKind::Plus,
+                    '*' => match self.peek() {
+                        '*' => {
+                            self.skip_ascii();
+                            TokenKind::StarStar
+                        }
+                        _ => TokenKind::Star,
+                    },
+                    '/' => match self.peek() {
+                        '/' => {
+                            self.skip_ascii();
+                            TokenKind::SlashSlash
+                        }
+                        _ => TokenKind::Slash,
+                    },
+                    // `~` is also Twig's whitespace control marker, which the arm
+                    // for markers above takes when it is next to the delimiter.
+                    '~' => TokenKind::Tilde,
+                    c @ ('\'' | '"') => self.string(c),
+                    c => TokenKind::Unexpected(c),
+                }
+            };
+
+            let location = ByteRange::new(offset, self.len_consumed());
+            self.tokens.push(Token::new(kind, location));
+            return true;
+        }
+    }
+
+    /// Lex the tree that `delimiter` opens at `offset`, and push it and each of
+    /// its tokens. Returns `false` after a fatal error.
+    fn open_tree(&mut self, delimiter: Delimiter, offset: usize) -> bool {
+        // The length and the span of the tree are set once it closes.
+        let tree = self.tokens.len();
+        self.tokens.push(Token::new(TokenKind::Tree(delimiter, 0), ByteRange::singleton(offset)));
+        self.eat_token_tree(delimiter);
+
+        if self.has_fatal_error {
+            return false;
+        }
+
+        // The contents of a `{% raw %}` block, as in [Jinja], [Liquid] and
+        // [Nunjucks], are output as they are written, so they are text
+        // rather than tokens.
+        //
+        // [Jinja]: https://jinja.palletsprojects.com/en/stable/templates/#escaping
+        // [Liquid]: https://shopify.github.io/liquid/tags/template/#raw
+        // [Nunjucks]: https://mozilla.github.io/nunjucks/templating.html#raw
+        if self.dialect.has_raw_blocks()
+            && matches!(self.tokens[tree..], tree!(Percent, [kw!(Raw)]))
+        {
+            self.hunk("endraw");
+        }
+
+        // The contents of a `{% doc %}` block, as in [Liquid], are
+        // documentation that needn't be valid Liquid, so they are text too.
+        // One without its `{% enddoc %}` is lexed as usual, since it may be
+        // in a `{% comment %}`, or else the parser reports it.
+        //
+        // [Liquid]: https://github.com/Shopify/liquid/blob/v5.14.0/lib/liquid/tags/doc.rb#L38-L55
+        if self.dialect.has_doc_blocks()
+            && matches!(self.tokens[tree..], tree!(Percent, [kw!(Doc)]))
+            && self.has_end_tag("enddoc")
+        {
+            self.hunk("enddoc");
+        }
+
         true
     }
 
@@ -592,7 +622,7 @@ impl<'lex> Lexer<'lex> {
         // `None` here doesn't just mean EOF, it could also be that
         // the next token failed to be parsed.
         while !self.is_eof() {
-            match self.advance_token() {
+            match self.advance_in_tree() {
                 true => {}
                 // A closing delimiter in a line closes nothing, e.g. the `)` in
                 // `echo total)`, and the rest of the line is still lexed.
