@@ -232,6 +232,10 @@ impl<'lex> Lexer<'lex> {
     /// Skip the whitespace before the next token. It is almost always ASCII,
     /// so its bytes are checked directly, up to the first non-ASCII byte, from
     /// where [char::is_whitespace] decides.
+    ///
+    /// ##Note: This runs before each token, so it is inlined into the loops
+    /// that lex them, rather than called.
+    #[inline(always)]
     fn skip_whitespace(&mut self) {
         let rest = unsafe { self.as_slice() }.as_bytes();
         let len =
