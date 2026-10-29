@@ -1,0 +1,47 @@
+# Stage the npm packages of a release, a package per platform with its binary
+# and @feds01/bracketlint, which depends on them, with npm's trusted
+# publishing: npm trusts the release workflow of this repository, so no token
+# is kept. The staged versions go live once a maintainer approves them, with
+# 2FA. The release workflow that dist generates calls it with the release's
+# plan, which it doesn't need: the release is of the binary crate's version.
+name: Stage the npm packages
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+
+jobs:
+  publish-npm-package:
+    runs-on: ubuntu-24.04
+    # The OIDC token that npm exchanges for one that stages the packages.
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      # This repository, for its justfile and the packages' templates in npm/.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          path: bracketlint
+      # The archive of each platform's binary.
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: artifacts-build-local-*
+          path: artifacts/
+          merge-multiple: true
+      # Staged publishing needs Node 22.14 and npm 11.15, or later, which the
+      # newest Node 24 comes with: `check-latest` takes it, rather than an
+      # older one that the runner has cached. Without a `registry-url`,
+      # setup-node writes no .npmrc that expects a token.
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          check-latest: true
+      # Pinned, as it isn't GitHub's own, and each step here could stage the
+      # packages.
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+      - name: Stage the packages
+        run: just --justfile bracketlint/justfile publish-npm artifacts
