@@ -1,80 +1,68 @@
-# Bracketlint :zap:
+# Bracketlint
 
 [![CodSpeed](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json)](https://app.codspeed.io/feds01/bracketlint?utm_source=badge)
 
-> HTML template linter for [Jinja](https://jinja.palletsprojects.com/), [Nunjucks](https://mozilla.github.io/nunjucks/), [Django templates](https://docs.djangoproject.com/en/dev/topics/templates/), [Twig](https://twig.symfony.com/), [Liquid](https://shopify.github.io/liquid/).
+> A linter and formatter for Django, Jinja, Liquid, Nunjucks and Twig templates.
+
+`bracketlint check` reports the problems in a project's templates, such as a
+tag that is never closed, or another dialect's spelling of a tag.
+`bracketlint fmt` formats them: it lays out their HTML and their tags, and
+evens out the spacing inside each tag. It reads [Django](https://docs.djangoproject.com/en/stable/ref/templates/),
+[Jinja](https://jinja.palletsprojects.com/en/stable/templates/),
+[Liquid](https://shopify.github.io/liquid/),
+[Nunjucks](https://mozilla.github.io/nunjucks/templating.html) and
+[Twig](https://twig.symfony.com/doc/3.x/) templates.
 
 ## Installation
 
-Prebuilt binaries for macOS (Apple Silicon, Intel), Linux (x86_64, arm64; statically linked) and Windows ship with every [release](https://github.com/feds01/bracketlint/releases). No Rust toolchain needed.
+See [INSTALL.md](INSTALL.md). With npm, for example:
 
-With npm, as a project's dev dependency, run with `npx`:
-
-```bash
-$ npm install --save-dev @feds01/bracketlint
-$ npx bracketlint check templates/
+```sh
+npm install --save-dev @feds01/bracketlint
 ```
 
-The binary for each platform is in a package of its own, such as `@feds01/bracketlint-darwin-arm64`, which `@feds01/bracketlint` lists as an optional dependency, so the package manager installs only the one for your platform, with no install script. Leaving optional dependencies out, e.g. with `npm install --omit=optional`, leaves out the binary too.
+## Usage
 
-With [Homebrew](https://brew.sh), on macOS or Linux:
-
-```bash
-$ brew install feds01/tap/bracketlint
+```sh
+bracketlint check templates/        # report problems in the templates
+bracketlint fmt templates/          # format the templates in place
+bracketlint fmt --check templates/  # list the templates that formatting would change
+bracketlint fmt --diff templates/   # print a diff of how formatting would change them
 ```
 
-With the install script, on macOS / Linux:
+`fmt --check` and `fmt --diff` don't write any file, and exit with 1 if
+formatting would change a template, so CI can require formatted templates.
+The list and the diff go to stdout, and everything else to stderr, so
+`bracketlint fmt --diff templates/ > changes.diff` writes a plain diff that
+`patch -p0` applies.
 
-```bash
-$ curl --proto '=https' --tlsv1.2 -LsSf https://github.com/feds01/bracketlint/releases/latest/download/bracketlint-installer.sh | sh
+Files that `.gitignore` and other ignore files exclude are skipped, unless you
+pass `--no-respect-gitignore`. Each file is read in the dialect that its
+extension names: `.jinja` is Jinja, `.liquid` is Liquid, `.njk` is Nunjucks
+and `.twig` is Twig. Any other file, such as `.html`, is read as Django, unless
+the project's [`bracketlint.toml`](#configuration) sets another dialect. To
+read every file in one dialect instead, pass `--dialect`:
+
+```sh
+bracketlint check --dialect liquid theme/
 ```
 
-Windows:
+Only errors fail a run. A warning, such as another dialect's spelling of a
+tag, is reported but doesn't fail it, unless you pass `--deny-warnings`:
 
-```powershell
-> powershell -ExecutionPolicy Bypass -c "irm https://github.com/feds01/bracketlint/releases/latest/download/bracketlint-installer.ps1 | iex"
+```sh
+bracketlint check --deny-warnings templates/
 ```
 
-The installer puts `bracketlint` in `~/.local/bin` (or `$XDG_BIN_HOME`). To fetch an archive directly instead, e.g. in CI:
+`bracketlint` exits with 0 when a run passes, 1 when it fails, and 2 when it
+couldn't run, e.g. when an argument is wrong, or it crashed. Pass `-v`
+(`--verbose`) to also print debug logs, such as how long each step of a run
+takes.
 
-```bash
-$ gh release download --repo feds01/bracketlint --pattern 'bracketlint-aarch64-apple-darwin.tar.xz'
-```
+## Configuration
 
-From source (with Rust & Cargo installed):
-
-```bash
-$ cargo install --git https://github.com/feds01/bracketlint bracketlint
-```
-
-### Usage
-
-```bash
-$ bracketlint check templates/        # report problems in the templates
-$ bracketlint fmt templates/          # format the templates in place
-$ bracketlint fmt --check templates/  # list the templates that formatting would change
-$ bracketlint fmt --diff templates/   # print a diff of how formatting would change them
-```
-
-`fmt --check` and `fmt --diff` don't write any file, and exit with 1 if formatting would change a template, so CI can require formatted templates. The list and the diff go to stdout, and everything else to stderr, so `bracketlint fmt --diff templates/ > changes.diff` writes a plain diff that `patch -p0` applies.
-
-Files that `.gitignore` and other ignore files exclude are skipped, unless you pass `--no-respect-gitignore`. Each file is read in the dialect that its extension names: `.jinja` is Jinja, `.liquid` is Liquid, `.njk` is Nunjucks and `.twig` is Twig. Any other file, such as `.html`, is read as Django, unless the project's [`bracketlint.toml`](#configuration) sets another dialect. To read every file in one dialect instead, pass `--dialect`:
-
-```bash
-$ bracketlint check --dialect liquid theme/
-```
-
-Only errors fail a run. A warning, such as another dialect's spelling of a tag, is reported but doesn't fail it, unless you pass `--deny-warnings`:
-
-```bash
-$ bracketlint check --deny-warnings templates/
-```
-
-`bracketlint` exits with 0 when a run passes, 1 when it fails, and 2 when it couldn't run, e.g. when an argument is wrong, or it crashed. Pass `-v` (`--verbose`) to also print debug logs, such as how long each step of a run takes.
-
-### Configuration
-
-A project's settings go in a `bracketlint.toml`, which bracketlint reads from the current directory, or else the closest of its parents that has one:
+A project's settings go in a `bracketlint.toml`, which bracketlint reads from
+the current directory, or else the closest of its parents that has one:
 
 ```toml
 # The dialect of the templates whose extension doesn't name one, such as
@@ -86,26 +74,15 @@ dialect = "jinja"
 markup = "text"
 ```
 
-Whitespace in a `text` template is part of its output, so `bracketlint fmt` keeps all of the text between its tags exactly as it is written, and only formats the tags. In an `html` template, it indents the text and wraps its lines, as HTML shows a run of whitespace as a single space.
+Whitespace in a `text` template is part of its output, so `bracketlint fmt`
+keeps all of the text between its tags exactly as it is written, and only
+formats the tags. In an `html` template, it indents the text and wraps its
+lines, as HTML shows a run of whitespace as a single space.
 
-### Development
+## Contributing
 
-Common tasks are recipes in the [`justfile`](./justfile) (install [just](https://github.com/casey/just) with `brew install just` or `cargo install just`). Run `just` to list them all:
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-```bash
-$ just setup             # install the pinned nightly toolchain and pre-commit hooks
-$ just install           # install `bracketlint` from this checkout into ~/.cargo/bin
-$ just run check foo/    # run the CLI from source
-$ just test              # run all tests
-$ just update-snapshots  # re-generate the UI test snapshots in tests/cases, and how the real-world templates in tests/corpus do
-$ just corpus            # print how the real-world templates in tests/corpus do
-$ just corpus-compare    # compare them with the baselines on main, as the comment on each PR does
-$ just ci                # run tests, clippy and the formatting check, like CI does
-$ just bench             # run benchmarks
-```
+## License
 
-### Releasing
-
-Bump `version` in `crates/bl/Cargo.toml`, and with it `Cargo.lock`, and run `just changelog <version>`, which writes [CHANGELOG.md](CHANGELOG.md) with [git-cliff](https://git-cliff.org) from the titles of the pull requests merged since the last release (see [cliff.toml](cliff.toml)). Merge that to `main`, then run `just release` to tag it. [dist](https://github.com/axodotdev/cargo-dist) (`.github/workflows/release.yml`, configured in `dist-workspace.toml`) builds the binaries and installers, and publishes the GitHub release, with the release's section of the changelog as its notes, and the Homebrew formula, to [feds01/homebrew-tap](https://github.com/feds01/homebrew-tap).
-
-A pull request's title is its entry in the changelog, so write it as a conventional commit, as in `feat(parse): …`. Features, fixes, performance and documentation are listed; other types are not.
+MIT
