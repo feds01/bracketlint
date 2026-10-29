@@ -6,15 +6,14 @@ pub mod version;
 
 use std::{
     fmt::{self as std_fmt, Display, Formatter},
-    io,
+    fs, io,
     path::{Path, PathBuf},
-    sync::atomic::{AtomicUsize, Ordering},
-    thread,
 };
 
+use bl_ast::SourceId;
 use bl_reporting::{ReportBuilder, Reports};
-use bl_utils::path::relative_path;
-use bl_workspace::resolver::ResolvedFile;
+use bl_utils::{path::relative_path, pool::map_in_parallel};
+use bl_workspace::{Workspace, resolver::ResolvedFile};
 
 /// Sort the `files` that the walker found by their paths, after the paths
 /// that it couldn't search. It searches them in parallel, so it finds them in
@@ -28,50 +27,35 @@ pub(crate) fn sort_files(files: &mut [Result<ResolvedFile, ignore::Error>]) {
     files.sort_by(|a, b| path(a).cmp(&path(b)));
 }
 
-/// Map `f` over `items` on `threads` threads, and return what it returns for
-/// each item, in the order of `items`. Each thread takes the next item that no
-/// thread has taken yet, so that a large one doesn't hold up the rest, and
-/// keeps a state for `f` that `init` makes, e.g. an arena to parse into. With
-/// one thread, the items are mapped on this one.
-pub(crate) fn map_in_parallel<T: Sync, S, R: Send>(
-    items: &[T],
+/// Read the `files` that the walker found, on `threads` threads, and reserve a
+/// member of `workspace` for each, in the order of the files. Returns each
+/// file's member, or the reports of why it couldn't be found or read.
+///
+/// ##Note: Reading the files takes longer than parsing them, so they are read
+/// in parallel too, before their members are reserved in order.
+pub(crate) fn read_members(
+    files: Vec<Result<ResolvedFile, ignore::Error>>,
+    workspace: &mut Workspace,
     threads: usize,
-    init: impl Fn() -> S + Sync,
-    f: impl Fn(&mut S, &T) -> R + Sync,
-) -> Vec<R> {
-    if threads <= 1 || items.len() <= 1 {
-        let mut state = init();
-        return items.iter().map(|item| f(&mut state, item)).collect();
-    }
+) -> Vec<Result<SourceId, Reports>> {
+    let files: Vec<_> = files.into_iter().map(|file| file.map(ResolvedFile::into_path)).collect();
+    let contents = map_in_parallel(
+        &files,
+        threads,
+        || (),
+        |(), file| file.as_ref().ok().map(fs::read_to_string),
+    );
 
-    let next = AtomicUsize::new(0);
-    let mut mapped: Vec<(usize, R)> = thread::scope(|scope| {
-        let workers: Vec<_> = (0..threads.min(items.len()))
-            .map(|_| {
-                scope.spawn(|| {
-                    let mut state = init();
-                    let mut mapped = Vec::new();
-                    loop {
-                        let index = next.fetch_add(1, Ordering::Relaxed);
-                        let Some(item) = items.get(index) else {
-                            break mapped;
-                        };
-                        mapped.push((index, f(&mut state, item)));
-                    }
-                })
-            })
-            .collect();
-
-        workers
-            .into_iter()
-            .flat_map(|worker| {
-                worker.join().unwrap_or_else(|panic| std::panic::resume_unwind(panic))
-            })
-            .collect()
-    });
-
-    mapped.sort_unstable_by_key(|&(index, _)| index);
-    mapped.into_iter().map(|(_, value)| value).collect()
+    files
+        .into_iter()
+        .zip(contents)
+        .map(|(file, contents)| match (file, contents) {
+            (Ok(path), Some(Ok(contents))) => Ok(workspace.reserve_member(path, contents)),
+            (Ok(path), Some(Err(err))) => Err(Reports::from(FileError::Read { path, err })),
+            (Err(err), _) => Err(Reports::from(FileError::from(err))),
+            (Ok(_), None) => unreachable!("each path that was found is read"),
+        })
+        .collect()
 }
 
 /// A file that couldn't be read or written, or a path that couldn't be
@@ -130,33 +114,5 @@ impl From<FileError> for Reports {
         let mut reporter = ReportBuilder::default();
         reporter.error().title(err);
         reporter.into_reports()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::map_in_parallel;
-
-    #[test]
-    fn mapped_in_parallel_in_the_order_of_the_items() {
-        // The items take different times to map, so that the threads finish
-        // them out of order.
-        let items: Vec<u64> = (0..200).collect();
-        let spin = |item: u64| (0..item % 7 * 10_000).fold(0u64, u64::wrapping_add);
-
-        for threads in [1, 2, 8] {
-            let mapped = map_in_parallel(
-                &items,
-                threads,
-                || (),
-                |(), &item| {
-                    std::hint::black_box(spin(item));
-                    item * 2
-                },
-            );
-
-            let expected: Vec<_> = items.iter().map(|item| item * 2).collect();
-            assert_eq!(mapped, expected, "with {threads} threads");
-        }
     }
 }

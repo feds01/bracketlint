@@ -5,6 +5,7 @@ pub mod fs;
 pub mod highlight;
 pub mod logging;
 pub mod path;
+pub mod pool;
 pub mod printing;
 pub mod range_map;
 pub mod stream;

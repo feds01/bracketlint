@@ -1,19 +1,22 @@
 //! Implementation of the `check` command.
 
-use std::{fs, num::NonZero, path::PathBuf, thread};
+use std::path::PathBuf;
 
 use anyhow::Result;
 use bl_arena::Arena;
 use bl_ast::SourceId;
-use bl_parse::{ParseQuery, ParseQueryResult, emit_source_tree, parse_source};
+use bl_parse::{ParseQuery, ParseQueryResult, format_source_tree, parse_source};
 use bl_reporting::Reports;
-use bl_utils::timed;
+use bl_utils::{
+    pool::{self, map_in_parallel},
+    timed,
+};
 use bl_workspace::{
     Workspace, WorkspaceMembers, resolver::find_files_in_paths, settings::Settings,
 };
-use log::{Level, debug, warn};
+use log::{Level, debug, info, warn};
 
-use super::{FileError, map_in_parallel, sort_files};
+use super::{read_members, sort_files};
 
 pub fn check(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
     // Firstly, we need to discover all of the files in the provided paths.
@@ -32,57 +35,36 @@ pub fn check(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
     debug!("found {} files", files.len());
 
     // The files are read and parsed on as many threads as the machine has,
-    // which each take the next file in turn. A file's tree is dumped as it is
-    // parsed, so `--dump-ast` takes one thread, to dump the trees in order.
-    let threads = if workspace.settings.should_dump_ast() {
-        1
-    } else {
-        thread::available_parallelism().map_or(1, NonZero::get)
-    };
+    // which each take the next file in turn.
+    let threads = pool::threads();
 
     // @@Todo: integrate a cache system here, we should be able to avoid re-linting
     // already existent files and just skip them.
     let diagnostics = timed(
         || {
-            let files: Vec<_> =
-                files.into_iter().map(|file| file.map(|file| file.into_path())).collect();
-
-            // Reading the files takes longer than parsing them, so they are read
-            // in parallel too, before their members are reserved in order.
-            let contents = map_in_parallel(
-                &files,
-                threads,
-                || (),
-                |(), file| file.as_ref().ok().map(fs::read_to_string),
-            );
-
-            let checks: Vec<_> = files
-                .into_iter()
-                .zip(contents)
-                .map(|(file, contents)| match (file, contents) {
-                    (Ok(path), Some(Ok(contents))) => Ok(workspace.reserve_member(path, contents)),
-                    (Ok(path), Some(Err(err))) => Err(Reports::from(FileError::Read { path, err })),
-                    (Err(err), _) => Err(Reports::from(FileError::from(err))),
-                    (Ok(_), None) => unreachable!("each path that was found is read"),
-                })
-                .collect();
+            let members = read_members(files, workspace, threads);
 
             // Each thread parses each file into its own arena, and then frees it,
             // so that its next file reuses its memory.
-            let (members, settings) = (&workspace.members, &workspace.settings);
-            let mut parsed = map_in_parallel(&checks, threads, Arena::new, |arena, check| {
-                let id = *check.as_ref().ok()?;
-                let diagnostics = check_member(members, settings, id, arena);
+            let (all, settings) = (&workspace.members, &workspace.settings);
+            let checked = map_in_parallel(&members, threads, Arena::new, |arena, member| {
+                let id = *member.as_ref().ok()?;
+                let checked = check_member(all, settings, id, arena);
                 arena.reset();
-                Some(diagnostics)
-            })
-            .into_iter();
+                Some(checked)
+            });
 
-            // The diagnostics of each file are reported in the order of the files.
+            // The trees are dumped, and the diagnostics of each file reported, in
+            // the order of the files.
             let mut diagnostics = Reports::default();
-            for check in checks {
-                match (check, parsed.next().flatten()) {
-                    (Ok(_), Some(parsed)) => diagnostics.extend(parsed),
+            for (member, checked) in members.into_iter().zip(checked) {
+                match (member, checked) {
+                    (Ok(_), Some(checked)) => {
+                        if let Some(tree) = checked.tree {
+                            info!("{tree}");
+                        }
+                        diagnostics.extend(checked.diagnostics);
+                    }
                     (Err(reports), _) => diagnostics.extend(reports),
                     (Ok(_), None) => unreachable!("each member is parsed"),
                 }
@@ -99,22 +81,30 @@ pub fn check(files: &[PathBuf], workspace: &mut Workspace) -> Result<Reports> {
     Ok(diagnostics)
 }
 
-/// Parse the member `id` into `arena`, dump its tree if the settings ask for
-/// it, and return the diagnostics from parsing it.
+/// What came of parsing one template.
+struct CheckedMember {
+    /// The diagnostics from parsing the template.
+    diagnostics: Reports,
+
+    /// The tree of the template, drawn for `--dump-ast` if the settings ask
+    /// for it, since the tree is freed with its arena before it is dumped.
+    tree: Option<String>,
+}
+
+/// Parse the member `id` into `arena`, and draw its tree if the settings ask
+/// for it to be dumped.
 fn check_member(
     members: &WorkspaceMembers,
     settings: &Settings,
     id: SourceId,
     arena: &Arena,
-) -> Reports {
+) -> CheckedMember {
     let member = members.member(id);
     let ParseQueryResult { node, diagnostics } = parse_source(ParseQuery::new(id, member), arena);
 
-    if let Some(document) = node
-        && settings.should_dump_ast()
-    {
-        emit_source_tree(member, document);
-    }
+    let tree = node
+        .filter(|_| settings.should_dump_ast())
+        .map(|document| format_source_tree(member, document));
 
-    diagnostics
+    CheckedMember { diagnostics, tree }
 }
