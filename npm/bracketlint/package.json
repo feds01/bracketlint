@@ -1,0 +1,22 @@
+{
+  "name": "@feds01/bracketlint",
+  "version": "0.0.0",
+  "description": "A linter and formatter for Django, Jinja, Liquid, Nunjucks and Twig templates",
+  "keywords": ["linter", "formatter", "templates", "html", "django", "jinja", "liquid", "nunjucks", "twig"],
+  "homepage": "https://github.com/feds01/bracketlint",
+  "bugs": "https://github.com/feds01/bracketlint/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/feds01/bracketlint.git"
+  },
+  "license": "MIT",
+  "author": "Alexander Fedotov <alexander.fedotov.uk@gmail.com>",
+  "bin": {
+    "bracketlint": "bin/bracketlint.js"
+  },
+  "files": ["bin"],
+  "engines": {
+    "node": ">=14"
+  },
+  "optionalDependencies": {}
+}

@@ -2,6 +2,9 @@
 
 set positional-arguments
 
+# The version of the `bracketlint` binary, which a release is of
+bracketlint_version := `sed -n 's/^version = "\(.*\)"/\1/p' crates/bl/Cargo.toml | head -1 | grep .`
+
 # List available recipes
 default:
     @just --list --unsorted
@@ -146,6 +149,7 @@ release:
 
     git tag -a "$tag" -m "Release $tag"
     git push origin "$tag"
+    echo "Once the release workflow has run, approve the npm packages on npmjs.com, under Staged Packages."
 
 # Commit the Homebrew formula of each release in $PLAN, dist's plan, to the tap checked out at `tap`, and push it (run by the release workflow)
 [no-cd]
@@ -175,4 +179,52 @@ publish-formula tap:
     done <<<"$releases"
 
     git push
+
+# Assemble and pack the npm packages into `out`, from the release archives in `archives`, at the binary's version unless given another, and only for `targets` if given any
+[no-cd]
+npm-packages archives out version="" *targets:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    shift 3
+    # An absolute path: npm reads a relative one, like `out/bracketlint`, as a
+    # GitHub repository.
+    out="$(mkdir -p "{{out}}" && cd "{{out}}" && pwd)"
+    node "{{justfile_directory()}}/npm/assemble.mjs" "{{ if version == "" { bracketlint_version } else { version } }}" "{{archives}}" "$out" "$@"
+    for package in "$out"/bracketlint*/; do
+        npm pack --json --pack-destination "$out" "$package" | jq --raw-output '.[].filename'
+    done
+
+# Stage the npm packages of the release, at the binary's version, from the archives in `dir`, for a maintainer to approve, skipping versions already on npm (run by the release workflow)
+[no-cd]
+publish-npm dir:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # 1. Assemble the packages: one per platform, and @feds01/bracketlint.
+    out="$(mktemp -d)"
+    node "{{justfile_directory()}}/npm/assemble.mjs" "{{bracketlint_version}}" "{{dir}}" "$out"
+
+    # 2. Stage the platform packages first, then @feds01/bracketlint, which
+    #    depends on them.
+    for package in "$out"/bracketlint-*/ "$out/bracketlint/"; do
+        # What it stages, e.g. `@feds01/bracketlint@0.3.0`.
+        spec="$(jq --raw-output '.name + "@" + .version' "$package/package.json")"
+
+        # A version already on npm, published by hand or approved after an
+        # earlier run, is skipped, so that the job can be re-run. One that is
+        # staged but not yet approved can't be staged again: approve or reject
+        # it first.
+        if [ -n "$(npm view "$spec" version 2>/dev/null)" ]; then
+            echo "$spec is already on npm"
+            continue
+        fi
+
+        # Staged, not published: it goes live once a maintainer approves it,
+        # with 2FA. npm prints the id to approve it by, as
+        # `+ @feds01/bracketlint@0.3.0 (staged with id <id>)`.
+        tarball="$out/$(npm pack --json --pack-destination "$out" "$package" | jq --raw-output '.[].filename')"
+        staged="$(npm stage publish --access public "$tarball")"
+        echo "$staged"
+        id="$(sed -n 's/.*(staged with id \(.*\))$/\1/p' <<<"$staged")"
+        echo "::notice title=npm::Staged $spec. Approve it on npmjs.com, under Staged Packages, or with npm stage approve ${id:-<id>}."
+    done
 

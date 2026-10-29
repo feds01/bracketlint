@@ -8,6 +8,15 @@
 
 Prebuilt binaries for macOS (Apple Silicon, Intel), Linux (x86_64, arm64; statically linked) and Windows ship with every [release](https://github.com/feds01/bracketlint/releases). No Rust toolchain needed.
 
+With npm, as a project's dev dependency, run with `npx`:
+
+```bash
+$ npm install --save-dev @feds01/bracketlint
+$ npx bracketlint check templates/
+```
+
+The binary for each platform is in a package of its own, such as `@feds01/bracketlint-darwin-arm64`, which `@feds01/bracketlint` lists as an optional dependency, so the package manager installs only the one for your platform, with no install script. Leaving optional dependencies out, e.g. with `npm install --omit=optional`, leaves out the binary too.
+
 With [Homebrew](https://brew.sh), on macOS or Linux:
 
 ```bash
