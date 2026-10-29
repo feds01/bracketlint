@@ -1030,6 +1030,11 @@ impl Dialect {
     }
 
     /// Whether the dialect has `syntax`, by the rule that decides it.
+    ///
+    /// ##Note: The parser checks some syntax on each token or text, e.g. `{# #}`
+    /// comments, so this is inlined, and a check of a known syntax is then a
+    /// check of its rule.
+    #[inline]
     pub fn has(self, syntax: Syntax) -> bool {
         match syntax {
             Syntax::ArgCommas => self.requires_comma_separated_args(),
@@ -1050,6 +1055,7 @@ impl Dialect {
     /// and another one does, e.g. Liquid's commas between a tag's arguments in
     /// Jinja. The template is then likely written in one of the dialects that
     /// have it.
+    #[inline]
     pub fn foreign(self, syntax: Syntax) -> Option<ForeignSyntax> {
         let foreign = !self.has(syntax) && syntax.dialects().next().is_some();
         foreign.then_some(ForeignSyntax { syntax, dialect: self })
