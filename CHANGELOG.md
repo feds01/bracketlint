@@ -10,6 +10,7 @@ section as its notes on GitHub.
 ### Features
 
 - **release:** install with Homebrew, with `brew install feds01/tap/bracketlint` ([#134](https://github.com/feds01/bracketlint/pull/134))
+- **release:** install with npm, with `npm install --save-dev @feds01/bracketlint` ([#145](https://github.com/feds01/bracketlint/pull/145))
 
 ### Fixes
 
