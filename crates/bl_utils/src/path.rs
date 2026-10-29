@@ -4,12 +4,18 @@ use std::{
     env,
     fs::canonicalize,
     path::{Path, PathBuf},
+    sync::LazyLock,
 };
 
 /// The path of `path` from the current directory, as a user names it, or
 /// `path` itself if it isn't in the current directory.
+///
+/// ##Note: The current directory is read once, and kept for the rest of the
+/// run. Reading it opens the directory on macOS, and `fmt --check` names each
+/// file that it would reformat with this.
 pub fn relative_path(path: &Path) -> &Path {
-    env::current_dir().ok().and_then(|dir| path.strip_prefix(dir).ok()).unwrap_or(path)
+    static CURRENT_DIR: LazyLock<Option<PathBuf>> = LazyLock::new(|| env::current_dir().ok());
+    CURRENT_DIR.as_deref().and_then(|dir| path.strip_prefix(dir).ok()).unwrap_or(path)
 }
 
 /// Function to apply formatting onto a path when printing it.
