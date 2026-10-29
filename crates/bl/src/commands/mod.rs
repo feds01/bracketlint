@@ -6,13 +6,14 @@ pub mod version;
 
 use std::{
     fmt::{self as std_fmt, Display, Formatter},
-    io,
+    fs, io,
     path::{Path, PathBuf},
 };
 
+use bl_ast::SourceId;
 use bl_reporting::{ReportBuilder, Reports};
-use bl_utils::path::relative_path;
-use bl_workspace::resolver::ResolvedFile;
+use bl_utils::{path::relative_path, pool::map_in_parallel};
+use bl_workspace::{Workspace, resolver::ResolvedFile};
 
 /// Sort the `files` that the walker found by their paths, after the paths
 /// that it couldn't search. It searches them in parallel, so it finds them in
@@ -24,6 +25,37 @@ pub(crate) fn sort_files(files: &mut [Result<ResolvedFile, ignore::Error>]) {
     }
 
     files.sort_by(|a, b| path(a).cmp(&path(b)));
+}
+
+/// Read the `files` that the walker found, on `threads` threads, and reserve a
+/// member of `workspace` for each, in the order of the files. Returns each
+/// file's member, or the reports of why it couldn't be found or read.
+///
+/// ##Note: Reading the files takes longer than parsing them, so they are read
+/// in parallel too, before their members are reserved in order.
+pub(crate) fn read_members(
+    files: Vec<Result<ResolvedFile, ignore::Error>>,
+    workspace: &mut Workspace,
+    threads: usize,
+) -> Vec<Result<SourceId, Reports>> {
+    let files: Vec<_> = files.into_iter().map(|file| file.map(ResolvedFile::into_path)).collect();
+    let contents = map_in_parallel(
+        &files,
+        threads,
+        || (),
+        |(), file| file.as_ref().ok().map(fs::read_to_string),
+    );
+
+    files
+        .into_iter()
+        .zip(contents)
+        .map(|(file, contents)| match (file, contents) {
+            (Ok(path), Some(Ok(contents))) => Ok(workspace.reserve_member(path, contents)),
+            (Ok(path), Some(Err(err))) => Err(Reports::from(FileError::Read { path, err })),
+            (Err(err), _) => Err(Reports::from(FileError::from(err))),
+            (Ok(_), None) => unreachable!("each path that was found is read"),
+        })
+        .collect()
 }
 
 /// A file that couldn't be read or written, or a path that couldn't be

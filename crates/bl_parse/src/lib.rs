@@ -132,16 +132,18 @@ pub fn parse_source<'a>(query: ParseQuery, arena: &'a Arena) -> ParseQueryResult
     ParseQueryResult { node: Some(node), diagnostics: reports }
 }
 
-pub fn emit_source_tree(member: &Member, document: AstNodeRef<Document>) {
+/// The tree of `member` as `--dump-ast` logs it, which names the member's file
+/// and dialect, and draws the tree under them.
+pub fn format_source_tree(member: &Member, document: AstNodeRef<Document>) -> String {
     let spanned = member.spanned();
     let tree = AstTreePrinter::new(spanned).visit_document(document).unwrap();
     let config = TreeWriterConfig::unicode();
-    log::info!(
+    format!(
         "parsed module '{}' as {}:\n{}",
         spanned.path.display(),
         member.dialect,
         TreeWriter::new_with_config(&tree, config)
-    );
+    )
 }
 
 pub fn emit_tokens(id: SourceId, member: &Member, tokens: &[Token]) {

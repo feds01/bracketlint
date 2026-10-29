@@ -4,15 +4,20 @@ use std::{fs, io::Write, path::PathBuf};
 
 use anyhow::Result;
 use bl_arena::Arena;
+use bl_ast::SourceId;
 use bl_fmt::{FormatQuery, FormatQueryResult, FormatterOptions, fmt_module};
 use bl_lints::{diff::Diff, settings::FixMode};
 use bl_parse::{ParseQuery, ParseQueryResult, parse_source};
 use bl_reporting::{Reports, pluralise};
-use bl_utils::{path::relative_path, stream_write, stream_writeln, timed};
+use bl_utils::{
+    path::relative_path,
+    pool::{self, map_in_parallel},
+    stream_write, stream_writeln, timed,
+};
 use bl_workspace::{Member, Workspace, resolver::find_files_in_paths};
 use log::{Level, debug, warn};
 
-use super::{FileError, sort_files};
+use super::{FileError, read_members, sort_files};
 
 /// What came of formatting the templates.
 #[derive(Debug, Default)]
@@ -76,40 +81,66 @@ pub fn fmt(files: &[PathBuf], workspace: &mut Workspace) -> Result<FormatResults
 
     let options =
         FormatterOptions { markup: workspace.settings.markup, ..FormatterOptions::default() };
+    let fix_mode = workspace.settings.linter_settings.fix_mode;
     let mut counts = FormatCounts::default();
     let mut parse_diagnostics = Reports::default();
     let mut format_diagnostics = Reports::default();
 
-    // Each file is parsed into the arena, formatted, and then freed from it, so
-    // that the next file reuses its memory.
-    let mut arena = Arena::new();
+    // The files are read, parsed and formatted on as many threads as the
+    // machine has, which each take the next file in turn.
+    let threads = pool::threads();
 
     // @@Todo: integrate a cache system here, we should be able to avoid re-linting
     // already existent files and just skip them.
-    // Now iterate the files, parse them and lint them.
-    //
-    // @@Todo: we could fairly easily parallelize this operation, but we need to
-    // first add `salsa` to the project. For now, we'll just lint them sequentially
-    // and then parallelize it later.
     timed(
         || {
-            for file in files {
-                match file {
-                    Ok(file) => {
-                        let formatted = format_file(workspace, file.into_path(), &arena, options);
-                        parse_diagnostics.extend(formatted.parse_diagnostics);
-                        format_diagnostics.extend(formatted.format_diagnostics);
+            let members = read_members(files, workspace, threads);
 
-                        match formatted.changed {
-                            Some(true) => counts.changed += 1,
-                            Some(false) => counts.unchanged += 1,
-                            None => {}
-                        }
+            // Each thread parses each file into its own arena, formats it, and
+            // then frees it, so that its next file reuses its memory.
+            let all = &workspace.members;
+            let formatted = map_in_parallel(&members, threads, Arena::new, |arena, member| {
+                let id = *member.as_ref().ok()?;
+                let formatted = format_member(all.member(id), id, arena, options, fix_mode);
+                arena.reset();
+                Some(formatted)
+            });
 
-                        arena.reset();
+            // Each file is emitted, and its diagnostics reported, in the order of
+            // the files, since emitting it can write to standard output.
+            for (member, formatted) in members.into_iter().zip(formatted) {
+                let (id, formatted) = match (member, formatted) {
+                    (Ok(id), Some(formatted)) => (id, formatted),
+                    (Err(reports), _) => {
+                        parse_diagnostics.extend(reports);
+                        continue;
                     }
-                    Err(err) => parse_diagnostics.extend(Reports::from(FileError::from(err))),
+                    (Ok(_), None) => unreachable!("each member is formatted"),
+                };
+
+                let FormattedMember {
+                    parse_diagnostics: parsed,
+                    format_diagnostics: mut formats,
+                    changed,
+                    buffer,
+                } = formatted;
+                parse_diagnostics.extend(parsed);
+
+                if let Some(changed) = changed {
+                    let member = workspace.members.member(id);
+                    let emitted = match &buffer {
+                        Some(buffer) => emit_formatted(workspace, member, buffer, changed),
+                        None => Ok(()),
+                    };
+
+                    match emitted {
+                        Ok(()) if changed => counts.changed += 1,
+                        Ok(()) => counts.unchanged += 1,
+                        Err(err) => formats.extend(Reports::from(err)),
+                    }
                 }
+
+                format_diagnostics.extend(formats);
             }
         },
         Level::Debug,
@@ -126,38 +157,31 @@ pub fn fmt(files: &[PathBuf], workspace: &mut Workspace) -> Result<FormatResults
 
 /// What came of formatting one template.
 #[derive(Default)]
-struct FormattedFile {
-    /// The diagnostics from reading and parsing the template.
+struct FormattedMember {
+    /// The diagnostics from parsing the template.
     parse_diagnostics: Reports,
 
-    /// The diagnostics from formatting the template, and writing it back.
+    /// The diagnostics from formatting the template.
     format_diagnostics: Reports,
 
     /// Whether formatting changes the template, or `None` if it isn't
-    /// formatted, or couldn't be written back.
+    /// formatted.
     changed: Option<bool>,
+
+    /// The formatted template, if it is to be emitted: when formatting changes
+    /// it, or when the fix mode emits each template.
+    buffer: Option<String>,
 }
 
-/// Parse the file at `path` into `arena`, and format it and emit the result if
-/// it parsed without errors.
-fn format_file(
-    workspace: &mut Workspace,
-    path: PathBuf,
+/// Parse `member`, whose ID is `source`, into `arena`, and format it if it
+/// parsed without errors.
+fn format_member(
+    member: &Member,
+    source: SourceId,
     arena: &Arena,
     options: FormatterOptions,
-) -> FormattedFile {
-    // We first need to convert this to a workspace member.
-    let contents = match fs::read_to_string(&path) {
-        Ok(contents) => contents,
-        Err(err) => {
-            let parse_diagnostics = Reports::from(FileError::Read { path, err });
-            return FormattedFile { parse_diagnostics, ..Default::default() };
-        }
-    };
-
-    let source = workspace.reserve_member(path, contents);
-    let member = workspace.members.member(source);
-
+    fix_mode: FixMode,
+) -> FormattedMember {
     let ParseQueryResult { node, diagnostics } =
         parse_source(ParseQuery::new(source, member), arena);
 
@@ -165,22 +189,20 @@ fn format_file(
     // parts that it couldn't parse.
     let has_errors = diagnostics.iter().any(|report| report.is_error());
     let Some(document) = node.filter(|_| !has_errors) else {
-        return FormattedFile { parse_diagnostics: diagnostics, ..Default::default() };
+        return FormattedMember { parse_diagnostics: diagnostics, ..Default::default() };
     };
 
-    let FormatQueryResult { buffer, diagnostics: mut format_diagnostics } =
+    let FormatQueryResult { buffer, diagnostics: format_diagnostics } =
         fmt_module(FormatQuery { member, source, options, document });
     let changed = buffer != member.contents();
+    let buffer = (changed || matches!(fix_mode, FixMode::Generate)).then_some(buffer);
 
-    let changed = match emit_formatted(workspace, member, &buffer, changed) {
-        Ok(()) => Some(changed),
-        Err(err) => {
-            format_diagnostics.extend(Reports::from(err));
-            None
-        }
-    };
-
-    FormattedFile { parse_diagnostics: diagnostics, format_diagnostics, changed }
+    FormattedMember {
+        parse_diagnostics: diagnostics,
+        format_diagnostics,
+        changed: Some(changed),
+        buffer,
+    }
 }
 
 /// Emit the formatted `buffer` of `member` as the fix mode asks: as the whole
