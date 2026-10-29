@@ -3,6 +3,27 @@
 What changed for bracketlint's users in each release. dist shows a release's
 section as its notes on GitHub.
 
+## [0.3.0] - 2026-10-29
+
+[Changes since v0.2.0](https://github.com/feds01/bracketlint/compare/v0.2.0...v0.3.0)
+
+### Features
+
+- **release:** install with Homebrew, with `brew install feds01/tap/bracketlint` ([#134](https://github.com/feds01/bracketlint/pull/134))
+
+### Fixes
+
+- **parse:** read a conditional loop iterator in Nunjucks and Twig, e.g. `{% for x in a ? b : c %}` ([#136](https://github.com/feds01/bracketlint/pull/136))
+
+### Performance
+
+- lex and parse with fewer instructions and allocations ([#137](https://github.com/feds01/bracketlint/pull/137))
+- **ast:** keep the largest tags and expressions behind a node ([#138](https://github.com/feds01/bracketlint/pull/138))
+- **lexer:** lex the tokens of a tree in its loop, rather than with a call for each ([#140](https://github.com/feds01/bracketlint/pull/140))
+- **cli:** read, parse and format files in parallel in check and fmt ([#141](https://github.com/feds01/bracketlint/pull/141))
+- **lexer:** inline skipping whitespace, and the parser's checks of a dialect's syntax ([#142](https://github.com/feds01/bracketlint/pull/142))
+- **cli:** read the current directory once, rather than for each file named ([#143](https://github.com/feds01/bracketlint/pull/143))
+
 ## [0.2.0] - 2026-10-13
 
 [Changes since v0.1.0](https://github.com/feds01/bracketlint/compare/v0.1.0...v0.2.0)

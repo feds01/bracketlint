@@ -1,6 +1,6 @@
 [package]
 name = "bracketlint"
-version = "0.2.0"
+version = "0.3.0"
 description = "A linter and formatter for Django, Jinja, Liquid, Nunjucks and Twig templates"
 authors = { workspace = true }
 edition = { workspace = true }
