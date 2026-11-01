@@ -36,7 +36,7 @@ jobs:
       # newest Node 24 comes with: `check-latest` takes it, rather than an
       # older one that the runner has cached. Without a `registry-url`,
       # setup-node writes no .npmrc that expects a token.
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           check-latest: true
